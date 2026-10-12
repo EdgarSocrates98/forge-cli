@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0010.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T13:01:25+00:00",
+  "id": "lf-0010",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0010.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0010.md",
+  "spec_sha256": "baff18a22459b43eebfbbe8c56e11a2fe1cd74cfb1fbfaa230ad37e8d2aef0a9",
+  "status": "planned",
+  "title": "Doctor --fix heal mode + smarter versioned python resolution"
+}

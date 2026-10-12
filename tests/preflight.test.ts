@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isNodeSupported, pythonVersion, runPreflight } from '../src/preflight.js';
+import {
+  isNodeSupported,
+  pythonCandidates,
+  pythonVersion,
+  runPreflight,
+} from '../src/preflight.js';
 
 describe('isNodeSupported', () => {
   it('accepts Node >= 20', () => {
@@ -35,6 +40,21 @@ describe('runPreflight', () => {
     // warn checks may fail without blocking: the run only exits on fatal
     const fatalFailed = checks.filter((c) => c.severity === 'fatal' && !c.ok);
     expect(Array.isArray(fatalFailed)).toBe(true);
+  });
+});
+
+describe('pythonCandidates', () => {
+  it('orders versioned py-launcher probes newest-first on win32, then bare names', () => {
+    const candidates = pythonCandidates('win32');
+    expect(candidates[0]).toEqual({ exe: 'py', args: ['-3.14'] });
+    expect(candidates[4]).toEqual({ exe: 'py', args: ['-3.10'] });
+    expect(candidates.slice(-3).map((c) => c.exe)).toEqual(['python', 'python3', 'py']);
+  });
+
+  it('orders versioned binaries first on POSIX', () => {
+    const candidates = pythonCandidates('linux');
+    expect(candidates[0]).toEqual({ exe: 'python3.14', args: [] });
+    expect(candidates.slice(-2).map((c) => c.exe)).toEqual(['python3', 'python']);
   });
 });
 

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('execa', () => ({ execa: vi.fn() }));
 
 import { execa } from 'execa';
-import { runDoctor } from '../src/doctor.js';
+import { reposNeedingFix, runDoctor } from '../src/doctor.js';
 import type { ForgeRepo } from '../src/types.js';
 import { S } from '../src/ui/strings.js';
 
@@ -116,5 +116,22 @@ describe('runDoctor', () => {
     await runDoctor([repo('a', ['a', '--help'])], dir);
     const calls = mockedExeca.mock.calls.map(([cmd]) => String(cmd));
     expect(calls).toEqual(['a']);
+  });
+});
+
+describe('reposNeedingFix', () => {
+  it('returns only repos whose doctor status is fail', () => {
+    const results = [
+      { repo: repo('a', ['a']), status: 'ok' as const, detail: 'x' },
+      { repo: repo('b', ['b']), status: 'fail' as const, detail: 'x' },
+      { repo: repo('c', ['c']), status: 'skipped' as const, detail: 'x' },
+      { repo: repo('d', ['d']), status: 'fail' as const, detail: 'x' },
+    ];
+    expect(reposNeedingFix(results).map((r) => r.name)).toEqual(['b', 'd']);
+  });
+
+  it('returns empty when nothing failed', () => {
+    expect(reposNeedingFix([])).toEqual([]);
+    expect(reposNeedingFix([{ repo: repo('a'), status: 'ok' as const, detail: 'x' }])).toEqual([]);
   });
 });

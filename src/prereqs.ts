@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { pythonInfo } from './preflight.js';
+import { pythonCandidates, pythonInfo, type PythonCandidate } from './preflight.js';
 import type { PrereqCheck } from './types.js';
 import { S } from './ui/strings.js';
 import { commandOutput, commandWorks } from './utils/system.js';
@@ -85,31 +85,46 @@ export async function checkRepoPrereqs(
 
   if (py !== null) {
     const spec = parseRequiresPython(py);
-    const pyInfo = await pythonInfo(platform);
+    let probe: PythonCandidate | null = null;
     if (spec) {
-      if (!pyInfo) {
-        checks.push({ name: `Python ${spec}`, ok: false, detail: S.pythonNotFound });
-      } else {
-        const ok = satisfiesVersion(pyInfo.version, spec);
+      for (const candidate of pythonCandidates(platform)) {
+        const version = await commandOutput(candidate.exe, [...candidate.args, '--version']);
+        if (version && satisfiesVersion(version, spec)) {
+          probe = candidate;
+          checks.push({
+            name: `Python ${spec}`,
+            ok: true,
+            detail: `${candidate.exe} ${candidate.args.join(' ')} (${version})`.trim(),
+          });
+          break;
+        }
+      }
+      if (!probe) {
+        const pyInfo = await pythonInfo(platform);
+        probe = pyInfo ? { exe: pyInfo.exe, args: pyInfo.args } : null;
         checks.push({
           name: `Python ${spec}`,
-          ok,
-          detail: ok ? pyInfo.version : `${S.prereqFound}: ${pyInfo.version}`,
+          ok: false,
+          detail: pyInfo ? `${S.prereqFound}: ${pyInfo.version}` : S.pythonNotFound,
         });
       }
     } else {
       checks.push({ name: 'Python', ok: true, detail: S.prereqNotDeclared });
+      const pyInfo = await pythonInfo(platform);
+      probe = pyInfo ? { exe: pyInfo.exe, args: pyInfo.args } : null;
     }
-    const base = pyInfo?.exe ?? (platform === 'win32' ? 'python' : 'python3');
+    const base = probe?.exe ?? (platform === 'win32' ? 'python' : 'python3');
+    const baseArgs = probe?.args ?? [];
+    const label = `${base} ${baseArgs.join(' ')}`.trim();
     checks.push({
       name: 'pip',
-      ok: (await commandOutput(base, ['-m', 'pip', '--version'])) !== null,
-      detail: `${base} -m pip --version`,
+      ok: (await commandOutput(base, [...baseArgs, '-m', 'pip', '--version'])) !== null,
+      detail: `${label} -m pip --version`,
     });
     checks.push({
       name: 'venv',
-      ok: await commandWorks(base, ['-c', 'import venv']),
-      detail: `${base} -c "import venv"`,
+      ok: await commandWorks(base, [...baseArgs, '-c', 'import venv']),
+      detail: `${label} -c "import venv"`,
     });
   }
 

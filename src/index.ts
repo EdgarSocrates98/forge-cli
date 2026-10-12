@@ -30,7 +30,7 @@ import {
   usage,
 } from './cli-args.js';
 import { FORGE_REPOS } from './constants/repos.js';
-import { runDoctor } from './doctor.js';
+import { reposNeedingFix, runDoctor } from './doctor.js';
 import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
@@ -145,7 +145,32 @@ async function runDoctorCommand(cli: CliOptions): Promise<void> {
     })
     .join('\n');
   note(body, S.doctorTitle);
-  process.exit(results.some((r) => r.status === 'fail') ? 1 : 0);
+
+  if (!cli.fix) {
+    process.exit(results.some((r) => r.status === 'fail') ? 1 : 0);
+    return;
+  }
+
+  const fixing = reposNeedingFix(results);
+  const skipped = results.filter((r) => r.status === 'skipped');
+  if (!fixing.length && !skipped.length) {
+    log.success(S.doctorAllOk);
+    process.exit(0);
+    return;
+  }
+  if (skipped.length) {
+    log.warn(`${S.doctorNeedsInstall}: ${skipped.map((r) => r.repo.name).join(', ')}`);
+  }
+  let fixResults: RepoResult[] = [];
+  if (fixing.length) {
+    log.step(`${S.doctorFixing} ${fixing.map((r) => r.name).join(', ')}`);
+    const runLog = openRunLog(targetDir);
+    fixResults = await processBatch(fixing, targetDir, {}, runLog.write);
+    log.info(`${S.logSaved} ${theme.dim(runLog.file)}`);
+    renderReport(fixResults);
+  }
+  const healed = fixing.length === fixResults.filter((r) => r.status === 'ok').length;
+  process.exit(healed && !skipped.length ? 0 : 1);
 }
 
 async function main(): Promise<void> {

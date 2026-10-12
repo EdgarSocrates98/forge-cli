@@ -71,6 +71,9 @@ export const S = {
   doctorNoCheckout: 'sem checkout neste diretório',
   doctorNoVerify: 'sem comando de verificação',
   doctorPrereqsFail: 'pré-reqs falhos',
+  doctorAllOk: 'Tudo saudável — nada a reparar.',
+  doctorNeedsInstall: 'Sem checkout — instale com o modo normal',
+  doctorFixing: 'Reparando',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:
@@ -78,7 +81,7 @@ Uso:
   forge-cli --all --yes         Instala tudo sem perguntar
   forge-cli --only a,b --yes    Instala uma seleção sem perguntar
   forge-cli --plan              Mostra o plano por repositório e sai
-  forge-cli doctor [--dir ..]   Verifica repositórios já instalados
+  forge-cli doctor [--fix]      Diagnostica; --fix repara os que falharem
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)

@@ -51,6 +51,13 @@ describe('parseCliArgs', () => {
     expect(cli.help).toBe(true);
   });
 
+  it('parses --fix for doctor mode', () => {
+    const cli = parseCliArgs(['doctor', '--fix']);
+    expect(cli.fix).toBe(true);
+    expect(cli.positionals).toEqual(['doctor']);
+    expect(parseCliArgs(['doctor']).fix).toBe(false);
+  });
+
   it('treats --dry-run as --plan', () => {
     expect(parseCliArgs(['--plan']).plan).toBe(true);
     expect(parseCliArgs(['--dry-run']).plan).toBe(true);

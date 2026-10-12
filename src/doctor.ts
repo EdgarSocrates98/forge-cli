@@ -7,6 +7,10 @@ import { hasGitRepo, runStreamed } from './utils/system.js';
 
 export type DoctorStatus = 'ok' | 'fail' | 'skipped';
 
+export function reposNeedingFix(results: readonly DoctorResult[]): ForgeRepo[] {
+  return results.filter((r) => r.status === 'fail').map((r) => r.repo);
+}
+
 export interface DoctorResult {
   repo: ForgeRepo;
   status: DoctorStatus;

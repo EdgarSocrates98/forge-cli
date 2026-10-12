@@ -18,6 +18,7 @@ export interface CliOptions {
   jsonReport: boolean;
   reportPath?: string;
   retryFailed: boolean;
+  fix: boolean;
   positionals: string[];
 }
 
@@ -42,6 +43,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         json: { type: 'boolean' },
         report: { type: 'string' },
         'retry-failed': { type: 'boolean' },
+        fix: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -72,6 +74,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     jsonReport: (values.json ?? false) || values.report !== undefined,
     reportPath: values.report,
     retryFailed: values['retry-failed'] ?? false,
+    fix: values.fix ?? false,
     positionals,
   };
 }

@@ -9,21 +9,41 @@ export function isNodeSupported(version: string): boolean {
   return Number.isFinite(major) && major >= MIN_NODE_MAJOR;
 }
 
+export interface PythonCandidate {
+  exe: string;
+  args: string[];
+}
+
+const PYTHON_MINORS = [14, 13, 12, 11, 10] as const;
+
+export function pythonCandidates(platform: NodeJS.Platform = process.platform): PythonCandidate[] {
+  if (platform === 'win32') {
+    return [
+      ...PYTHON_MINORS.map((m) => ({ exe: 'py', args: [`-3.${m}`] })),
+      { exe: 'python', args: [] },
+      { exe: 'python3', args: [] },
+      { exe: 'py', args: [] },
+    ];
+  }
+  return [
+    ...PYTHON_MINORS.map((m) => ({ exe: `python3.${m}`, args: [] })),
+    { exe: 'python3', args: [] },
+    { exe: 'python', args: [] },
+  ];
+}
+
 export interface PythonInfo {
   exe: string;
+  args: string[];
   version: string;
 }
 
 export async function pythonInfo(
   platform: NodeJS.Platform = process.platform,
 ): Promise<PythonInfo | null> {
-  const candidates =
-    platform === 'win32'
-      ? (['python', 'python3', 'py'] as const)
-      : (['python3', 'python'] as const);
-  for (const exe of candidates) {
-    const out = await commandOutput(exe, ['--version']);
-    if (out) return { exe, version: out };
+  for (const candidate of pythonCandidates(platform)) {
+    const out = await commandOutput(candidate.exe, [...candidate.args, '--version']);
+    if (out) return { exe: candidate.exe, args: candidate.args, version: out };
   }
   return null;
 }

@@ -192,6 +192,29 @@ describe('checkRepoPrereqs', () => {
     expect(checks.find((c) => c.name === 'npm >=99')?.ok).toBe(false);
   });
 
+  it('satisfies the floor via a versioned interpreter when the default is too old', async () => {
+    const dir = tmpDir();
+    writePy(dir, '>=3.12');
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      if (cmd === 'py' && joined === '-3.12 -m pip --version') return okOut('pip 25.0');
+      if (cmd === 'py' && joined === '-3.12 -c import venv') return okOut('');
+      if (cmd === 'py' && joined === '-3.12 --version') return okOut('Python 3.12.4');
+      if (joined.endsWith('--version')) return failOut();
+      return failOut();
+    }) as never);
+    const checks = await checkRepoPrereqs(dir, 'win32');
+    const pyCheck = checks.find((c) => c.name === 'Python >=3.12');
+    expect(pyCheck?.ok).toBe(true);
+    expect(pyCheck?.detail).toContain('py -3.12');
+    expect(checks.every((c) => c.ok)).toBe(true);
+    expect(mockedExeca).toHaveBeenCalledWith(
+      'py',
+      ['-3.12', '-m', 'pip', '--version'],
+      expect.objectContaining({ reject: false }),
+    );
+  });
+
   it('returns no checks for a repo without manifests', async () => {
     expect(await checkRepoPrereqs(tmpDir())).toEqual([]);
   });
