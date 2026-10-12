@@ -140,3 +140,21 @@ describe('git sync helpers', () => {
     expect(classifyGitFailure('boom')).toBe('unknown');
   });
 });
+
+describe('syncRepo offline', () => {
+  const demo = {
+    name: 'demo',
+    url: 'https://github.com/a/b',
+    description: '',
+    kind: 'node' as const,
+  };
+  it('não clona nada sem rede', async () => {
+    await expect(syncRepo(demo, tmp, { offline: true })).rejects.toThrow(/offline/);
+  });
+  it('usa o clone existente sem pull nem fetch', async () => {
+    const dir = path.join(tmp, 'demo');
+    mkdirSync(path.join(dir, '.git'), { recursive: true });
+    const res = await syncRepo(demo, tmp, { offline: true });
+    expect(res.kind).toBe('fixed-ref');
+  });
+});

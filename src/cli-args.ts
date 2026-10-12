@@ -29,6 +29,7 @@ export interface CliOptions {
   onlyChanged: boolean;
   shallow: boolean;
   check: boolean;
+  offline: boolean;
   profile?: string;
   scope?: string;
   components?: string;
@@ -65,6 +66,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
         check: { type: 'boolean' },
+        offline: { type: 'boolean' },
         profile: { type: 'string' },
         scope: { type: 'string' },
         components: { type: 'string' },
@@ -129,6 +131,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
     check: values.check ?? false,
+    offline: values.offline ?? false,
     profile: values.profile,
     scope: values.scope,
     components: values.components,

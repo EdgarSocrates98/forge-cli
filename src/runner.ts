@@ -36,6 +36,7 @@ export interface RunOptions {
   ref?: string;
   refs?: Record<string, string>;
   cloneOnly?: boolean;
+  offline?: boolean;
   native?: NativeInstallOptions;
   trustCustom?: boolean;
   runAfterSyncFailure?: boolean;
@@ -70,6 +71,7 @@ export async function processRepo(
     sync = await syncRepo(repo, targetDir, {
       shallow: opts.shallow && !wantedRef,
       noPull: Boolean(wantedRef),
+      offline: opts.offline,
     });
     if (wantedRef && sync.kind !== 'non-git' && sync.kind !== 'remote-mismatch') {
       if (sync.dirty) throw new Error(S.errRefDirty);

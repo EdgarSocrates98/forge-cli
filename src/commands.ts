@@ -13,6 +13,8 @@ export type Command =
   | 'rollback'
   | 'reinstall'
   | 'doctor'
+  | 'help'
+  | 'components'
   | 'self-install'
   | 'self-update'
   | 'self-uninstall'
@@ -47,6 +49,8 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
     if (rest[0] === 'update') return { command: 'self-update', names: [] };
     return { command: 'unknown', names: [], unknown: `self ${rest[0] ?? ''}`.trim() };
   }
+  if (head === 'help') return { command: 'help', names: [] };
+  if (head === 'components') return { command: 'components', names: rest };
   if (head === 'doctor') return { command: 'doctor', names: rest };
   if (head === 'uninstall') return { command: 'uninstall', names: rest };
   if (REPO_COMMANDS.has(head)) return { command: head as Command, names: rest };

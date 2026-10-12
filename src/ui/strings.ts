@@ -120,6 +120,8 @@ export const S = {
   nativeApplied: 'instalador nativo',
   nativeNeedsYes: 'Plano nativo exibido sem escrever; reexecute com --yes para aplicar',
   nativeFailed: 'Instalador nativo falhou',
+  componentsTitle: 'Instaladores nativos (flags suportadas)',
+  errOfflineNoNetwork: 'Esta operação exige rede e não é compatível com --offline',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -192,6 +194,8 @@ Uso:
   forge-cli unpin <forja>       Remove a fixação
   forge-cli rollback <forja>    Volta o checkout ao HEAD anterior registrado
   forge-cli uninstall <forjas>  Remove clones limpos (backup de .env/configs; exige --yes)
+  forge-cli components [forjas] Mostra o instalador nativo e as flags suportadas por Forja
+  forge-cli help                Mostra esta ajuda
   forge-cli status [forjas]     Estado local (clonado, versão, alterações)
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
@@ -219,6 +223,7 @@ Opções:
   --profile <p>      Instalador nativo da Forja: minimal|recommended|full
   --scope <s>        Instalador nativo da Forja: project|workspace|user
   --components <a,b> Instalador nativo da Forja: ex. skills,agents,mcp
+  --offline          Não acessa a rede; só usa clones já existentes (sem prometer cache completo)
   --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente

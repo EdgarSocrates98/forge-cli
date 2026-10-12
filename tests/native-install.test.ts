@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseCliArgs } from '../src/cli-args.js';
 import { FORGE_REPOS } from '../src/constants/repos.js';
-import { buildNativeInstall, validateNativeOptions } from '../src/native-install.js';
+import {
+  buildNativeInstall,
+  componentsLines,
+  validateNativeOptions,
+} from '../src/native-install.js';
 
 describe('validateNativeOptions', () => {
   it('aceita valores conhecidos', () => {
@@ -52,5 +56,16 @@ describe('catálogo: instalador nativo', () => {
       'skills',
       '--dry-run',
     ]);
+  });
+});
+
+describe('componentsLines', () => {
+  it('lista flags suportadas e marca Forjas sem instalador nativo', () => {
+    const lines = componentsLines(FORGE_REPOS);
+    expect(lines).toHaveLength(FORGE_REPOS.length);
+    expect(lines.find((l) => l.startsWith('api-forge'))).toContain(
+      'apiforge install [--scope --profile --components]',
+    );
+    expect(lines.find((l) => l.startsWith('forge-portal'))).toContain('sem instalador nativo');
   });
 });

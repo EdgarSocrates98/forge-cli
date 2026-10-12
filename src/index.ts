@@ -55,6 +55,7 @@ import {
 } from './utils/system.js';
 import { localTags, remoteTags, updateCheck } from './git-revs.js';
 import { executeUninstall, planUninstall, rollbackRepo } from './lifecycle.js';
+import { componentsLines } from './native-install.js';
 import { detectInstallMethod, planSelfUpdate } from './self.js';
 import { actionNeedsRepos, actionToPositionals, askMenu, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
@@ -149,9 +150,14 @@ async function processBatch(
   return results;
 }
 
-async function runDoctorCommand(cli: CliOptions): Promise<void> {
+async function runDoctorCommand(cli: CliOptions, names: string[] = []): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
-  const results = await runDoctor(catalogFor(targetDir), targetDir);
+  const picked = reposByNames(catalogFor(targetDir), names);
+  if ('error' in picked) {
+    log.error(picked.error);
+    process.exit(2);
+  }
+  const results = await runDoctor(picked, targetDir);
   if ((await pathStatus()) === 'missing') log.warn(S.doctorPathMissing);
   const body = results
     .map((r) => {
@@ -491,7 +497,7 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   if (resolved.command === 'doctor') {
-    await runDoctorCommand(cli);
+    await runDoctorCommand(cli, resolved.names);
     return;
   }
   if (resolved.command === 'list') {
@@ -501,6 +507,26 @@ async function main(): Promise<void> {
   if (resolved.command === 'status') {
     await runStatusCommand(cli, resolved.names);
     return;
+  }
+  if (resolved.command === 'help') {
+    console.log(usage());
+    process.exit(0);
+  }
+  if (resolved.command === 'components') {
+    const picked = reposByNames(catalogFor(resolveTargetDir(cli.dir)), resolved.names);
+    if ('error' in picked) {
+      log.error(picked.error);
+      process.exit(2);
+    }
+    note(componentsLines(picked).join('\n'), S.componentsTitle);
+    process.exit(0);
+  }
+  if (
+    cli.offline &&
+    (resolved.command === 'versions' || (resolved.command === 'update' && cli.check))
+  ) {
+    log.error(S.errOfflineNoNetwork);
+    process.exit(2);
   }
   if (resolved.command === 'versions') {
     await runVersionsCommand(cli, resolved.names);
@@ -674,6 +700,7 @@ async function main(): Promise<void> {
     ref: cli.ref,
     refs,
     cloneOnly,
+    offline: cli.offline,
     native: {
       profile: cli.profile,
       scope: cli.scope,

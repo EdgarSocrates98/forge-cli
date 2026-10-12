@@ -7,6 +7,9 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- `help`, `components [forjas]` (flags do instalador nativo por Forja),
+  `doctor <forja>` e `--offline` (usa só clones existentes; nunca clona
+  nem faz pull/fetch).
 - Adaptadores leves (Cycle 0/6): `--profile`, `--scope` e `--components`
   acionam o instalador nativo da Forja (`<cli> install ...`) depois do
   bootstrap, somente para Forjas que o documentam; sempre `--dry-run`

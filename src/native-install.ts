@@ -53,3 +53,12 @@ export function buildNativeInstall(
   argv.push(dryRun ? '--dry-run' : '--yes');
   return { argv, dryRun, ignored };
 }
+
+/** Linhas legíveis com o que cada Forja realmente documenta suportar. */
+export function componentsLines(repos: readonly ForgeRepo[]): string[] {
+  return repos.map((repo) => {
+    if (!repo.nativeInstall) return `${repo.name} — sem instalador nativo documentado`;
+    const flags = repo.nativeInstall.flags.map((f) => `--${f}`).join(' ');
+    return `${repo.name} — ${repo.nativeInstall.command.join(' ')} [${flags}]`;
+  });
+}

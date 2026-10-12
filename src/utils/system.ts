@@ -124,6 +124,7 @@ export function classifyGitFailure(message: string): SyncFailure {
 export interface SyncOptions {
   shallow?: boolean;
   noPull?: boolean;
+  offline?: boolean;
 }
 
 export async function syncRepo(
@@ -144,6 +145,7 @@ export async function syncRepo(
     if (remote && remote !== 'ok' && !sameRemote(remote, repo.url)) {
       return { kind: 'remote-mismatch', dirty };
     }
+    if (opts.offline) return { kind: 'fixed-ref', dirty };
     if (opts.noPull) {
       await execa('git', ['fetch', '--quiet', '--tags'], {
         cwd: repoDir,
@@ -159,6 +161,7 @@ export async function syncRepo(
       return { kind: 'pull-failed', dirty, failure: classifyGitFailure(errorDetail(error)) };
     }
   }
+  if (opts.offline) throw new Error(`modo offline: ${repo.name} não está clonada localmente`);
   const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];
   await execa('git', [...cloneArgs, '--', repo.url, repoDir]);
   return { kind: 'cloned', dirty: false };

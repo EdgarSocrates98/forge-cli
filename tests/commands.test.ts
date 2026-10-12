@@ -81,3 +81,19 @@ describe('collectStatus', () => {
     expect(infos[0].dirty).toBe(true);
   });
 });
+
+describe('help e components', () => {
+  it('resolve help e components com nomes', () => {
+    expect(resolveCommand({ positionals: ['help'] }).command).toBe('help');
+    expect(resolveCommand({ positionals: ['components', 'api-forge'] })).toEqual({
+      command: 'components',
+      names: ['api-forge'],
+    });
+  });
+  it('doctor aceita nomes de Forjas', () => {
+    expect(resolveCommand({ positionals: ['doctor', 'api-forge'] })).toEqual({
+      command: 'doctor',
+      names: ['api-forge'],
+    });
+  });
+});
