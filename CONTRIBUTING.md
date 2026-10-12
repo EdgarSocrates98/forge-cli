@@ -93,3 +93,11 @@ inglês, com o id da spec quando aplicável — por exemplo,
    segredo `NPM_TOKEN` estiver configurado (com provenance).
 4. Defina uma licença (`license` no `package.json` e arquivo `LICENSE`) antes da
    primeira publicação pública.
+
+## Governança do repositório
+
+- A `main` é protegida por ruleset: alterações entram por pull request, com
+  aprovação do dono (CODEOWNERS) e CI verde; force-push e exclusão são bloqueados.
+- Apenas o dono (admin) pode fazer push direto na `main` e criar tags `v*`.
+- Colaboradores abrem PR; quem não é colaborador pode abrir issue ou fazer fork
+  e enviar PR do fork (a CI de contribuidores externos exige aprovação manual).
