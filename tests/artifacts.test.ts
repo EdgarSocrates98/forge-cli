@@ -13,7 +13,7 @@ import {
   withLog,
   writeJsonReport,
 } from '../src/artifacts.js';
-import type { ForgeRepo, RepoResult } from '../src/types.js';
+import type { RepoResult } from '../src/types.js';
 
 const tmpDirs: string[] = [];
 

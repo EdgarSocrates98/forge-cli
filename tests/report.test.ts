@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mergeResults, resultLine, slowestRepo, totalElapsed } from '../src/report.js';
+import {
+  formatElapsed,
+  mergeResults,
+  renderReport,
+  resultLine,
+  slowestRepo,
+  statusBadge,
+  totalElapsed,
+} from '../src/report.js';
 import type { RepoResult } from '../src/types.js';
 import { S } from '../src/ui/strings.js';
 
@@ -46,6 +54,34 @@ describe('resultLine', () => {
   it('includes notes when present', () => {
     const line = resultLine(base({ notes: ['nota um'] }));
     expect(line).toContain('nota um');
+  });
+});
+
+describe('statusBadge', () => {
+  it('renders a distinct badge per status', () => {
+    for (const status of ['ok', 'warning', 'error'] as const) {
+      expect(statusBadge(status).length).toBeGreaterThan(0);
+    }
+    expect(statusBadge('ok')).toContain(S.labelOk);
+    expect(statusBadge('warning')).toContain(S.labelWarn);
+    expect(statusBadge('error')).toContain(S.labelErr);
+  });
+});
+
+describe('formatElapsed', () => {
+  it('formats milliseconds as seconds with one decimal', () => {
+    expect(formatElapsed(1500)).toContain('1.5s');
+    expect(formatElapsed(0)).toContain('0.0s');
+  });
+});
+
+describe('renderReport', () => {
+  it('renders totals and slowest repo without throwing', () => {
+    expect(() => renderReport([named('a', 'ok', 900), named('b', 'error', 100)])).not.toThrow();
+  });
+
+  it('renders an empty run without throwing', () => {
+    expect(() => renderReport([])).not.toThrow();
   });
 });
 
