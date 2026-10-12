@@ -819,6 +819,7 @@ async function main(): Promise<void> {
 
   const hasErrors = results.some((r) => r.status === 'error');
   outro(`${icons.rocket} ${hasErrors ? S.outroWithErrors : S.outroOk}`);
+  if (hasErrors) process.exitCode = 1;
 }
 
 process.on('SIGINT', () => {
