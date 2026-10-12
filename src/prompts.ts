@@ -23,24 +23,30 @@ export async function askWorkspace(): Promise<string> {
   return targetDir;
 }
 
-export async function askRepos(): Promise<ForgeRepo[]> {
+export async function askRepos(
+  catalog: readonly ForgeRepo[] = FORGE_REPOS,
+): Promise<ForgeRepo[]> {
   const selected = await multiselect({
     message: S.askRepos,
-    options: FORGE_REPOS.map((repo) => ({
+    options: catalog.map((repo) => ({
       value: repo.name,
       label: repo.name,
       hint: repo.description,
     })),
-    initialValues: FORGE_REPOS.map((repo) => repo.name),
+    initialValues: catalog.map((repo) => repo.name),
     required: true,
   });
   if (isCancel(selected)) exitCancelled();
-  return FORGE_REPOS.filter((repo) => selected.includes(repo.name));
+  return catalog.filter((repo) => selected.includes(repo.name));
 }
 
-export async function askConfirm(targetDir: string, count: number): Promise<void> {
+export async function askConfirm(
+  targetDir: string,
+  count: number,
+  total: number,
+): Promise<void> {
   note(
-    `${icons.folder} Destino: ${theme.accent(targetDir)}\n${icons.box} Repositórios: ${theme.accent(String(count))} de ${FORGE_REPOS.length}`,
+    `${icons.folder} Destino: ${theme.accent(targetDir)}\n${icons.box} Repositórios: ${theme.accent(String(count))} de ${total}`,
     S.summaryTitle,
   );
   const proceed = await confirm({ message: S.confirmRun });

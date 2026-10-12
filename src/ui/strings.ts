@@ -57,6 +57,15 @@ export const S = {
   errUnknownRepos: 'Repositórios desconhecidos',
   validAre: 'válidos',
   errTimeoutInvalid: '--timeout deve ser um inteiro positivo (segundos)',
+  errNoState: 'Nenhum estado anterior encontrado neste diretório',
+  noFailedRepos: 'Nenhum repositório com erro registrado',
+  customReposInvalid: 'forge-cli.repos.json inválido — usando catálogo padrão',
+  customReposLoaded: 'Repositórios extras carregados de forge-cli.repos.json',
+  logSaved: 'Log salvo em',
+  reportSaved: 'Relatório JSON salvo em',
+  doctorTitle: 'Diagnóstico — verificação dos repositórios',
+  doctorNoCheckout: 'sem checkout neste diretório',
+  doctorNoVerify: 'sem comando de verificação',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:
@@ -64,6 +73,7 @@ Uso:
   forge-cli --all --yes         Instala tudo sem perguntar
   forge-cli --only a,b --yes    Instala uma seleção sem perguntar
   forge-cli --plan              Mostra o plano por repositório e sai
+  forge-cli doctor [--dir ..]   Verifica repositórios já instalados
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
@@ -74,6 +84,13 @@ Opções:
   --skip-scripts     Pula scripts de setup e npm
   --skip-verify      Pula a verificação pós-setup
   --timeout <seg>    Timeout por comando (padrão: 900)
+  --json             Grava relatório JSON em .forge-cli/reports/
+  --report <path>    Grava relatório JSON em caminho próprio
+  --retry-failed     Reexecuta só os repositórios que falharam antes
   -h, --help         Mostra esta ajuda
+
+Extras:
+  forge-cli.repos.json no diretório alvo adiciona repositórios ao catálogo.
+  Artefatos (logs, estado, relatórios) ficam em <dir>/.forge-cli/
 `,
 };

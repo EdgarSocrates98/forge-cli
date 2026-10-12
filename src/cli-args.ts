@@ -15,6 +15,9 @@ export interface CliOptions {
   skipVerify: boolean;
   timeoutSecs: number;
   help: boolean;
+  jsonReport: boolean;
+  reportPath?: string;
+  retryFailed: boolean;
   positionals: string[];
 }
 
@@ -36,6 +39,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'skip-scripts': { type: 'boolean' },
         'skip-verify': { type: 'boolean' },
         timeout: { type: 'string' },
+        json: { type: 'boolean' },
+        report: { type: 'string' },
+        'retry-failed': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -60,12 +66,15 @@ export function parseCliArgs(argv: string[]): CliOptions {
     skipVerify: values['skip-verify'] ?? false,
     timeoutSecs: values.timeout === undefined ? DEFAULT_TIMEOUT_SECS : timeoutSecs,
     help: values.help ?? false,
+    jsonReport: (values.json ?? false) || values.report !== undefined,
+    reportPath: values.report,
+    retryFailed: values['retry-failed'] ?? false,
     positionals,
   };
 }
 
 export function isNonInteractive(cli: CliOptions): boolean {
-  return cli.all || (cli.only?.length ?? 0) > 0;
+  return cli.all || (cli.only?.length ?? 0) > 0 || cli.retryFailed;
 }
 
 export type Selection = { repos: ForgeRepo[] } | { error: string };
