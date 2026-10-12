@@ -313,6 +313,8 @@ async function main(): Promise<void> {
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,
     shallow: effectiveCli.shallow,
+    trustCustom: cli.trustCustom,
+    runAfterSyncFailure: cli.runAfterSyncFailure,
     onlyChanged: effectiveCli.onlyChanged,
     state: effectiveCli.onlyChanged ? loadState(targetDir)?.repos : undefined,
   };

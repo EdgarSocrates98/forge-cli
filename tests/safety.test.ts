@@ -124,3 +124,19 @@ describe('syncRepo', () => {
     await expect(syncRepo(repo('lnk'), path.dirname(link))).rejects.toThrow(/link/);
   });
 });
+
+import { classifyGitFailure, sameRemote } from '../src/utils/system.js';
+
+describe('git sync helpers', () => {
+  it('compara remotes ignorando protocolo, .git e credenciais', () => {
+    expect(sameRemote('git@github.com:A/b.git', 'https://github.com/a/b')).toBe(true);
+    expect(sameRemote('https://tok@github.com/a/b/', 'https://github.com/a/b')).toBe(true);
+    expect(sameRemote('https://github.com/evil/b', 'https://github.com/a/b')).toBe(false);
+  });
+  it('classifica falhas de pull', () => {
+    expect(classifyGitFailure('fatal: Not possible to fast-forward, aborting.')).toBe('diverged');
+    expect(classifyGitFailure('Could not resolve host: github.com')).toBe('network');
+    expect(classifyGitFailure('fatal: Authentication failed for')).toBe('auth');
+    expect(classifyGitFailure('boom')).toBe('unknown');
+  });
+});

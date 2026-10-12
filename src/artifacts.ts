@@ -126,6 +126,7 @@ export function loadCustomRepos(targetDir: string): CustomReposResult {
         typeof item.description === 'string'
       ) {
         repos.push({
+          origin: 'custom',
           kind: item.kind === 'node' ? 'node' : 'python',
           nextSteps: item.nextSteps,
           envKeys: item.envKeys,

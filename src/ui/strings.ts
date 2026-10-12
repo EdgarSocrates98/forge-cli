@@ -42,6 +42,13 @@ export const S = {
   nonGitDir: 'Diretório existe e não é um repositório Git — pulado',
   warnDirtyTree: 'Alterações locais detectadas',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
+  warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
+  warnPullNetwork: 'Falha de rede ao atualizar o repositório',
+  warnPullAuth: 'Falha de autenticação ao atualizar o repositório',
+  warnRemoteMismatch: 'Remote origin difere do catálogo — repositório não atualizado',
+  warnScriptsSkippedSync:
+    'Scripts não executados após falha de sincronização (use --run-after-sync-failure)',
+  warnScriptsSkippedUntrusted: 'Repositório customizado: scripts não executados sem --trust-custom',
   configCopied: 'Config de exemplo copiada',
   configFailed: 'Falha ao copiar configs de exemplo',
   verifyOk: 'Verificação OK',
@@ -115,6 +122,8 @@ Opções:
   --jobs <n>         Processa até n repositórios em paralelo (1-8; só não-interativo)
   --only-changed     Pula repositórios cujo HEAD não mudou desde o último ok
   --shallow          Clona com git clone --depth 1 (só clones novos)
+  --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
+  --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente
   -h, --help         Mostra esta ajuda
 
 Extras:

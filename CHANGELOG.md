@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Sync Git (Cycle 1): detecta remote divergente do catálogo e classifica
+  falhas de pull (divergente/rede/autenticação). Scripts não rodam após
+  falha de sync sem `--run-after-sync-failure`; repositórios de
+  `forge-cli.repos.json` só executam scripts com `--trust-custom`.
 - Segurança (Cycle 1): validação de nomes/URLs de repositórios (bloqueia
   path traversal, `--opção`, `ext::`, `file://` e credenciais embutidas),
   recusa de destino symlink/junction, `git clone --`, redação de

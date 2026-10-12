@@ -8,6 +8,7 @@ export interface ForgeRepo {
   verify?: readonly string[];
   nextSteps?: readonly string[];
   envKeys?: readonly string[];
+  origin?: 'builtin' | 'custom';
 }
 
 export type RepoStatus = 'ok' | 'warning' | 'error';
@@ -30,11 +31,14 @@ export interface SetupScript {
   args: string[];
 }
 
-export type SyncKind = 'cloned' | 'pulled' | 'pull-failed' | 'non-git';
+export type SyncKind = 'cloned' | 'pulled' | 'pull-failed' | 'non-git' | 'remote-mismatch';
+
+export type SyncFailure = 'diverged' | 'network' | 'auth' | 'unknown';
 
 export interface SyncResult {
   kind: SyncKind;
   dirty: boolean;
+  failure?: SyncFailure;
 }
 
 export type CheckSeverity = 'fatal' | 'warn';

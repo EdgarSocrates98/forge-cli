@@ -26,6 +26,8 @@ export interface CliOptions {
   jobsSet: boolean;
   onlyChanged: boolean;
   shallow: boolean;
+  trustCustom: boolean;
+  runAfterSyncFailure: boolean;
   positionals: string[];
 }
 
@@ -54,6 +56,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
         jobs: { type: 'string' },
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
+        'trust-custom': { type: 'boolean' },
+        'run-after-sync-failure': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -95,6 +99,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
     jobsSet: values.jobs !== undefined,
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
+    trustCustom: values['trust-custom'] ?? false,
+    runAfterSyncFailure: values['run-after-sync-failure'] ?? false,
     positionals,
   };
 }

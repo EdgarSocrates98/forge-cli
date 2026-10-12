@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { execa } from 'execa';
 import { isLinkOrJunction, isSafeRepoUrl, redactSecrets, resolveInside } from '../safety.js';
-import type { ForgeRepo, SetupScript, SyncResult } from '../types.js';
+import type { ForgeRepo, SetupScript, SyncFailure, SyncResult } from '../types.js';
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
 
@@ -88,6 +88,39 @@ export async function currentHead(repoDir: string): Promise<string | null> {
   return commandOutput('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
 }
 
+function normalizeRemote(url: string): string {
+  return url
+    .trim()
+    .replace(/^git@([^:]+):/, 'https://$1/')
+    .replace(/^ssh:\/\/git@/, 'https://')
+    .replace(/^https?:\/\/[^@/]+@/, 'https://')
+    .replace(/\.git$/, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
+export function sameRemote(a: string, b: string): boolean {
+  return normalizeRemote(a) === normalizeRemote(b);
+}
+
+export function classifyGitFailure(message: string): SyncFailure {
+  if (
+    /authentication failed|could not read username|permission denied|403|terminal prompts disabled/i.test(
+      message,
+    )
+  )
+    return 'auth';
+  if (/not possible to fast-forward|divergent|diverged|refusing to merge/i.test(message))
+    return 'diverged';
+  if (
+    /could not resolve host|unable to access|timed out|connection (refused|reset)|network is unreachable/i.test(
+      message,
+    )
+  )
+    return 'network';
+  return 'unknown';
+}
+
 export interface SyncOptions {
   shallow?: boolean;
 }
@@ -106,11 +139,15 @@ export async function syncRepo(
   if (existsSync(repoDir)) {
     if (!hasGitRepo(repoDir)) return { kind: 'non-git', dirty: false };
     const dirty = await isGitDirty(repoDir);
+    const remote = await commandOutput('git', ['-C', repoDir, 'remote', 'get-url', 'origin']);
+    if (remote && remote !== 'ok' && !sameRemote(remote, repo.url)) {
+      return { kind: 'remote-mismatch', dirty };
+    }
     try {
       await execa('git', ['pull', '--ff-only'], { cwd: repoDir });
       return { kind: 'pulled', dirty };
-    } catch {
-      return { kind: 'pull-failed', dirty };
+    } catch (error) {
+      return { kind: 'pull-failed', dirty, failure: classifyGitFailure(errorDetail(error)) };
     }
   }
   const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];

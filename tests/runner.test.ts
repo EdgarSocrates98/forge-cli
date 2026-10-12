@@ -130,7 +130,7 @@ describe('processRepo', () => {
     expect(result.status).toBe('ok');
   });
 
-  it('downgrades to warning on pull failure and still runs setup', async () => {
+  it('does not run setup scripts after a pull failure by default', async () => {
     mockExeca({ pullFails: true });
     const target = tmpDir();
     const repoDir = existingGitRepo(target);
@@ -138,7 +138,31 @@ describe('processRepo', () => {
     const result = await processRepo(baseRepo, target);
     expect(result.status).toBe('warning');
     expect(result.notes).toContain(S.warnPullFailed);
+    expect(result.notes).toContain(S.warnScriptsSkippedSync);
+    expect(result.detail).toBe(S.noSetupSteps);
+  });
+
+  it('runs setup after a pull failure with runAfterSyncFailure', async () => {
+    mockExeca({ pullFails: true });
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(baseRepo, target, {}, { runAfterSyncFailure: true });
+    expect(result.status).toBe('warning');
     expect(result.detail).toBe(`${S.installedVia} npm install`);
+  });
+
+  it('skips scripts of custom repos unless trustCustom', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repo: ForgeRepo = { ...baseRepo, origin: 'custom' };
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const blocked = await processRepo(repo, target);
+    expect(blocked.notes).toContain(S.warnScriptsSkippedUntrusted);
+    expect(blocked.detail).toBe(S.noSetupSteps);
+    const trusted = await processRepo(repo, target, {}, { trustCustom: true });
+    expect(trusted.detail).toBe(`${S.installedVia} npm install`);
   });
 
   it('copies config examples and notes them', async () => {

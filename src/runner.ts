@@ -27,6 +27,8 @@ export interface RunOptions {
   timeoutMs?: number;
   shallow?: boolean;
   onlyChanged?: boolean;
+  trustCustom?: boolean;
+  runAfterSyncFailure?: boolean;
   state?: CliState['repos'];
 }
 
@@ -59,6 +61,8 @@ export async function processRepo(
     return finish('error', `${S.cloneFailed}: ${errorDetail(error)}`);
   }
   if (sync.kind === 'non-git') return finish('warning', S.nonGitDir);
+  const remoteMismatch = sync.kind === 'remote-mismatch';
+  if (remoteMismatch) notes.push(S.warnRemoteMismatch);
   head = await currentHead(repoDir);
   const prior = opts.onlyChanged ? opts.state?.[repo.name] : undefined;
   if (prior?.status === 'ok' && prior.head && prior.head === head) {
@@ -67,7 +71,23 @@ export async function processRepo(
   }
   if (sync.dirty) notes.push(S.warnDirtyTree);
   const pullFailed = sync.kind === 'pull-failed';
-  if (pullFailed) notes.push(S.warnPullFailed);
+  if (pullFailed) {
+    notes.push(
+      sync.failure === 'diverged'
+        ? S.warnPullDiverged
+        : sync.failure === 'network'
+          ? S.warnPullNetwork
+          : sync.failure === 'auth'
+            ? S.warnPullAuth
+            : S.warnPullFailed,
+    );
+  }
+  const syncFailed = pullFailed || remoteMismatch;
+  const syncBlocksScripts = syncFailed && !opts.runAfterSyncFailure;
+  const untrusted = repo.origin === 'custom' && !opts.trustCustom;
+  const skipScripts = opts.skipScripts || syncBlocksScripts || untrusted;
+  if (!opts.skipScripts && syncBlocksScripts) notes.push(S.warnScriptsSkippedSync);
+  if (!opts.skipScripts && untrusted) notes.push(S.warnScriptsSkippedUntrusted);
 
   let envNote: string | undefined;
   try {
@@ -95,7 +115,7 @@ export async function processRepo(
   }
 
   const ran: string[] = [];
-  const script = opts.skipScripts ? null : findSetupScript(repoDir);
+  const script = skipScripts ? null : findSetupScript(repoDir);
   if (script) {
     reporter.phase?.(`${S.phaseInstall} ${script.file}`);
     reporter.commandStart?.(script.file);
@@ -114,7 +134,7 @@ export async function processRepo(
     }
   }
 
-  const npmArgs = opts.skipScripts ? null : npmInstallArgs(repoDir);
+  const npmArgs = skipScripts ? null : npmInstallArgs(repoDir);
   if (npmArgs) {
     const title = `npm ${npmArgs[0]}`;
     reporter.phase?.(title);
@@ -131,7 +151,7 @@ export async function processRepo(
 
   if (!ran.length) return finish('warning', S.noSetupSteps, envNote);
 
-  let status: RepoStatus = pullFailed ? 'warning' : 'ok';
+  let status: RepoStatus = syncFailed ? 'warning' : 'ok';
   if (repo.verify?.length && !opts.skipVerify) {
     reporter.phase?.(S.phaseVerify);
     try {
