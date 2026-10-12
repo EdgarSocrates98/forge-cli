@@ -23,6 +23,26 @@ export function resultLine(result: RepoResult): string {
   return `${statusBadge(result.status)} ${result.repo.name} — ${result.detail}${envPart}${notesPart} ${theme.dim(formatElapsed(result.elapsedMs))}${stepsPart}`;
 }
 
+export function totalElapsed(results: RepoResult[]): number {
+  return results.reduce((acc, r) => acc + r.elapsedMs, 0);
+}
+
+export function slowestRepo(results: RepoResult[]): RepoResult | undefined {
+  return results.reduce<RepoResult | undefined>(
+    (max, r) => (max === undefined || r.elapsedMs > max.elapsedMs ? r : max),
+    undefined,
+  );
+}
+
+export function mergeResults(prev: RepoResult[], next: RepoResult[]): RepoResult[] {
+  const byName = new Map(next.map((r) => [r.repo.name, r]));
+  const merged = prev.map((r) => byName.get(r.repo.name) ?? r);
+  for (const r of next) {
+    if (!prev.some((p) => p.repo.name === r.repo.name)) merged.push(r);
+  }
+  return merged;
+}
+
 export function renderReport(results: RepoResult[]): void {
   const ok = results.filter((r) => r.status === 'ok').length;
   const warnings = results.filter((r) => r.status === 'warning').length;
@@ -30,5 +50,9 @@ export function renderReport(results: RepoResult[]): void {
 
   const body = results.map(resultLine).join('\n');
   const totals = `${theme.ok(`${icons.ok} ${ok}`)} · ${theme.warn(`${icons.warn} ${warnings}`)} · ${theme.err(`${icons.err} ${errors}`)}`;
-  note(`${body}\n\n${totals}`, S.reportTitle);
+  const slowest = slowestRepo(results);
+  const meta = slowest
+    ? `${theme.dim(`${S.totalTime} ${formatElapsed(totalElapsed(results))} · ${S.slowestRepo} ${slowest.repo.name} ${formatElapsed(slowest.elapsedMs)}`)}`
+    : '';
+  note(`${body}\n\n${totals}${meta ? `\n${meta}` : ''}`, S.reportTitle);
 }

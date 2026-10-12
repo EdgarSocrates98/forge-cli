@@ -47,6 +47,13 @@ describe('FORGE_REPOS catalog', () => {
     }
   });
 
+  it('marks repo kinds — 7 python + 1 node', () => {
+    const kinds = FORGE_REPOS.map((r) => r.kind);
+    expect(kinds.filter((k) => k === 'python')).toHaveLength(7);
+    expect(kinds.filter((k) => k === 'node')).toHaveLength(1);
+    expect(FORGE_REPOS.find((r) => r.kind === 'node')?.name).toBe('forge-portal');
+  });
+
   it('defines documented envKeys only for api-forge', () => {
     const api = FORGE_REPOS.find((r) => r.name === 'api-forge');
     expect(api?.envKeys).toEqual(['APIFORGE_HOME', 'APIFORGE_CONFIG', 'APIFORGE_CACHE']);

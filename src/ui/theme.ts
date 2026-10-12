@@ -20,3 +20,8 @@ export const icons = {
   env: '🔐',
   gear: '⚙️',
 };
+
+export const kindIcon = {
+  python: '🐍',
+  node: '🅰️',
+} as const;

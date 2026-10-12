@@ -50,7 +50,12 @@ function mockExeca(state: GitState = {}) {
   }) as never);
 }
 
-const baseRepo: ForgeRepo = { name: 'demo', url: 'https://x/demo', description: 'demo' };
+const baseRepo: ForgeRepo = {
+  name: 'demo',
+  url: 'https://x/demo',
+  description: 'demo',
+  kind: 'node',
+};
 
 function existingGitRepo(targetDir: string): string {
   const repoDir = path.join(targetDir, baseRepo.name);

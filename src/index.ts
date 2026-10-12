@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cancel, intro, log, note, outro, spinner, taskLog } from '@clack/prompts';
+import { cancel, confirm, intro, isCancel, log, note, outro, spinner, taskLog } from '@clack/prompts';
 import figlet from 'figlet';
 import {
   CliError,
@@ -11,11 +11,11 @@ import {
 import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
-import { renderReport, resultLine } from './report.js';
+import { mergeResults, renderReport, resultLine } from './report.js';
 import { processRepo, type RepoReporter, type RunOptions } from './runner.js';
 import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
-import { icons, theme } from './ui/theme.js';
+import { icons, kindIcon, theme } from './ui/theme.js';
 import { resolveTargetDir } from './utils/system.js';
 
 const BANNER_LINE_DELAY_MS = 30;
@@ -50,10 +50,12 @@ async function processBatch(
   repos: ForgeRepo[],
   targetDir: string,
   opts: RunOptions,
+  offset = 0,
+  total = repos.length,
 ): Promise<RepoResult[]> {
   const results: RepoResult[] = [];
-  for (const repo of repos) {
-    const label = theme.accent(repo.name);
+  for (const [index, repo] of repos.entries()) {
+    const label = `${theme.dim(`[${offset + index + 1}/${total}]`)} ${kindIcon[repo.kind]} ${theme.accent(repo.name)}`;
     let s = spinner({ indicator: 'timer' });
     s.start(label);
     let live: ReturnType<typeof taskLog> | undefined;
@@ -143,9 +145,23 @@ async function main(): Promise<void> {
     skipVerify: cli.skipVerify,
     timeoutMs: cli.timeoutSecs * 1000,
   };
-  const results = await processBatch(repos, targetDir, opts);
+  let results = await processBatch(repos, targetDir, opts, 0, repos.length);
 
   renderReport(results);
+
+  if (interactive && results.some((r) => r.status === 'error')) {
+    const retry = await confirm({ message: S.askRetry, initialValue: true });
+    if (isCancel(retry)) {
+      cancel(S.cancelled);
+      process.exit(0);
+    }
+    if (retry) {
+      const failed = results.filter((r) => r.status === 'error').map((r) => r.repo);
+      const retried = await processBatch(failed, targetDir, opts, 0, failed.length);
+      results = mergeResults(results, retried);
+      renderReport(results);
+    }
+  }
 
   const hasErrors = results.some((r) => r.status === 'error');
   outro(`${icons.rocket} ${hasErrors ? S.outroWithErrors : S.outroOk}`);

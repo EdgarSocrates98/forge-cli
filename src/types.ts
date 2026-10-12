@@ -1,7 +1,10 @@
+export type RepoKind = 'python' | 'node';
+
 export interface ForgeRepo {
   name: string;
   url: string;
   description: string;
+  kind: RepoKind;
   verify?: readonly string[];
   nextSteps?: readonly string[];
   envKeys?: readonly string[];

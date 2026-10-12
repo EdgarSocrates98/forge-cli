@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0006.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T11:37:42+00:00",
+  "id": "lf-0006",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0006.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0006.md",
+  "spec_sha256": "fe4b26a78f334a07923ed15e310c8e08ff109d456a6381eb012c1ca21ee51ae4",
+  "status": "planned",
+  "title": "UX polish \u2014 overall progress, phase checklist, retry prompt, report extras"
+}

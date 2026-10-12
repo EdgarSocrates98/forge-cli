@@ -18,6 +18,7 @@ const repo: ForgeRepo = {
   name: 'demo',
   url: 'https://x/demo',
   description: 'd',
+  kind: 'node',
   verify: ['demo', '--help'],
 };
 
