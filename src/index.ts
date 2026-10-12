@@ -1,97 +1,70 @@
 #!/usr/bin/env node
-import {
-  cancel,
-  confirm,
-  intro,
-  isCancel,
-  log,
-  multiselect,
-  note,
-  outro,
-  spinner,
-  text,
-} from '@clack/prompts';
+import { cancel, intro, log, outro, spinner } from '@clack/prompts';
 import figlet from 'figlet';
-import pc from 'picocolors';
-import { FORGE_REPOS } from './constants/repos.js';
+import { runPreflight } from './preflight.js';
+import { askConfirm, askRepos, askWorkspace } from './prompts.js';
+import { renderReport, resultLine } from './report.js';
+import { processRepo } from './runner.js';
 import type { RepoResult } from './types.js';
-import { ensureDir, processRepo, resolveTargetDir } from './utils/system.js';
+import { S } from './ui/strings.js';
+import { icons, theme } from './ui/theme.js';
 
-function exitCancelled(): never {
-  cancel('Operação cancelada pelo usuário.');
-  process.exit(0);
+const BANNER_LINE_DELAY_MS = 30;
+
+async function printBanner(): Promise<void> {
+  const art = figlet.textSync(S.bannerWord, { font: 'Standard' });
+  for (const line of art.split('\n')) {
+    console.log(theme.brand(line));
+    await new Promise((resolve) => setTimeout(resolve, BANNER_LINE_DELAY_MS));
+  }
 }
 
-function statusLabel(result: RepoResult): string {
-  if (result.status === 'ok') return pc.green('[OK]');
-  if (result.status === 'warning') return pc.yellow('[AVISO]');
-  return pc.red('[ERRO]');
+async function checkEnvironment(): Promise<void> {
+  log.step(`${icons.gear} ${S.preflightTitle}`);
+  const checks = await runPreflight();
+  for (const check of checks) {
+    if (check.ok) {
+      log.success(`${icons.ok} ${check.name} ${theme.dim(`(${check.detail})`)}`);
+    } else {
+      log.error(`${icons.err} ${check.name} ${theme.dim(`(${check.detail})`)}`);
+    }
+  }
+  if (checks.some((check) => !check.ok)) {
+    log.error(S.preflightFailed);
+    process.exit(1);
+  }
 }
 
 async function main(): Promise<void> {
-  console.log(pc.cyan(figlet.textSync('FORGE CLI', { font: 'Standard' })));
-  intro(pc.inverse(' forge-cli — instalador do ecossistema Forge '));
+  await printBanner();
+  intro(theme.accent(S.intro));
 
-  const dirAnswer = await text({
-    message: 'Onde os repositórios devem ser instalados?',
-    placeholder: './forge-workspace',
-    defaultValue: './forge-workspace',
-  });
-  if (isCancel(dirAnswer)) exitCancelled();
+  await checkEnvironment();
 
-  const targetDir = resolveTargetDir(dirAnswer);
-  await ensureDir(targetDir);
-
-  const selected = await multiselect({
-    message: 'Selecione os repositórios para instalar',
-    options: FORGE_REPOS.map((repo) => ({
-      value: repo.name,
-      label: repo.name,
-      hint: repo.description,
-    })),
-    initialValues: FORGE_REPOS.map((repo) => repo.name),
-    required: true,
-  });
-  if (isCancel(selected)) exitCancelled();
-
-  const repos = FORGE_REPOS.filter((repo) => selected.includes(repo.name));
-
-  note(`Destino: ${pc.cyan(targetDir)}\nRepositórios: ${pc.cyan(String(repos.length))} de ${FORGE_REPOS.length}`, 'Resumo');
-  const proceed = await confirm({ message: 'Confirmar e iniciar a instalação?' });
-  if (isCancel(proceed) || !proceed) exitCancelled();
+  const targetDir = await askWorkspace();
+  const repos = await askRepos();
+  await askConfirm(targetDir, repos.length);
 
   const results: RepoResult[] = [];
   for (const repo of repos) {
-    const s = spinner();
-    s.start(`Processando ${pc.cyan(repo.name)}...`);
-    const result = await processRepo(repo, targetDir);
+    const s = spinner({ indicator: 'timer' });
+    s.start(theme.accent(repo.name));
+    const result = await processRepo(repo, targetDir, (phase) =>
+      s.message(`${theme.accent(repo.name)} — ${phase}`),
+    );
     results.push(result);
-    if (result.status === 'warning') {
-      s.stop(`${pc.yellow('[AVISO]')} ${repo.name} — ${result.detail}`);
-      log.warn(result.detail);
-    } else {
-      s.stop(`${statusLabel(result)} ${repo.name} — ${result.detail}`);
-    }
+    s.stop(resultLine(result), result.status === 'error' ? 1 : 0);
   }
 
-  const ok = results.filter((r) => r.status === 'ok').length;
-  const warnings = results.filter((r) => r.status === 'warning').length;
-  const errors = results.filter((r) => r.status === 'error').length;
+  renderReport(results);
 
-  const report = results
-    .map((r) => `${statusLabel(r)} ${r.repo.name} — ${r.detail}`)
-    .join('\n');
-  note(
-    `${report}\n\n${pc.green(`${ok} ok`)} · ${pc.yellow(`${warnings} avisos`)} · ${pc.red(`${errors} erros`)}`,
-    'Relatório final',
-  );
-
-  outro(errors === 0 ? 'Tudo pronto! Bom código.' : 'Instalação concluída com pendências — verifique os erros acima.');
+  const hasErrors = results.some((r) => r.status === 'error');
+  outro(`${icons.rocket} ${hasErrors ? S.outroWithErrors : S.outroOk}`);
 }
 
 process.on('SIGINT', () => {
   console.log('');
-  cancel('Operação interrompida (Ctrl+C).');
+  cancel(S.interrupted);
   process.exit(130);
 });
 
