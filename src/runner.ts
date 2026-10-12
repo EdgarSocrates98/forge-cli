@@ -200,7 +200,13 @@ export async function processRepo(
 
   let status: RepoStatus = syncFailed ? 'warning' : 'ok';
   let validated = false;
-  const manifest = repo.verify?.length ? null : readForgeManifest(repoDir);
+  // forge.json é conteúdo do repositório (não confiável): só vira comando para Forja do
+  // catálogo ou repositório customizado aprovado, e roda fora do diretório da Forja para
+  // que um executável local não seja resolvido antes do PATH.
+  const repoTrusted =
+    repo.origin !== 'custom' || opts.trustCustom === true || opts.trustedRepos?.has(repo.name);
+  const manifest = repo.verify?.length || !repoTrusted ? null : readForgeManifest(repoDir);
+  const fromManifest = !repo.verify?.length && Boolean(manifest?.cli);
   const verifyCmd: readonly string[] | undefined = repo.verify?.length
     ? repo.verify
     : manifest?.cli
@@ -209,7 +215,12 @@ export async function processRepo(
   if (verifyCmd?.length && !opts.skipVerify) {
     reporter.phase?.(S.phaseVerify);
     try {
-      await runStreamed([...verifyCmd], repoDir, undefined, opts.timeoutMs);
+      await runStreamed(
+        [...verifyCmd],
+        fromManifest ? targetDir : repoDir,
+        undefined,
+        opts.timeoutMs,
+      );
       notes.push(`${S.verifyOk}: ${verifyCmd.join(' ')}`);
       validated = true;
     } catch {

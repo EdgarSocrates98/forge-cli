@@ -616,3 +616,34 @@ describe('forge.json, {python} e operações nativas', () => {
     expect(result.notes).toContain(S.nativeNeedsYes);
   });
 });
+
+describe('verify derivado de forge.json exige repositório confiável', () => {
+  const setup = (origin?: 'custom') => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    writeFileSync(path.join(repoDir, 'forge.json'), JSON.stringify({ cli: 'demo-cli' }));
+    return { target, repo: { ...baseRepo, origin } as ForgeRepo };
+  };
+  const cliCall = () => mockedExeca.mock.calls.find(([cmd]) => cmd === 'demo-cli');
+
+  it('customizado não aprovado: não executa o binário do manifesto', async () => {
+    const { target, repo } = setup('custom');
+    await processRepo(repo, target, {}, { trustedRepos: new Set(['demo']), skipVerify: false });
+    // aprovado para scripts, mas sem trust explícito de verify também vale: aprovado == confiável
+    expect(cliCall()).toBeDefined();
+    mockedExeca.mockClear();
+    const { target: t2, repo: r2 } = setup('custom');
+    await processRepo(r2, t2, {}, { deniedScripts: new Set(['demo']), trustCustom: false });
+    expect(cliCall()).toBeUndefined();
+  });
+
+  it('roda fora do diretório da Forja (cwd = workspace)', async () => {
+    const { target, repo } = setup();
+    await processRepo(repo, target);
+    const call = cliCall();
+    const options = (call as unknown as [string, string[], { cwd?: string }])[2];
+    expect(options.cwd).toBe(target);
+  });
+});
