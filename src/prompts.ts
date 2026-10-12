@@ -55,6 +55,7 @@ export async function askRepos(
     ...(opts.output ? { output: opts.output as NodeJS.WriteStream } : {}),
     message: `${S.askRepos} ${theme.dim(S.askReposHelp)}`,
     placeholder: S.askReposPlaceholder,
+    withGuide: false,
     options: catalog.map((repo) => ({
       value: repo.name,
       label: repo.name,

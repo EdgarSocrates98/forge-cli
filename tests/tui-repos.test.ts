@@ -50,8 +50,9 @@ describe('askRepos (seleção com busca, teclas simuladas)', () => {
       input: io.input,
       output: io.output,
     });
-    // digita "portal", Tab/espaço alterna conforme a UI; Enter confirma
-    press(io, ['p', 'o', 'r', 't', 'a', 'l', '\t', '\r']);
+    // Sai da busca com seta para baixo, marca com Espaço e confirma.
+    // Essa sequência funciona de forma consistente em PowerShell, CMD e Git Bash.
+    press(io, ['p', 'o', 'r', 't', 'a', 'l', '\u001b[B', ' ', '\r']);
     const picked = await pending;
     expect(picked.map((r) => r.name)).toEqual(['forge-portal']);
   });
