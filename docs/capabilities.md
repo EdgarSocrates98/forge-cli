@@ -52,6 +52,42 @@ com `--dry-run`, a menos que `--yes` seja informado.
 | Atualização nativa              | **não verificado**       | **não verificado**              | **não verificado**         | `--upgrade` (bootstrap)    | **não verificado**      | **não verificado**                                   | **não verificado**          | `npm`        |
 | Desinstalação nativa            | **não verificado**       | **não verificado**              | **não verificado**         | **não verificado**         | **não verificado**      | **não verificado**                                   | **não verificado**          | não          |
 
+## Operações nativas de ciclo de vida (confirmadas no código)
+
+Segunda inspeção (leitura do parser de cada instalador). Todas aceitam
+`--dry-run`; **nenhuma** das operações abaixo aceita `--yes` (aplicam quando
+`--dry-run` está ausente). O forge-cli só as aciona com `--native`.
+
+| Forja             | update                             | uninstall                             |
+| ----------------- | ---------------------------------- | ------------------------------------- |
+| the-forge         | `theforge install update`          | `theforge install uninstall`          |
+| spark-forge-aws   | `sparkforge-aws update`            | `sparkforge-aws uninstall`            |
+| spark-forge-azure | `sparkforge-azure install update`  | `sparkforge-azure install uninstall`  |
+| api-forge         | `apiforge install update`          | `apiforge install uninstall`          |
+| platform-forge    | `platformforge upgrade`            | `platformforge uninstall`             |
+| forge-doctor-data | `forge-doctor-data install update` | `forge-doctor-data install uninstall` |
+| forge-doctor-api  | não verificado                     | não verificado                        |
+| forge-portal      | —                                  | —                                     |
+
+Regras do forge-cli: sem `--yes`, `update --native` roda a operação com
+`--dry-run`; `uninstall --native --yes` executa a desinstalação nativa
+**antes** de remover o clone e preserva o clone se ela falhar.
+
+## Flags adicionais do instalador nativo
+
+| Forja             | `--host`       | `--gateway-profile` |
+| ----------------- | -------------- | ------------------- |
+| the-forge         | sim            | não verificado      |
+| spark-forge-aws   | sim            | sim                 |
+| spark-forge-azure | sim            | sim                 |
+| api-forge         | sim            | sim                 |
+| platform-forge    | não verificado | não verificado      |
+| forge-doctor-data | não verificado | sim                 |
+
+`forge-doctor-api` passou a usar o script documentado
+`python scripts/forge_install.py install` (interpretador resolvido entre
+`python3`, `python` e `py -3`).
+
 Notas:
 
 - A presença de `--scope`/`--profile`/`--components` foi confirmada no código

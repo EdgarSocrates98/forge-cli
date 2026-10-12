@@ -153,3 +153,39 @@ describe('CLI ponta a ponta (processo real, diretórios temporários)', { timeou
     expect(existsSync(path.join(dir, '.git'))).toBe(true);
   });
 });
+
+describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
+  it('status --json imprime só JSON (sem banner)', async () => {
+    const res = await cli('status', '--json', '--dir', ws);
+    expect(res.code).toBe(0);
+    const data = JSON.parse(res.out);
+    expect(data).toHaveLength(8);
+    expect(data[0]).toMatchObject({ name: 'the-forge', phase: 'not-installed', dirty: false });
+  });
+
+  it('components --json expõe flags e ops nativas', async () => {
+    const res = await cli('components', 'spark-forge-aws', 'forge-portal', '--json', '--dir', ws);
+    const data = JSON.parse(res.out);
+    expect(data[0].nativeInstall.flags).toContain('gateway-profile');
+    expect(data[0].nativeInstall.ops.update).toEqual(['sparkforge-aws', 'update']);
+    expect(data[1].nativeInstall).toBeNull();
+  });
+
+  it('update --check --json lista estado por Forja', async () => {
+    const res = await cli('update', '--check', '--json', '--dir', ws);
+    expect(res.code).toBe(0);
+    expect(JSON.parse(res.out).every((r: { state: string }) => r.state === 'not-installed')).toBe(
+      true,
+    );
+  });
+
+  it('uninstall --native sem a operação nativa preserva o clone', async () => {
+    const dir = fakeClone(
+      'forge-doctor-api',
+      'https://github.com/EdgarSocrates98/forge-doctor-api',
+    );
+    const res = await cli('uninstall', 'forge-doctor-api', '--native', '--yes', '--dir', ws);
+    expect(res.code).toBe(1);
+    expect(existsSync(dir)).toBe(true);
+  });
+});

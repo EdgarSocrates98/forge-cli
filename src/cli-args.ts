@@ -29,6 +29,9 @@ export interface CliOptions {
   onlyChanged: boolean;
   shallow: boolean;
   check: boolean;
+  native: boolean;
+  host?: string;
+  gatewayProfile?: string;
   verbose: boolean;
   offline: boolean;
   profile?: string;
@@ -67,6 +70,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
         check: { type: 'boolean' },
+        native: { type: 'boolean' },
+        host: { type: 'string' },
+        'gateway-profile': { type: 'string' },
         verbose: { type: 'boolean' },
         offline: { type: 'boolean' },
         profile: { type: 'string' },
@@ -102,6 +108,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
     profile: values.profile,
     scope: values.scope,
     components: values.components,
+    host: values.host,
+    gatewayProfile: values['gateway-profile'],
   });
   if (nativeError) throw new CliError(nativeError);
   const ref = values.ref ?? values.version;
@@ -133,6 +141,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
     check: values.check ?? false,
+    native: values.native ?? false,
+    host: values.host,
+    gatewayProfile: values['gateway-profile'],
     verbose: values.verbose ?? false,
     offline: values.offline ?? false,
     profile: values.profile,

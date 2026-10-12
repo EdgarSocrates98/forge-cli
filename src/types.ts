@@ -1,5 +1,7 @@
 export type RepoKind = 'python' | 'node';
 
+export type NativeFlag = 'scope' | 'profile' | 'components' | 'host' | 'gateway-profile';
+
 export interface ForgeRepo {
   name: string;
   url: string;
@@ -12,7 +14,9 @@ export interface ForgeRepo {
   /** Instalador nativo documentado pela Forja (após o bootstrap), com as flags realmente suportadas. */
   nativeInstall?: {
     command: readonly string[];
-    flags: readonly ('scope' | 'profile' | 'components')[];
+    flags: readonly NativeFlag[];
+    /** Operações nativas de ciclo de vida (argv completo); aceitam --dry-run, sem --yes. */
+    ops?: { update?: readonly string[]; uninstall?: readonly string[] };
   };
 }
 

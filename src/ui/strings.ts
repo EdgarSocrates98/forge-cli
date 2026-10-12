@@ -138,6 +138,9 @@ export const S = {
   askReposHelp: '(digite para pesquisar · espaço marca · Enter confirma)',
   askReposPlaceholder: 'Pesquisar Forjas…',
   verboseLimit: 'Saída completa dos comandos habilitada (--verbose)',
+  nativeNoPython: 'Python não encontrado (python3, python, py) para o instalador nativo',
+  nativeUninstallFailed: 'Desinstalação nativa falhou — clone preservado',
+  nativeUninstallPlan: 'desinstalação nativa',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -241,6 +244,9 @@ Opções:
   --components <a,b> Instalador nativo da Forja: ex. skills,agents,mcp
   --offline          Não acessa a rede; só usa clones já existentes (sem prometer cache completo)
   --verbose          Mostra a saída completa dos comandos (e não só as últimas linhas)
+  --host <h>         Instalador nativo: claude|devin|codex|copilot|all (onde suportado)
+  --gateway-profile <g>  Instalador nativo: economy|balanced|deep (onde suportado)
+  --native           Com update/uninstall: aciona também a operação nativa da Forja
   --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente

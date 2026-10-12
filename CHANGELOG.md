@@ -7,6 +7,13 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Instaladores nativos (itens 6/7/9/10): `forge-doctor-api` via
+  `scripts/forge_install.py` (Python resolvido em runtime), `--host` e
+  `--gateway-profile` repassados onde a Forja suporta, `--native` em
+  `update` e `uninstall`, e `forge.json` opcional (campos validados)
+  para derivar a verificação de Forjas sem `verify` no catálogo.
+- `--json` em `status`, `list`, `versions`, `components`, `update --check`
+  e `doctor`: só JSON no stdout, sem banner.
 - TUI: seleção de Forjas com busca (digite para filtrar) e dica de fase/versão
   por Forja; `--verbose` para saída completa dos comandos; logs com
   timestamp. Código de saída 1 quando alguma Forja falha.

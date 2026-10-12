@@ -65,6 +65,14 @@ export async function commandWorks(command: string, args: string[]): Promise<boo
   }
 }
 
+/** Resolve o interpretador Python disponível (python3, python, py -3). */
+export async function resolvePython(): Promise<string[] | null> {
+  for (const candidate of [['python3'], ['python'], ['py', '-3']]) {
+    if (await commandWorks(candidate[0], [...candidate.slice(1), '--version'])) return candidate;
+  }
+  return null;
+}
+
 export async function commandOutput(command: string, args: string[]): Promise<string | null> {
   try {
     const result = await execa(command, args, { reject: false });

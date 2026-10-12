@@ -9,7 +9,11 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['theforge', '--help'],
     nativeInstall: {
       command: ['theforge', 'install', 'apply'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host'],
+      ops: {
+        update: ['theforge', 'install', 'update'],
+        uninstall: ['theforge', 'install', 'uninstall'],
+      },
     },
     nextSteps: ['theforge install apply --yes', 'theforge doctor'],
   },
@@ -21,7 +25,8 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-aws', '--help'],
     nativeInstall: {
       command: ['sparkforge-aws', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      ops: { update: ['sparkforge-aws', 'update'], uninstall: ['sparkforge-aws', 'uninstall'] },
     },
     nextSteps: ['sparkforge-aws install'],
   },
@@ -33,7 +38,11 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-azure', '--help'],
     nativeInstall: {
       command: ['sparkforge-azure', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      ops: {
+        update: ['sparkforge-azure', 'install', 'update'],
+        uninstall: ['sparkforge-azure', 'install', 'uninstall'],
+      },
     },
     nextSteps: ['sparkforge-azure install'],
   },
@@ -46,6 +55,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     nativeInstall: {
       command: ['platformforge', 'install'],
       flags: ['scope', 'profile', 'components'],
+      ops: { update: ['platformforge', 'upgrade'], uninstall: ['platformforge', 'uninstall'] },
     },
     nextSteps: ['platformforge doctor', 'platformforge init --repo .'],
   },
@@ -55,7 +65,14 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Backend central e APIs',
     kind: 'python',
     verify: ['apiforge', '--help'],
-    nativeInstall: { command: ['apiforge', 'install'], flags: ['scope', 'profile', 'components'] },
+    nativeInstall: {
+      command: ['apiforge', 'install'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      ops: {
+        update: ['apiforge', 'install', 'update'],
+        uninstall: ['apiforge', 'install', 'uninstall'],
+      },
+    },
     envKeys: ['APIFORGE_HOME', 'APIFORGE_CONFIG', 'APIFORGE_CACHE'],
     nextSteps: ['apiforge install --yes'],
   },
@@ -65,6 +82,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'API de diagnóstico e telemetria',
     kind: 'python',
     verify: ['forge-doctor-api', '--help'],
+    nativeInstall: {
+      command: ['{python}', 'scripts/forge_install.py', 'install'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['forge-doctor-api install'],
   },
   {
@@ -75,7 +96,11 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-data', '--help'],
     nativeInstall: {
       command: ['forge-doctor-data', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'gateway-profile'],
+      ops: {
+        update: ['forge-doctor-data', 'install', 'update'],
+        uninstall: ['forge-doctor-data', 'install', 'uninstall'],
+      },
     },
     nextSteps: ['forge-doctor-data install'],
   },

@@ -3,6 +3,7 @@ import { parseCliArgs } from '../src/cli-args.js';
 import { FORGE_REPOS } from '../src/constants/repos.js';
 import {
   buildNativeInstall,
+  buildNativeOp,
   componentsLines,
   validateNativeOptions,
 } from '../src/native-install.js';
@@ -32,12 +33,24 @@ describe('validateNativeOptions', () => {
 describe('catálogo: instalador nativo', () => {
   it('o binário nativo é o mesmo usado na verificação', () => {
     for (const repo of FORGE_REPOS.filter((r) => r.nativeInstall)) {
-      expect(repo.nativeInstall!.command[0]).toBe(repo.verify![0]);
+      const bin = repo.nativeInstall!.command[0];
+      if (bin === '{python}') continue; // script do repositório, resolvido em runtime
+      expect(bin).toBe(repo.verify![0]);
     }
   });
-  it('forge-portal e forge-doctor-api não declaram instalador nativo (não documentado)', () => {
-    for (const name of ['forge-portal', 'forge-doctor-api']) {
-      expect(FORGE_REPOS.find((r) => r.name === name)?.nativeInstall).toBeUndefined();
+  it('forge-portal não declara instalador nativo; doctor-api usa o script documentado', () => {
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-portal')?.nativeInstall).toBeUndefined();
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-doctor-api')?.nativeInstall?.command).toEqual([
+      '{python}',
+      'scripts/forge_install.py',
+      'install',
+    ]);
+  });
+  it('toda Forja com instalador nativo (exceto script) declara update e uninstall', () => {
+    for (const repo of FORGE_REPOS.filter((r) => r.nativeInstall)) {
+      if (repo.nativeInstall!.command[0] === '{python}') continue;
+      expect(repo.nativeInstall!.ops?.update?.length).toBeGreaterThan(0);
+      expect(repo.nativeInstall!.ops?.uninstall?.length).toBeGreaterThan(0);
     }
   });
   it('monta o comando só com flags suportadas', () => {
@@ -64,8 +77,45 @@ describe('componentsLines', () => {
     const lines = componentsLines(FORGE_REPOS);
     expect(lines).toHaveLength(FORGE_REPOS.length);
     expect(lines.find((l) => l.startsWith('api-forge'))).toContain(
-      'apiforge install [--scope --profile --components]',
+      'apiforge install [--scope --profile --components --host --gateway-profile]',
     );
     expect(lines.find((l) => l.startsWith('forge-portal'))).toContain('sem instalador nativo');
+  });
+});
+
+describe('host, gateway-profile e operações nativas', () => {
+  const aws = FORGE_REPOS.find((r) => r.name === 'spark-forge-aws')!;
+  const platform = FORGE_REPOS.find((r) => r.name === 'platform-forge')!;
+
+  it('valida host e gateway-profile', () => {
+    expect(validateNativeOptions({ host: 'claude', gatewayProfile: 'economy' })).toBeNull();
+    expect(validateNativeOptions({ host: 'vim' })).toMatch(/host/);
+    expect(validateNativeOptions({ gatewayProfile: 'turbo' })).toMatch(/gateway-profile/);
+  });
+
+  it('repassa host/gateway só onde a Forja suporta', () => {
+    expect(buildNativeInstall(aws, { host: 'claude', gatewayProfile: 'economy' })?.argv).toEqual([
+      'sparkforge-aws',
+      'install',
+      '--host',
+      'claude',
+      '--gateway-profile',
+      'economy',
+      '--dry-run',
+    ]);
+    const built = buildNativeInstall(platform, { host: 'claude' });
+    expect(built?.ignored).toEqual(['host']);
+  });
+
+  it('operações nativas: --dry-run sem aprovação, aplicam com aprovação', () => {
+    expect(buildNativeOp(aws, 'update', false)).toEqual({
+      argv: ['sparkforge-aws', 'update', '--dry-run'],
+      dryRun: true,
+    });
+    expect(buildNativeOp(aws, 'uninstall', true)).toEqual({
+      argv: ['sparkforge-aws', 'uninstall'],
+      dryRun: false,
+    });
+    expect(buildNativeOp({ ...aws, nativeInstall: undefined }, 'update', true)).toBeNull();
   });
 });

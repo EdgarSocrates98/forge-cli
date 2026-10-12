@@ -1,8 +1,10 @@
 import path from 'node:path';
 import { copyConfigExamples } from './configs.js';
 import { checkoutRef } from './git-revs.js';
+import { readForgeManifest } from './manifest.js';
 import {
   buildNativeInstall,
+  buildNativeOp,
   hasNativeRequest,
   type NativeInstallOptions,
 } from './native-install.js';
@@ -15,6 +17,7 @@ import {
   errorDetail,
   findSetupScript,
   npmInstallArgs,
+  resolvePython,
   runStreamed,
   syncRepo,
 } from './utils/system.js';
@@ -38,6 +41,7 @@ export interface RunOptions {
   cloneOnly?: boolean;
   offline?: boolean;
   native?: NativeInstallOptions;
+  nativeUpdate?: boolean;
   trustCustom?: boolean;
   trustedRepos?: ReadonlySet<string>;
   deniedScripts?: ReadonlySet<string>;
@@ -196,17 +200,48 @@ export async function processRepo(
 
   let status: RepoStatus = syncFailed ? 'warning' : 'ok';
   let validated = false;
-  if (repo.verify?.length && !opts.skipVerify) {
+  const manifest = repo.verify?.length ? null : readForgeManifest(repoDir);
+  const verifyCmd: readonly string[] | undefined = repo.verify?.length
+    ? repo.verify
+    : manifest?.cli
+      ? [manifest.cli, '--help']
+      : undefined;
+  if (verifyCmd?.length && !opts.skipVerify) {
     reporter.phase?.(S.phaseVerify);
     try {
-      await runStreamed(repo.verify, repoDir, undefined, opts.timeoutMs);
-      notes.push(`${S.verifyOk}: ${repo.verify.join(' ')}`);
+      await runStreamed([...verifyCmd], repoDir, undefined, opts.timeoutMs);
+      notes.push(`${S.verifyOk}: ${verifyCmd.join(' ')}`);
       validated = true;
     } catch {
       status = 'warning';
-      notes.push(`${S.verifyFailed}: ${repo.verify.join(' ')}`);
+      notes.push(`${S.verifyFailed}: ${verifyCmd.join(' ')}`);
     }
   }
+
+  const runNative = async (argv: string[], dryRun: boolean): Promise<void> => {
+    if (argv[0] === '{python}') {
+      const py = await resolvePython();
+      if (!py) {
+        status = 'warning';
+        notes.push(S.nativeNoPython);
+        return;
+      }
+      argv.splice(0, 1, ...py);
+    }
+    const title = argv.join(' ');
+    reporter.phase?.(S.phaseNative);
+    reporter.commandStart?.(title);
+    try {
+      await runStreamed(argv, repoDir, reporter.commandLine, opts.timeoutMs);
+      reporter.commandEnd?.(true, title);
+      ran.push(dryRun ? S.nativeDryRun : S.nativeApplied);
+      if (dryRun) notes.push(S.nativeNeedsYes);
+    } catch (error) {
+      reporter.commandEnd?.(false, title);
+      status = 'warning';
+      notes.push(`${S.nativeFailed}: ${errorDetail(error)}`);
+    }
+  };
 
   if (nativeRequested && opts.native) {
     const built = buildNativeInstall(repo, opts.native);
@@ -215,19 +250,17 @@ export async function processRepo(
       notes.push(S.nativeUnsupported);
     } else {
       for (const flag of built.ignored) notes.push(`${S.nativeFlagIgnored}: --${flag}`);
-      const title = built.argv.join(' ');
-      reporter.phase?.(S.phaseNative);
-      reporter.commandStart?.(title);
-      try {
-        await runStreamed(built.argv, repoDir, reporter.commandLine, opts.timeoutMs);
-        reporter.commandEnd?.(true, title);
-        ran.push(built.dryRun ? S.nativeDryRun : S.nativeApplied);
-        if (built.dryRun) notes.push(S.nativeNeedsYes);
-      } catch (error) {
-        reporter.commandEnd?.(false, title);
-        status = 'warning';
-        notes.push(`${S.nativeFailed}: ${errorDetail(error)}`);
-      }
+      await runNative(built.argv, built.dryRun);
+    }
+  }
+
+  if (opts.nativeUpdate) {
+    const op = buildNativeOp(repo, 'update', opts.native?.approve === true);
+    if (!op) {
+      status = 'warning';
+      notes.push(S.nativeUnsupported);
+    } else {
+      await runNative(op.argv, op.dryRun);
     }
   }
 

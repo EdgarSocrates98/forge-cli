@@ -117,6 +117,9 @@ forge-cli uninstall api-forge [--yes]        # plano + backup de .env/configs
 forge-cli components [forjas]                # flags do instalador nativo por Forja
 forge-cli doctor [forjas] [--fix]            # diagnostica (ou repara) Forjas
 forge-cli install api-forge --offline        # só usa clone existente, sem rede
+forge-cli update api-forge --native           # também a operação nativa (--dry-run sem --yes)
+forge-cli uninstall api-forge --native --yes # desinstala nativamente e depois remove o clone
+forge-cli status --json                      # saída estruturada (também list, versions, components, doctor)
 forge-cli self install | self uninstall | self update
 forge-cli help
 ```

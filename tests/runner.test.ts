@@ -567,3 +567,52 @@ describe('fases do ciclo de vida', () => {
     expect(result.phase).toBe('failed');
   });
 });
+
+describe('forge.json, {python} e operações nativas', () => {
+  it('deriva a verificação de forge.json quando o catálogo não define verify', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    writeFileSync(path.join(repoDir, 'forge.json'), JSON.stringify({ cli: 'demo-cli' }));
+    const result = await processRepo(baseRepo, target);
+    expect(result.phase).toBe('validated');
+    expect(result.notes?.some((n) => n.includes('demo-cli --help'))).toBe(true);
+  });
+
+  it('resolve {python} para o interpretador disponível', async () => {
+    mockExeca();
+    const target = tmpDir();
+    existingGitRepo(target);
+    const repo: ForgeRepo = {
+      ...baseRepo,
+      nativeInstall: { command: ['{python}', 'scripts/x.py', 'install'], flags: ['profile'] },
+    };
+    await processRepo(repo, target, {}, { native: { profile: 'full', approve: true } });
+    const call = mockedExeca.mock.calls.find(
+      ([, args]) => (args as string[])[0] === 'scripts/x.py',
+    );
+    expect(call).toBeDefined();
+    expect(['python3', 'python', 'py']).toContain(call![0]);
+    expect(call![1]).toEqual(['scripts/x.py', 'install', '--profile', 'full', '--yes']);
+  });
+
+  it('nativeUpdate roda a operação de update com --dry-run sem aprovação', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const repo: ForgeRepo = {
+      ...baseRepo,
+      nativeInstall: {
+        command: ['demo-cli', 'install'],
+        flags: [],
+        ops: { update: ['demo-cli', 'install', 'update'] },
+      },
+    };
+    const result = await processRepo(repo, target, {}, { nativeUpdate: true });
+    const call = mockedExeca.mock.calls.find(([cmd]) => cmd === 'demo-cli');
+    expect(call?.[1]).toEqual(['install', 'update', '--dry-run']);
+    expect(result.notes).toContain(S.nativeNeedsYes);
+  });
+});
