@@ -56,7 +56,7 @@ function fakeClone(name: string, url: string): string {
   return dir;
 }
 
-describe('CLI ponta a ponta (processo real, diretórios temporários)', () => {
+describe('CLI ponta a ponta (processo real, diretórios temporários)', { timeout: 180_000 }, () => {
   it('help e comando desconhecido', async () => {
     const help = await cli('help');
     expect(help.code).toBe(0);

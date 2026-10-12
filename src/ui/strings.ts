@@ -135,6 +135,9 @@ export const S = {
   approvalTitle: 'Execução planejada',
   askTrustCustom: 'Executar os scripts do repositório customizado',
   warnScriptsDenied: 'Scripts não executados: não aprovados pelo usuário',
+  askReposHelp: '(digite para pesquisar · espaço marca · Enter confirma)',
+  askReposPlaceholder: 'Pesquisar Forjas…',
+  verboseLimit: 'Saída completa dos comandos habilitada (--verbose)',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -237,6 +240,7 @@ Opções:
   --scope <s>        Instalador nativo da Forja: project|workspace|user
   --components <a,b> Instalador nativo da Forja: ex. skills,agents,mcp
   --offline          Não acessa a rede; só usa clones já existentes (sem prometer cache completo)
+  --verbose          Mostra a saída completa dos comandos (e não só as últimas linhas)
   --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente

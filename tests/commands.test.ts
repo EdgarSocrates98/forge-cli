@@ -107,3 +107,20 @@ describe('fases persistidas', () => {
     expect(phaseOf(true, { status: 'ok', detail: '', at, phase: 'validated' })).toBe('validated');
   });
 });
+
+describe('repoHint', () => {
+  it('combina descrição, fase, versão e alterações locais', async () => {
+    const { repoHint } = await import('../src/prompts.js');
+    const repo = {
+      name: 'x',
+      url: 'https://github.com/a/x',
+      description: 'Desc',
+      kind: 'node' as const,
+    };
+    expect(repoHint(repo)).toBe('Desc');
+    const hint = repoHint(repo, { name: 'x', phase: 'validated', head: 'abc1234', dirty: true });
+    expect(hint).toContain('Desc');
+    expect(hint).toContain('validada');
+    expect(hint).toContain('abc1234');
+  });
+});

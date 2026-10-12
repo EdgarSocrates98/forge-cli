@@ -44,7 +44,21 @@ describe('run log', () => {
     log.write('linha um');
     log.write('linha dois');
     const content = readFileSync(log.file, 'utf8');
-    expect(content).toBe('linha um\nlinha dois\n');
+    const lines = content.trimEnd().split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z linha um$/);
+    expect(lines[1]).toMatch(/linha dois$/);
+  });
+
+  it('mascara segredos e URLs com credenciais antes de gravar', () => {
+    const log = openRunLog(tmpDir());
+    const token = 'ghp_' + 'b'.repeat(36);
+    log.write(`[cmd] git clone https://x-access-token:${token}@github.com/a/b`);
+    log.write('API_KEY=supersecret');
+    const content = readFileSync(log.file, 'utf8');
+    expect(content).not.toContain(token);
+    expect(content).not.toContain('supersecret');
+    expect(content).toContain('https://***@github.com/a/b');
   });
 
   it('withLog taps every reporter method', () => {

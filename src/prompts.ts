@@ -1,5 +1,6 @@
-import { cancel, confirm, isCancel, multiselect, note, text } from '@clack/prompts';
+import { autocompleteMultiselect, cancel, confirm, isCancel, note, text } from '@clack/prompts';
 import { FORGE_REPOS } from './constants/repos.js';
+import type { RepoStatusInfo } from './status.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, theme } from './ui/theme.js';
@@ -23,16 +24,34 @@ export async function askWorkspace(): Promise<string> {
   return targetDir;
 }
 
+export function repoHint(repo: ForgeRepo, info?: RepoStatusInfo): string {
+  if (!info) return repo.description;
+  const label: Record<RepoStatusInfo['phase'], string> = {
+    'not-installed': S.statusNotInstalled,
+    cloned: S.statusCloned,
+    prepared: S.statusPrepared,
+    installed: S.statusInstalled,
+    validated: S.statusValidated,
+    partial: S.statusPartial,
+    failed: S.statusFailed,
+    drifted: S.statusDrifted,
+  };
+  const version = info.describe ?? info.head;
+  const parts = [label[info.phase], version, info.dirty ? S.warnDirtyTree : undefined];
+  return `${repo.description} · ${parts.filter(Boolean).join(' · ')}`;
+}
+
 export async function askRepos(
   catalog: readonly ForgeRepo[] = FORGE_REPOS,
-  opts: { initialAll?: boolean } = {},
+  opts: { initialAll?: boolean; status?: ReadonlyMap<string, RepoStatusInfo> } = {},
 ): Promise<ForgeRepo[]> {
-  const selected = await multiselect({
-    message: S.askRepos,
+  const selected = await autocompleteMultiselect({
+    message: `${S.askRepos} ${theme.dim(S.askReposHelp)}`,
+    placeholder: S.askReposPlaceholder,
     options: catalog.map((repo) => ({
       value: repo.name,
       label: repo.name,
-      hint: repo.description,
+      hint: repoHint(repo, opts.status?.get(repo.name)),
     })),
     initialValues: opts.initialAll === false ? [] : catalog.map((repo) => repo.name),
     required: true,

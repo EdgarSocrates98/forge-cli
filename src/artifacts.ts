@@ -32,7 +32,11 @@ function timestamp(d = new Date()): string {
 export function openRunLog(targetDir: string): { file: string; write: (line: string) => void } {
   const file = path.join(artifactsRoot(targetDir), 'logs', `forge-cli-${timestamp()}.log`);
   mkdirSync(path.dirname(file), { recursive: true });
-  return { file, write: (line) => appendFileSync(file, `${line}\n`, 'utf8') };
+  return {
+    file,
+    write: (line) =>
+      appendFileSync(file, `${new Date().toISOString()} ${redactSecrets(line)}\n`, 'utf8'),
+  };
 }
 
 export function withLog(reporter: RepoReporter, write: (line: string) => void): RepoReporter {

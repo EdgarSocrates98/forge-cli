@@ -103,6 +103,8 @@ function catalogFor(targetDir: string): ForgeRepo[] {
   return [...FORGE_REPOS];
 }
 
+let TASKLOG_LIMIT = 8;
+
 async function processBatch(
   repos: ForgeRepo[],
   targetDir: string,
@@ -122,7 +124,7 @@ async function processBatch(
       phase: (phase) => s.message(`${label} — ${phase}`),
       commandStart: (title) => {
         s.stop(`${label} — ${title}`);
-        live = taskLog({ title: theme.accent(`${repo.name} › ${title}`), limit: 8 });
+        live = taskLog({ title: theme.accent(`${repo.name} › ${title}`), limit: TASKLOG_LIMIT });
       },
       commandLine: (line) => live?.message(theme.dim(line)),
       commandEnd: (ok, title) => {
@@ -519,7 +521,12 @@ async function main(): Promise<void> {
       const dir = cli.dir ? resolveTargetDir(cli.dir) : await askWorkspace();
       let names: string[] = [];
       if (actionNeedsRepos(action)) {
-        const chosen = await askRepos(catalogFor(dir), { initialAll: false });
+        const cat = catalogFor(dir);
+        const infos = await collectStatus(cat, dir, loadState(dir));
+        const chosen = await askRepos(cat, {
+          initialAll: false,
+          status: new Map(infos.map((i) => [i.name, i])),
+        });
         names = chosen.map((r) => r.name);
       }
       cli = {
@@ -530,6 +537,7 @@ async function main(): Promise<void> {
       };
     }
   }
+  if (cli.verbose) TASKLOG_LIMIT = 200;
   const resolved = resolveCommand(cli);
   if (resolved.command === 'unknown') {
     log.error(`${S.errUnknownCommand}: ${resolved.unknown}`);
@@ -660,7 +668,8 @@ async function main(): Promise<void> {
   let repos: ForgeRepo[];
   let review: { trusted: Set<string>; denied: Set<string> } | undefined;
   if (!nonInteractive) {
-    repos = await askRepos(catalog);
+    const infos = await collectStatus(catalog, targetDir, loadState(targetDir));
+    repos = await askRepos(catalog, { status: new Map(infos.map((i) => [i.name, i])) });
     if (!cli.yes) {
       review = await reviewExecution(repos, targetDir, cli);
       await askConfirm(targetDir, repos.length, catalog.length);

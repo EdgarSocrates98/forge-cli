@@ -7,6 +7,14 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- TUI: seleção de Forjas com busca (digite para filtrar) e dica de fase/versão
+  por Forja; `--verbose` para saída completa dos comandos; logs com
+  timestamp. Código de saída 1 quando alguma Forja falha.
+
+### Corrigido
+
+- O log da execução (`.forge-cli/logs`) agora mascara segredos e URLs com
+  credenciais; antes só relatórios e mensagens de erro eram mascarados.
 - Aprovação e estados (pós-roadmap): resumo de execução (origem, revisão,
   confiança, comandos exatos) antes da confirmação, aprovação por
   repositório customizado, e fases persistidas (`cloned`, `prepared`,
