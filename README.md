@@ -1,4 +1,8 @@
-# forge-cli
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Forge Cli" width="440">
+</p>
+
+# Forge-CLI
 
 CLI interativa para clonar e configurar o ecossistema **Forge**: oito
 repositórios, um comando. O forge-cli resolve o diretório de destino,
