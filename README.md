@@ -64,14 +64,27 @@ Alternativa sem npm global — o próprio CLI se registra no PATH do usuário
 
 ```bash
 npm run build
-node dist/index.js install     # Windows: forge-cli.cmd + PATH do usuário
+node dist/index.js self install  # Windows: forge-cli.cmd + PATH do usuário
                                # Linux/macOS: shim sh + bloco nos profiles
-forge-cli uninstall            # desfaz tudo (PATH, shims e bundle)
+forge-cli self uninstall       # desfaz tudo (PATH, shims e bundle)
 ```
 
-Após `install`, abra um terminal novo — o PATH do usuário só é lido por
+Após `self install`, abra um terminal novo — o PATH do usuário só é lido por
 processos novos. `forge-cli doctor` avisa quando o binário não está
 acessível no PATH.
+
+## Comandos
+
+```bash
+forge-cli install api-forge platform-forge   # instala Forjas escolhidas
+forge-cli install                            # fluxo interativo
+forge-cli clone api-forge                    # só clona/sincroniza, sem scripts
+forge-cli status                             # estado local (clonado, versão, alterações)
+forge-cli self install | self uninstall      # registra/remove o CLI no PATH
+```
+
+> `forge-cli install` agora instala Forjas; o registro no PATH passou a
+> ser `forge-cli self install`.
 
 ## Uso
 

@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Subcomandos (Cycle 3): `install [forjas]`, `clone <forjas>` (sem
+  scripts), `status [forjas]`, `self install|uninstall`. **Mudança:**
+  `forge-cli install` sem nomes agora abre o fluxo interativo; o
+  registro no PATH é `forge-cli self install`.
 - Sync Git (Cycle 1): detecta remote divergente do catálogo e classifica
   falhas de pull (divergente/rede/autenticação). Scripts não rodam após
   falha de sync sem `--run-after-sync-failure`; repositórios de

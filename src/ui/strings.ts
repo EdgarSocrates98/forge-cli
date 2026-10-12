@@ -41,6 +41,15 @@ export const S = {
   noSetupSteps: 'Nenhum passo de setup detectado (script ou package.json)',
   nonGitDir: 'Diretório existe e não é um repositório Git — pulado',
   warnDirtyTree: 'Alterações locais detectadas',
+  clonedOnly: 'Clonado (nenhum script executado)',
+  syncedOnly: 'Já clonado — sincronizado (nenhum script executado)',
+  statusTitle: 'Estado local',
+  statusNotInstalled: 'não clonado',
+  statusCloned: 'clonado',
+  statusInstalled: 'instalado',
+  statusFailed: 'falha',
+  errCloneNeedsNames: 'clone exige nomes de Forjas (ou --all/--only)',
+  errUnknownCommand: 'Comando desconhecido',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -104,8 +113,12 @@ Uso:
   forge-cli --plan              Mostra o plano por repositório e sai
   forge-cli doctor [--fix]      Diagnostica; --fix repara os que falharem
   forge-cli list                Lista o catálogo e o último estado conhecido
-  forge-cli install             Registra forge-cli no PATH do usuário
-  forge-cli uninstall           Remove o registro do PATH
+  forge-cli install [forjas]    Instala uma ou mais Forjas (sem nomes: interativo)
+  forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
+  forge-cli status [forjas]     Estado local (clonado, versão, alterações)
+  forge-cli self install        Registra forge-cli no PATH do usuário
+  forge-cli self uninstall      Remove o registro do PATH
+  forge-cli uninstall           Remove o registro do PATH (legado)
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)

@@ -34,7 +34,9 @@ import { FORGE_REPOS } from './constants/repos.js';
 import { loadConfig } from './config.js';
 import { reposNeedingFix, runDoctor } from './doctor.js';
 import { install, pathStatus, uninstall } from './install.js';
+import { resolveCommand } from './commands.js';
 import { planLines } from './plan.js';
+import { collectStatus } from './status.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
 import { listLine, mergeResults, renderReport, resultLine } from './report.js';
@@ -191,6 +193,28 @@ async function runListCommand(cli: CliOptions): Promise<void> {
   process.exit(0);
 }
 
+async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const catalog = catalogFor(targetDir);
+  const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
+  const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
+  const label: Record<string, string> = {
+    'not-installed': S.statusNotInstalled,
+    cloned: S.statusCloned,
+    installed: S.statusInstalled,
+    failed: S.statusFailed,
+  };
+  const body = infos
+    .map((i) => {
+      const ver = i.describe ?? i.head;
+      const extra = [ver, i.dirty ? S.warnDirtyTree : undefined].filter(Boolean).join(' · ');
+      return `${i.name} — ${label[i.phase]}${extra ? theme.dim(` (${extra})`) : ''}`;
+    })
+    .join('\n');
+  note(body, S.statusTitle);
+  process.exit(0);
+}
+
 async function runInstallCommand(): Promise<void> {
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
@@ -227,21 +251,37 @@ async function main(): Promise<void> {
     console.log(usage());
     process.exit(0);
   }
-  if (cli.positionals[0] === 'doctor') {
+  const resolved = resolveCommand(cli);
+  if (resolved.command === 'unknown') {
+    log.error(`${S.errUnknownCommand}: ${resolved.unknown}`);
+    console.log(usage());
+    process.exit(2);
+  }
+  if (resolved.command === 'doctor') {
     await runDoctorCommand(cli);
     return;
   }
-  if (cli.positionals[0] === 'list') {
+  if (resolved.command === 'list') {
     await runListCommand(cli);
     return;
   }
-  if (cli.positionals[0] === 'install') {
+  if (resolved.command === 'status') {
+    await runStatusCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'self-install') {
     await runInstallCommand();
     return;
   }
-  if (cli.positionals[0] === 'uninstall') {
+  if (resolved.command === 'self-uninstall' || resolved.command === 'uninstall') {
     await runUninstallCommand();
     return;
+  }
+  if (resolved.names.length) cli = { ...cli, only: [...(cli.only ?? []), ...resolved.names] };
+  const cloneOnly = resolved.command === 'clone';
+  if (cloneOnly && !isNonInteractive(cli)) {
+    log.error(S.errCloneNeedsNames);
+    process.exit(2);
   }
 
   await checkEnvironment();
@@ -310,6 +350,7 @@ async function main(): Promise<void> {
 
   const opts: RunOptions = {
     skipScripts: cli.skipScripts,
+    cloneOnly,
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,
     shallow: effectiveCli.shallow,

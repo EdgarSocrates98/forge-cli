@@ -1,0 +1,47 @@
+import type { CliState } from './artifacts.js';
+import { resolveInside } from './safety.js';
+import type { ForgeRepo } from './types.js';
+import { commandOutput, currentHead, hasGitRepo, isGitDirty } from './utils/system.js';
+
+export type InstallPhase = 'not-installed' | 'cloned' | 'installed' | 'failed';
+
+export interface RepoStatusInfo {
+  name: string;
+  phase: InstallPhase;
+  head?: string;
+  describe?: string;
+  dirty: boolean;
+}
+
+export function phaseOf(cloned: boolean, entry?: CliState['repos'][string]): InstallPhase {
+  if (!cloned) return 'not-installed';
+  if (!entry) return 'cloned';
+  if (entry.status === 'error') return 'failed';
+  return 'installed';
+}
+
+export async function collectStatus(
+  repos: readonly ForgeRepo[],
+  targetDir: string,
+  state: CliState | null,
+): Promise<RepoStatusInfo[]> {
+  const out: RepoStatusInfo[] = [];
+  for (const repo of repos) {
+    const dir = resolveInside(targetDir, repo.name);
+    const entry = state?.repos[repo.name];
+    if (!dir || !hasGitRepo(dir)) {
+      out.push({ name: repo.name, phase: phaseOf(false, entry), dirty: false });
+      continue;
+    }
+    const head = await currentHead(dir);
+    const describe = await commandOutput('git', ['-C', dir, 'describe', '--tags', '--always']);
+    out.push({
+      name: repo.name,
+      phase: phaseOf(true, entry),
+      head: head?.slice(0, 7),
+      describe: describe && describe !== 'ok' ? describe : undefined,
+      dirty: await isGitDirty(dir),
+    });
+  }
+  return out;
+}

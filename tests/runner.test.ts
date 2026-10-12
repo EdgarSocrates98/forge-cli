@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -163,6 +163,17 @@ describe('processRepo', () => {
     expect(blocked.detail).toBe(S.noSetupSteps);
     const trusted = await processRepo(repo, target, {}, { trustCustom: true });
     expect(trusted.detail).toBe(`${S.installedVia} npm install`);
+  });
+
+  it('cloneOnly stops after sync without env, scripts or npm', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const result = await processRepo(baseRepo, target, {}, { cloneOnly: true });
+    expect(result.status).toBe('ok');
+    expect(result.detail).toBe(S.clonedOnly);
+    const ran = mockedExeca.mock.calls.map(([cmd]) => cmd);
+    expect(ran).not.toContain('npm');
+    expect(existsSync(path.join(target, 'demo', '.env'))).toBe(false);
   });
 
   it('copies config examples and notes them', async () => {

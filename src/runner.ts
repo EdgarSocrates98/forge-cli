@@ -27,6 +27,7 @@ export interface RunOptions {
   timeoutMs?: number;
   shallow?: boolean;
   onlyChanged?: boolean;
+  cloneOnly?: boolean;
   trustCustom?: boolean;
   runAfterSyncFailure?: boolean;
   state?: CliState['repos'];
@@ -64,6 +65,12 @@ export async function processRepo(
   const remoteMismatch = sync.kind === 'remote-mismatch';
   if (remoteMismatch) notes.push(S.warnRemoteMismatch);
   head = await currentHead(repoDir);
+  if (opts.cloneOnly) {
+    return finish(
+      sync.kind === 'pull-failed' || remoteMismatch ? 'warning' : 'ok',
+      sync.kind === 'cloned' ? S.clonedOnly : S.syncedOnly,
+    );
+  }
   const prior = opts.onlyChanged ? opts.state?.[repo.name] : undefined;
   if (prior?.status === 'ok' && prior.head && prior.head === head) {
     notes.push(S.unchanged);
