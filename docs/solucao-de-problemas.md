@@ -7,11 +7,11 @@ Falhas comuns do forge-cli e como resolver cada uma.
 O preflight roda antes de qualquer prompt e encerra com código `1`
 quando algo falta:
 
-| Falha | Causa | Correção |
-|---|---|---|
-| `git` indisponível | Git não instalado ou fora do `PATH` | Instale o Git e abra um terminal novo |
-| `Node.js >= 20` falha | Versão antiga | Atualize via [nodejs.org](https://nodejs.org) ou `nvm` |
-| `powershell.exe` indisponível | Somente Windows; fora do `PATH` | Reinstale o PowerShell ou ajuste o `PATH` |
+| Falha                         | Causa                               | Correção                                               |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| `git` indisponível            | Git não instalado ou fora do `PATH` | Instale o Git e abra um terminal novo                  |
+| `Node.js >= 20` falha         | Versão antiga                       | Atualize via [nodejs.org](https://nodejs.org) ou `nvm` |
+| `powershell.exe` indisponível | Somente Windows; fora do `PATH`     | Reinstale o PowerShell ou ajuste o `PATH`              |
 
 ## Falha no clone/pull (`[ERRO]`)
 

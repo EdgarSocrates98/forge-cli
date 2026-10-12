@@ -59,9 +59,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
   return {
     dir: values.dir,
     all: values.all ?? false,
-    only: values.only?.split(',').map((s) => s.trim()).filter(Boolean),
+    only: values.only
+      ?.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     yes: values.yes ?? false,
-    plan: (values.plan ?? values['dry-run']) ?? false,
+    plan: values.plan ?? values['dry-run'] ?? false,
     skipScripts: values['skip-scripts'] ?? false,
     skipVerify: values['skip-verify'] ?? false,
     timeoutSecs: values.timeout === undefined ? DEFAULT_TIMEOUT_SECS : timeoutSecs,

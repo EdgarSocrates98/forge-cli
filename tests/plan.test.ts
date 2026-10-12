@@ -62,10 +62,7 @@ describe('planLines', () => {
   it('detects the setup script and config examples', () => {
     const target = tmpDir();
     const repoDir = existingGitRepo(target);
-    writeFileSync(
-      path.join(repoDir, process.platform === 'win32' ? 'setup.ps1' : 'setup.sh'),
-      'x',
-    );
+    writeFileSync(path.join(repoDir, process.platform === 'win32' ? 'setup.ps1' : 'setup.sh'), 'x');
     writeFileSync(path.join(repoDir, 'config.example.yaml'), 'a: 1\n');
     const text = planLines(repo, target).join('\n');
     expect(text).toContain(process.platform === 'win32' ? 'setup.ps1' : 'setup.sh');

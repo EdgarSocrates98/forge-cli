@@ -18,7 +18,7 @@ feedback visual em tempo real.
 - **Scripts por sistema operacional**: `install.ps1` no Windows e
   `install.sh` no Linux/macOS, detectados automaticamente.
 - **Verificação de ambiente (preflight)**: confirma `git`, Node.js
-  >= 20 e `powershell.exe` (Windows) antes de qualquer alteração.
+  > = 20 e `powershell.exe` (Windows) antes de qualquer alteração.
 - **Isolamento de falhas**: o erro em um repositório não interrompe os
   demais; o relatório final mostra `[OK]`, `[AVISO]` ou `[ERRO]` por
   item, com tempo de execução.
@@ -27,13 +27,13 @@ feedback visual em tempo real.
 
 ## Requisitos
 
-| Requisito | Versão | Observação |
-|---|---|---|
-| Node.js | >= 20 | Verificado no preflight |
-| npm | >= 10 | Gerenciador de pacotes fixo |
-| Git | qualquer recente | Precisa estar no `PATH` |
-| PowerShell | qualquer | Somente Windows — `install.ps1` |
-| Credenciais Git | — | Acesso aos repositórios privados |
+| Requisito       | Versão           | Observação                       |
+| --------------- | ---------------- | -------------------------------- |
+| Node.js         | >= 20            | Verificado no preflight          |
+| npm             | >= 10            | Gerenciador de pacotes fixo      |
+| Git             | qualquer recente | Precisa estar no `PATH`          |
+| PowerShell      | qualquer         | Somente Windows — `install.ps1`  |
+| Credenciais Git | —                | Acesso aos repositórios privados |
 
 ## Instalação
 
@@ -83,16 +83,16 @@ encerra de forma limpa (código `130` em `SIGINT`).
 
 ## Repositórios do ecossistema
 
-| Repositório | Descrição |
-|---|---|
-| `the-forge` | Framework base e utilitários |
-| `spark-forge-aws` | Pipelines Spark para AWS |
-| `spark-forge-azure` | Pipelines Spark para Azure |
-| `platform-forge` | Serviços e infra de plataforma |
-| `api-forge` | Backend central e APIs |
-| `forge-doctor-api` | API de diagnóstico e telemetria |
+| Repositório         | Descrição                        |
+| ------------------- | -------------------------------- |
+| `the-forge`         | Framework base e utilitários     |
+| `spark-forge-aws`   | Pipelines Spark para AWS         |
+| `spark-forge-azure` | Pipelines Spark para Azure       |
+| `platform-forge`    | Serviços e infra de plataforma   |
+| `api-forge`         | Backend central e APIs           |
+| `forge-doctor-api`  | API de diagnóstico e telemetria  |
 | `forge-doctor-data` | Pipeline de dados de diagnóstico |
-| `forge-portal` | Frontend / Portal Web |
+| `forge-portal`      | Frontend / Portal Web            |
 
 Todos os repositórios ficam na organização
 [`EdgarSocrates98`](https://github.com/EdgarSocrates98) no GitHub.
@@ -101,11 +101,11 @@ Todos os repositórios ficam na organização
 
 Antes do script de instalação, cada repositório recebe um `.env`:
 
-| Condição | Ação | Indicador no relatório |
-|---|---|---|
-| `.env` já existe | Nada — nunca sobrescreve | `.env já existia` |
-| `.env.example` existe | Copiado para `.env` | `.env criado a partir de .env.example` |
-| Nenhum dos dois | Modelo com comentários criado | `.env criado (modelo vazio…)` |
+| Condição              | Ação                          | Indicador no relatório                 |
+| --------------------- | ----------------------------- | -------------------------------------- |
+| `.env` já existe      | Nada — nunca sobrescreve      | `.env já existia`                      |
+| `.env.example` existe | Copiado para `.env`           | `.env criado a partir de .env.example` |
+| Nenhum dos dois       | Modelo com comentários criado | `.env criado (modelo vazio…)`          |
 
 Se o provisionamento falhar (por exemplo, permissão negada), o
 repositório é marcado como `[ERRO]` e o script de instalação **não**
@@ -113,21 +113,21 @@ repositório é marcado como `[ERRO]` e o script de instalação **não**
 
 ## Status de execução
 
-| Status | Significado |
-|---|---|
-| ✅ `[OK]` | Clonado/atualizado e script executado com sucesso |
+| Status       | Significado                                        |
+| ------------ | -------------------------------------------------- |
+| ✅ `[OK]`    | Clonado/atualizado e script executado com sucesso  |
 | ⚠️ `[AVISO]` | Clonado, mas sem script de instalação para este SO |
-| ❌ `[ERRO]` | Falha no clone/pull, no `.env` ou no script |
+| ❌ `[ERRO]`  | Falha no clone/pull, no `.env` ou no script        |
 
 ## Scripts do projeto
 
-| Comando | Ação |
-|---|---|
-| `npm run dev` | Executa o CLI via `tsx`, sem compilar |
-| `npm run build` | Compila `src/` para `dist/` via `tsup` |
-| `npm start` | Executa `dist/index.js` |
-| `npm test` | Testes unitários via `vitest` |
-| `npm run typecheck` | Verificação de tipos (`tsc --noEmit`) |
+| Comando             | Ação                                   |
+| ------------------- | -------------------------------------- |
+| `npm run dev`       | Executa o CLI via `tsx`, sem compilar  |
+| `npm run build`     | Compila `src/` para `dist/` via `tsup` |
+| `npm start`         | Executa `dist/index.js`                |
+| `npm test`          | Testes unitários via `vitest`          |
+| `npm run typecheck` | Verificação de tipos (`tsc --noEmit`)  |
 
 ## Estrutura do projeto
 

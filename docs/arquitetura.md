@@ -7,19 +7,19 @@ vive em módulos especializados.**
 
 ## Mapa de módulos
 
-| Módulo | Responsabilidade |
-|---|---|
-| `src/index.ts` | Orquestra o fluxo: banner → preflight → prompts → execução → relatório. Trata `SIGINT` e erros fatais. |
-| `src/prompts.ts` | Prompts interativos (diretório, seleção, confirmação) e tratamento de cancelamento via `isCancel()`. |
-| `src/preflight.ts` | Verificações de ambiente antes de qualquer prompt: `git`, Node.js >= 20, `powershell.exe` no Windows. |
-| `src/runner.ts` | Pipeline por repositório com cronômetro e fases: sincronizar → `.env` → script de instalação. |
-| `src/env.ts` | Provisionamento do `.env` (`planEnvFile` decide, `ensureEnvFile` executa). |
-| `src/report.ts` | Badges de status, linha por repositório e relatório consolidado. |
-| `src/ui/theme.ts` | Paleta de cores (picocolors) e ícones emoji. Único ponto de contato com cores. |
-| `src/ui/strings.ts` | Todas as strings visíveis ao usuário, em PT-BR. |
-| `src/constants/repos.ts` | Catálogo fixo dos oito repositórios Forge. |
-| `src/utils/system.ts` | Primitivas: resolução de caminho, `.git`, seleção de script por SO, `execa`, detalhe de erro. |
-| `src/types.ts` | Tipos compartilhados (`ForgeRepo`, `RepoResult`, `InstallScript`, `PreflightCheck`). |
+| Módulo                   | Responsabilidade                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `src/index.ts`           | Orquestra o fluxo: banner → preflight → prompts → execução → relatório. Trata `SIGINT` e erros fatais. |
+| `src/prompts.ts`         | Prompts interativos (diretório, seleção, confirmação) e tratamento de cancelamento via `isCancel()`.   |
+| `src/preflight.ts`       | Verificações de ambiente antes de qualquer prompt: `git`, Node.js >= 20, `powershell.exe` no Windows.  |
+| `src/runner.ts`          | Pipeline por repositório com cronômetro e fases: sincronizar → `.env` → script de instalação.          |
+| `src/env.ts`             | Provisionamento do `.env` (`planEnvFile` decide, `ensureEnvFile` executa).                             |
+| `src/report.ts`          | Badges de status, linha por repositório e relatório consolidado.                                       |
+| `src/ui/theme.ts`        | Paleta de cores (picocolors) e ícones emoji. Único ponto de contato com cores.                         |
+| `src/ui/strings.ts`      | Todas as strings visíveis ao usuário, em PT-BR.                                                        |
+| `src/constants/repos.ts` | Catálogo fixo dos oito repositórios Forge.                                                             |
+| `src/utils/system.ts`    | Primitivas: resolução de caminho, `.git`, seleção de script por SO, `execa`, detalhe de erro.          |
+| `src/types.ts`           | Tipos compartilhados (`ForgeRepo`, `RepoResult`, `InstallScript`, `PreflightCheck`).                   |
 
 ## Fluxo de execução
 
@@ -91,11 +91,25 @@ abre caminho para i18n futura sem reescrever módulos.
 ## Tipos centrais
 
 ```typescript
-interface ForgeRepo { name; url; description }
+interface ForgeRepo {
+  name;
+  url;
+  description;
+}
 type RepoStatus = 'ok' | 'warning' | 'error';
 type EnvAction = 'exists' | 'copied' | 'stub';
-interface RepoResult { repo; status; detail; envNote?; elapsedMs }
-interface InstallScript { file; command; args }
+interface RepoResult {
+  repo;
+  status;
+  detail;
+  envNote?;
+  elapsedMs;
+}
+interface InstallScript {
+  file;
+  command;
+  args;
+}
 ```
 
 ## Build e distribuição

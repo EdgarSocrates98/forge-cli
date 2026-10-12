@@ -18,7 +18,11 @@ const base = (over: Partial<RepoResult> = {}): RepoResult => ({
 });
 
 const named = (name: string, status: RepoResult['status'], elapsedMs = 100): RepoResult =>
-  base({ repo: { name, url: `https://x/${name}`, description: 'd', kind: 'python' }, status, elapsedMs });
+  base({
+    repo: { name, url: `https://x/${name}`, description: 'd', kind: 'python' },
+    status,
+    elapsedMs,
+  });
 
 describe('resultLine', () => {
   it('appends next-steps line for ok repos with nextSteps', () => {

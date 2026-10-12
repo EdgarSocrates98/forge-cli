@@ -48,8 +48,6 @@ export function planLines(repo: ForgeRepo, targetDir: string): string[] {
   const npmArgs = npmInstallArgs(repoDir);
   lines.push(`npm: ${npmArgs ? `npm ${npmArgs[0]}` : S.planNone}`);
 
-  lines.push(
-    `${S.phaseVerify}: ${repo.verify?.length ? repo.verify.join(' ') : S.planNone}`,
-  );
+  lines.push(`${S.phaseVerify}: ${repo.verify?.length ? repo.verify.join(' ') : S.planNone}`);
   return lines;
 }

@@ -21,8 +21,7 @@ function tmpDir(): string {
 
 function proc(outcome: { stdout?: string } | Error) {
   const iterable = async function* () {};
-  const p =
-    outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
+  const p = outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
   p.catch(() => {});
   return Object.assign(p, { iterable: () => iterable() });
 }

@@ -23,9 +23,7 @@ export async function askWorkspace(): Promise<string> {
   return targetDir;
 }
 
-export async function askRepos(
-  catalog: readonly ForgeRepo[] = FORGE_REPOS,
-): Promise<ForgeRepo[]> {
+export async function askRepos(catalog: readonly ForgeRepo[] = FORGE_REPOS): Promise<ForgeRepo[]> {
   const selected = await multiselect({
     message: S.askRepos,
     options: catalog.map((repo) => ({
@@ -40,11 +38,7 @@ export async function askRepos(
   return catalog.filter((repo) => selected.includes(repo.name));
 }
 
-export async function askConfirm(
-  targetDir: string,
-  count: number,
-  total: number,
-): Promise<void> {
+export async function askConfirm(targetDir: string, count: number, total: number): Promise<void> {
   note(
     `${icons.folder} Destino: ${theme.accent(targetDir)}\n${icons.box} Repositórios: ${theme.accent(String(count))} de ${total}`,
     S.summaryTitle,

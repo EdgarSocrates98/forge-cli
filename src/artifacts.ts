@@ -1,10 +1,4 @@
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { RepoReporter } from './runner.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
@@ -92,8 +86,7 @@ export function writeJsonReport(
   reportPath?: string,
 ): string {
   const file =
-    reportPath ??
-    path.join(artifactsRoot(targetDir), 'reports', `forge-cli-${timestamp()}.json`);
+    reportPath ?? path.join(artifactsRoot(targetDir), 'reports', `forge-cli-${timestamp()}.json`);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(
     file,

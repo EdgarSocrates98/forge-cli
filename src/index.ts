@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-import { cancel, confirm, intro, isCancel, log, note, outro, spinner, taskLog } from '@clack/prompts';
+import {
+  cancel,
+  confirm,
+  intro,
+  isCancel,
+  log,
+  note,
+  outro,
+  spinner,
+  taskLog,
+} from '@clack/prompts';
 import figlet from 'figlet';
 import {
   failedRepoNames,
@@ -160,7 +170,9 @@ async function main(): Promise<void> {
 
   const interactive = !isNonInteractive(cli);
   const targetDir = interactive
-    ? (cli.dir ? resolveTargetDir(cli.dir) : await askWorkspace())
+    ? cli.dir
+      ? resolveTargetDir(cli.dir)
+      : await askWorkspace()
     : resolveTargetDir(cli.dir);
   const catalog = catalogFor(targetDir);
 

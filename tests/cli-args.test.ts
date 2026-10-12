@@ -71,10 +71,7 @@ describe('resolveSelection', () => {
 
   it('--only returns matching catalog entries', () => {
     const sel = resolveSelection(parseCliArgs(['--only', 'api-forge,forge-portal']));
-    expect('repos' in sel && sel.repos.map((r) => r.name)).toEqual([
-      'api-forge',
-      'forge-portal',
-    ]);
+    expect('repos' in sel && sel.repos.map((r) => r.name)).toEqual(['api-forge', 'forge-portal']);
   });
 
   it('reports unknown names with the valid list', () => {
