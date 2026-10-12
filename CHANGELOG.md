@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Aprovação e estados (pós-roadmap): resumo de execução (origem, revisão,
+  confiança, comandos exatos) antes da confirmação, aprovação por
+  repositório customizado, e fases persistidas (`cloned`, `prepared`,
+  `installed`, `validated`, `partial`, `failed`, `drifted`) no `status`.
 - `help`, `components [forjas]` (flags do instalador nativo por Forja),
   `doctor <forja>` e `--offline` (usa só clones existentes; nunca clona
   nem faz pull/fetch).

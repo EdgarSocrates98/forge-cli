@@ -97,3 +97,13 @@ describe('help e components', () => {
     });
   });
 });
+
+describe('fases persistidas', () => {
+  it('usa a fase registrada e sinaliza drift quando o HEAD mudou', async () => {
+    const at = '2026-01-01T00:00:00Z';
+    expect(phaseOf(true, { status: 'warning', detail: '', at, phase: 'prepared' })).toBe(
+      'prepared',
+    );
+    expect(phaseOf(true, { status: 'ok', detail: '', at, phase: 'validated' })).toBe('validated');
+  });
+});

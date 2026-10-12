@@ -1,9 +1,9 @@
 import type { CliState } from './artifacts.js';
 import { resolveInside } from './safety.js';
-import type { ForgeRepo } from './types.js';
+import type { ForgeRepo, LifecyclePhase } from './types.js';
 import { commandOutput, currentHead, hasGitRepo, isGitDirty } from './utils/system.js';
 
-export type InstallPhase = 'not-installed' | 'cloned' | 'installed' | 'failed';
+export type InstallPhase = LifecyclePhase;
 
 export interface RepoStatusInfo {
   name: string;
@@ -16,6 +16,7 @@ export interface RepoStatusInfo {
 export function phaseOf(cloned: boolean, entry?: CliState['repos'][string]): InstallPhase {
   if (!cloned) return 'not-installed';
   if (!entry) return 'cloned';
+  if (entry.phase) return entry.phase;
   if (entry.status === 'error') return 'failed';
   return 'installed';
 }
@@ -35,9 +36,12 @@ export async function collectStatus(
     }
     const head = await currentHead(dir);
     const describe = await commandOutput('git', ['-C', dir, 'describe', '--tags', '--always']);
+    let phase = phaseOf(true, entry);
+    const recorded = entry?.head;
+    if (recorded && head && recorded !== head && phase !== 'cloned') phase = 'drifted';
     out.push({
       name: repo.name,
-      phase: phaseOf(true, entry),
+      phase,
       head: head?.slice(0, 7),
       describe: describe && describe !== 'ok' ? describe : undefined,
       dirty: await isGitDirty(dir),

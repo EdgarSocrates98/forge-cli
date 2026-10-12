@@ -20,6 +20,16 @@ export type RepoStatus = 'ok' | 'warning' | 'error';
 
 export type EnvAction = 'exists' | 'copied' | 'stub';
 
+export type LifecyclePhase =
+  | 'not-installed'
+  | 'cloned'
+  | 'prepared'
+  | 'installed'
+  | 'validated'
+  | 'partial'
+  | 'failed'
+  | 'drifted';
+
 export interface RepoResult {
   repo: ForgeRepo;
   status: RepoStatus;
@@ -28,6 +38,7 @@ export interface RepoResult {
   notes?: string[];
   elapsedMs: number;
   head?: string;
+  phase?: LifecyclePhase;
 }
 
 export interface SetupScript {

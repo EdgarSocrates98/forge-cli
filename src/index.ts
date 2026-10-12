@@ -220,8 +220,12 @@ async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void>
   const label: Record<string, string> = {
     'not-installed': S.statusNotInstalled,
     cloned: S.statusCloned,
+    prepared: S.statusPrepared,
     installed: S.statusInstalled,
+    validated: S.statusValidated,
+    partial: S.statusPartial,
     failed: S.statusFailed,
+    drifted: S.statusDrifted,
   };
   const body = infos
     .map((i) => {

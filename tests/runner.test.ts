@@ -533,3 +533,37 @@ describe('aprovação por repositório customizado', () => {
     expect(denied.detail).toBe(S.noSetupSteps);
   });
 });
+
+describe('fases do ciclo de vida', () => {
+  it('validated quando a verificação passa, installed quando falha', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const ok = await processRepo({ ...baseRepo, verify: ['demo', '--help'] }, target);
+    expect(ok.phase).toBe('validated');
+
+    const bad = await processRepo({ ...baseRepo, verify: ['verify-bad'] }, target);
+    expect(bad.phase).toBe('installed');
+    expect(bad.status).toBe('warning');
+  });
+
+  it('prepared quando scripts são pulados e cloned no clone-only', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const prepared = await processRepo(baseRepo, target, {}, { skipScripts: true });
+    expect(prepared.phase).toBe('prepared');
+    const cloned = await processRepo(baseRepo, target, {}, { cloneOnly: true });
+    expect(cloned.phase).toBe('cloned');
+  });
+
+  it('failed em erro antes de qualquer passo', async () => {
+    mockedExeca.mockImplementation((() => proc(new Error('boom'))) as never);
+    const target = tmpDir();
+    const result = await processRepo(baseRepo, target);
+    expect(result.status).toBe('error');
+    expect(result.phase).toBe('failed');
+  });
+});

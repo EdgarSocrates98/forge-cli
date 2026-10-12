@@ -2,13 +2,20 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { RepoReporter } from './runner.js';
 import { isSafeRepoName, isSafeRepoUrl, redactSecrets, writeFileAtomic } from './safety.js';
-import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
+import type { ForgeRepo, LifecyclePhase, RepoResult, RepoStatus } from './types.js';
 
 export interface CliState {
   version: 1;
   repos: Record<
     string,
-    { status: RepoStatus; detail: string; at: string; head?: string; previousHead?: string }
+    {
+      status: RepoStatus;
+      detail: string;
+      at: string;
+      head?: string;
+      previousHead?: string;
+      phase?: LifecyclePhase;
+    }
   >;
   pins?: Record<string, string>;
 }
@@ -76,6 +83,7 @@ export function recordResult(targetDir: string, result: RepoResult): void {
     detail: result.detail,
     at: new Date().toISOString(),
     ...(result.head ? { head: result.head } : {}),
+    ...(result.phase ? { phase: result.phase } : {}),
     ...(previousHead ? { previousHead } : {}),
   };
   saveState(targetDir, state);

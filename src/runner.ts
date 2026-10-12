@@ -8,7 +8,7 @@ import {
 } from './native-install.js';
 import { ensureEnvFile, envNoteFor } from './env.js';
 import { checkRepoPrereqs } from './prereqs.js';
-import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
+import type { ForgeRepo, LifecyclePhase, RepoResult, RepoStatus } from './types.js';
 import { S } from './ui/strings.js';
 import {
   currentHead,
@@ -56,6 +56,7 @@ export async function processRepo(
   const repoDir = path.join(targetDir, repo.name);
   const notes: string[] = [];
   let head: string | null = null;
+  let phase: LifecyclePhase | undefined;
   const finish = (status: RepoStatus, detail: string, envNote?: string): RepoResult => ({
     repo,
     status,
@@ -64,6 +65,9 @@ export async function processRepo(
     notes: notes.length ? notes : undefined,
     elapsedMs: elapsedMs(),
     ...(head ? { head } : {}),
+    ...((phase ?? (status === 'error' ? ('failed' as const) : undefined))
+      ? { phase: phase ?? 'failed' }
+      : {}),
   });
 
   const wantedRef = opts.ref ?? opts.refs?.[repo.name];
@@ -88,6 +92,7 @@ export async function processRepo(
   if (remoteMismatch) notes.push(S.warnRemoteMismatch);
   head = await currentHead(repoDir);
   if (opts.cloneOnly) {
+    phase = 'cloned';
     return finish(
       sync.kind === 'pull-failed' || remoteMismatch ? 'warning' : 'ok',
       sync.kind === 'cloned' ? S.clonedOnly : S.syncedOnly,
@@ -162,6 +167,7 @@ export async function processRepo(
       ran.push(script.file);
     } catch (error) {
       reporter.commandEnd?.(false, script.file);
+      phase = ran.length ? 'partial' : 'failed';
       return finish('error', `${S.installFailed} ${script.file}: ${errorDetail(error)}`, envNote);
     }
   }
@@ -177,19 +183,25 @@ export async function processRepo(
       ran.push(title);
     } catch (error) {
       reporter.commandEnd?.(false, title);
+      phase = ran.length ? 'partial' : 'failed';
       return finish('error', `${S.npmFailed}: ${errorDetail(error)}`, envNote);
     }
   }
 
   const nativeRequested = hasNativeRequest(opts.native);
-  if (!ran.length && !nativeRequested) return finish('warning', S.noSetupSteps, envNote);
+  if (!ran.length && !nativeRequested) {
+    phase = 'prepared';
+    return finish('warning', S.noSetupSteps, envNote);
+  }
 
   let status: RepoStatus = syncFailed ? 'warning' : 'ok';
+  let validated = false;
   if (repo.verify?.length && !opts.skipVerify) {
     reporter.phase?.(S.phaseVerify);
     try {
       await runStreamed(repo.verify, repoDir, undefined, opts.timeoutMs);
       notes.push(`${S.verifyOk}: ${repo.verify.join(' ')}`);
+      validated = true;
     } catch {
       status = 'warning';
       notes.push(`${S.verifyFailed}: ${repo.verify.join(' ')}`);
@@ -219,7 +231,11 @@ export async function processRepo(
     }
   }
 
-  if (!ran.length) return finish(status, S.noSetupSteps, envNote);
+  if (!ran.length) {
+    phase = 'prepared';
+    return finish(status, S.noSetupSteps, envNote);
+  }
+  phase = validated ? 'validated' : 'installed';
   return finish(status, `${S.installedVia} ${ran.join(' + ')}`, envNote);
 }
 
