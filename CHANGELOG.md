@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Versões e revisões (Cycle 3/5): `update [forjas]` (sem nomes: todas as
+  clonadas), `update --check` (só fetch, sem alterar), `versions`,
+  `--ref <sha|tag>` e `--version <tag>` (checkout destacado; recusa
+  working tree modificada; exige uma única Forja).
 - Subcomandos (Cycle 3): `install [forjas]`, `clone <forjas>` (sem
   scripts), `status [forjas]`, `self install|uninstall`. **Mudança:**
   `forge-cli install` sem nomes agora abre o fluxo interativo; o

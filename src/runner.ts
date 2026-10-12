@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { copyConfigExamples } from './configs.js';
+import { checkoutRef } from './git-revs.js';
 import { ensureEnvFile, envNoteFor } from './env.js';
 import { checkRepoPrereqs } from './prereqs.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
@@ -27,6 +28,7 @@ export interface RunOptions {
   timeoutMs?: number;
   shallow?: boolean;
   onlyChanged?: boolean;
+  ref?: string;
   cloneOnly?: boolean;
   trustCustom?: boolean;
   runAfterSyncFailure?: boolean;
@@ -57,7 +59,15 @@ export async function processRepo(
   reporter.phase?.(S.phaseClone);
   let sync;
   try {
-    sync = await syncRepo(repo, targetDir, { shallow: opts.shallow });
+    sync = await syncRepo(repo, targetDir, {
+      shallow: opts.shallow && !opts.ref,
+      noPull: Boolean(opts.ref),
+    });
+    if (opts.ref && sync.kind !== 'non-git' && sync.kind !== 'remote-mismatch') {
+      if (sync.dirty) throw new Error(S.errRefDirty);
+      const resolved = await checkoutRef(repoDir, opts.ref);
+      notes.push(`${S.refCheckedOut}: ${resolved}`);
+    }
   } catch (error) {
     return finish('error', `${S.cloneFailed}: ${errorDetail(error)}`);
   }

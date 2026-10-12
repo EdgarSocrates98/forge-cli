@@ -123,6 +123,7 @@ export function classifyGitFailure(message: string): SyncFailure {
 
 export interface SyncOptions {
   shallow?: boolean;
+  noPull?: boolean;
 }
 
 export async function syncRepo(
@@ -142,6 +143,14 @@ export async function syncRepo(
     const remote = await commandOutput('git', ['-C', repoDir, 'remote', 'get-url', 'origin']);
     if (remote && remote !== 'ok' && !sameRemote(remote, repo.url)) {
       return { kind: 'remote-mismatch', dirty };
+    }
+    if (opts.noPull) {
+      await execa('git', ['fetch', '--quiet', '--tags'], {
+        cwd: repoDir,
+        reject: false,
+        env: { GIT_TERMINAL_PROMPT: '0' },
+      });
+      return { kind: 'fixed-ref', dirty };
     }
     try {
       await execa('git', ['pull', '--ff-only'], { cwd: repoDir });

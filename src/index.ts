@@ -44,7 +44,9 @@ import { processPool, processRepo, type RepoReporter, type RunOptions } from './
 import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, kindIcon, theme } from './ui/theme.js';
-import { resolveTargetDir } from './utils/system.js';
+import { currentHead, hasGitRepo, resolveTargetDir } from './utils/system.js';
+import { localTags, remoteTags, updateCheck } from './git-revs.js';
+import { resolveInside } from './safety.js';
 
 const BANNER_LINE_DELAY_MS = 30;
 
@@ -215,6 +217,69 @@ async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void>
   process.exit(0);
 }
 
+function reposByNames(catalog: ForgeRepo[], names: string[]): ForgeRepo[] | { error: string } {
+  if (!names.length) return catalog;
+  const missing = names.filter((n) => !catalog.some((r) => r.name === n));
+  if (missing.length) return { error: `${S.errUnknownRepos}: ${missing.join(', ')}` };
+  return catalog.filter((r) => names.includes(r.name));
+}
+
+async function runUpdateCheckCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const picked = reposByNames(catalogFor(targetDir), names);
+  if ('error' in picked) {
+    log.error(picked.error);
+    process.exit(2);
+  }
+  const lines: string[] = [];
+  let pending = 0;
+  for (const repo of picked) {
+    const dir = resolveInside(targetDir, repo.name);
+    if (!dir || !hasGitRepo(dir)) {
+      lines.push(`${repo.name} — ${S.statusNotInstalled}`);
+      continue;
+    }
+    const check = await updateCheck(dir);
+    if (check.failure) {
+      lines.push(`${repo.name} — ${theme.warn(`${S.updateCheckFailed} (${check.failure})`)}`);
+    } else if (check.behind > 0) {
+      pending++;
+      lines.push(`${repo.name} — ${theme.accent(`${check.behind} ${S.updateCommitsBehind}`)}`);
+    } else {
+      lines.push(`${repo.name} — ${theme.ok(S.updateUpToDate)}`);
+    }
+  }
+  note(lines.join('\n'), S.updateCheckTitle);
+  process.exit(pending > 0 ? 1 : 0);
+}
+
+async function runVersionsCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const picked = reposByNames(catalogFor(targetDir), names);
+  if ('error' in picked) {
+    log.error(picked.error);
+    process.exit(2);
+  }
+  const lines: string[] = [];
+  for (const repo of picked) {
+    const dir = resolveInside(targetDir, repo.name);
+    if (dir && hasGitRepo(dir)) {
+      const head = (await currentHead(dir))?.slice(0, 7) ?? '?';
+      const tags = await localTags(dir);
+      lines.push(
+        `${theme.accent(repo.name)} — ${S.versionsRevision} ${head} · ${S.versionsTags}: ${tags.length ? tags.join(', ') : S.planNone}`,
+      );
+    } else {
+      const tags = await remoteTags(repo.url);
+      lines.push(
+        `${theme.accent(repo.name)} — ${S.statusNotInstalled} · ${S.versionsTags}: ${tags === null ? S.versionsUnavailable : tags.length ? tags.join(', ') : S.planNone}`,
+      );
+    }
+  }
+  note(lines.join('\n'), S.versionsTitle);
+  process.exit(0);
+}
+
 async function runInstallCommand(): Promise<void> {
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
@@ -268,6 +333,28 @@ async function main(): Promise<void> {
   if (resolved.command === 'status') {
     await runStatusCommand(cli, resolved.names);
     return;
+  }
+  if (resolved.command === 'versions') {
+    await runVersionsCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'update' && cli.check) {
+    await runUpdateCheckCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'update' && !resolved.names.length && !isNonInteractive(cli)) {
+    const dir = resolveTargetDir(cli.dir);
+    const present = catalogFor(dir)
+      .filter((r) => {
+        const d = resolveInside(dir, r.name);
+        return d !== null && hasGitRepo(d);
+      })
+      .map((r) => r.name);
+    if (!present.length) {
+      log.info(S.updateNothing);
+      process.exit(0);
+    }
+    cli = { ...cli, only: present };
   }
   if (resolved.command === 'self-install') {
     await runInstallCommand();
@@ -335,6 +422,11 @@ async function main(): Promise<void> {
     if (interactive && !cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
   }
 
+  if (cli.ref && repos.length !== 1) {
+    log.error(S.errRefNeedsOne);
+    process.exit(2);
+  }
+
   if (cli.plan) {
     const body = repos
       .map(
@@ -350,6 +442,7 @@ async function main(): Promise<void> {
 
   const opts: RunOptions = {
     skipScripts: cli.skipScripts,
+    ref: cli.ref,
     cloneOnly,
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,

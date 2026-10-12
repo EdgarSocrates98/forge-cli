@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { FORGE_REPOS } from './constants/repos.js';
+import { isValidRef } from './git-revs.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 
@@ -26,6 +27,8 @@ export interface CliOptions {
   jobsSet: boolean;
   onlyChanged: boolean;
   shallow: boolean;
+  check: boolean;
+  ref?: string;
   trustCustom: boolean;
   runAfterSyncFailure: boolean;
   positionals: string[];
@@ -56,6 +59,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         jobs: { type: 'string' },
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
+        check: { type: 'boolean' },
+        ref: { type: 'string' },
+        version: { type: 'string' },
         'trust-custom': { type: 'boolean' },
         'run-after-sync-failure': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
@@ -74,6 +80,14 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const jobs = Number(values.jobs ?? '');
   if (values.jobs !== undefined && (!Number.isInteger(jobs) || jobs < 1 || jobs > MAX_JOBS)) {
     throw new CliError(S.errJobsInvalid);
+  }
+
+  if (values.ref !== undefined && values.version !== undefined) {
+    throw new CliError(S.errRefExclusive);
+  }
+  const ref = values.ref ?? values.version;
+  if (ref !== undefined && !isValidRef(ref)) {
+    throw new CliError(`${S.errRefInvalid}: ${ref}`);
   }
 
   return {
@@ -99,6 +113,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
     jobsSet: values.jobs !== undefined,
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
+    check: values.check ?? false,
+    ref,
     trustCustom: values['trust-custom'] ?? false,
     runAfterSyncFailure: values['run-after-sync-failure'] ?? false,
     positionals,

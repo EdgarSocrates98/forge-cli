@@ -31,7 +31,8 @@ export interface SetupScript {
   args: string[];
 }
 
-export type SyncKind = 'cloned' | 'pulled' | 'pull-failed' | 'non-git' | 'remote-mismatch';
+export type SyncKind =
+  'cloned' | 'pulled' | 'pull-failed' | 'non-git' | 'remote-mismatch' | 'fixed-ref';
 
 export type SyncFailure = 'diverged' | 'network' | 'auth' | 'unknown';
 

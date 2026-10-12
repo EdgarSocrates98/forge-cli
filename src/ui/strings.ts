@@ -50,6 +50,20 @@ export const S = {
   statusFailed: 'falha',
   errCloneNeedsNames: 'clone exige nomes de Forjas (ou --all/--only)',
   errUnknownCommand: 'Comando desconhecido',
+  errRefDirty: 'Working tree com alterações locais — não é seguro trocar de revisão',
+  refCheckedOut: 'Revisão',
+  errRefNeedsOne: '--ref/--version exigem exatamente uma Forja',
+  errRefExclusive: 'Use apenas um entre --ref e --version',
+  errRefInvalid: 'Revisão/versão inválida',
+  updateCheckTitle: 'Verificação de atualizações',
+  updateCheckFailed: 'não foi possível verificar',
+  updateCommitsBehind: 'commit(s) disponíveis',
+  updateUpToDate: 'atualizado',
+  updateNothing: 'Nenhuma Forja clonada neste diretório — nada para atualizar',
+  versionsTitle: 'Versões',
+  versionsRevision: 'revisão',
+  versionsTags: 'tags',
+  versionsUnavailable: 'indisponível (offline?)',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -115,6 +129,8 @@ Uso:
   forge-cli list                Lista o catálogo e o último estado conhecido
   forge-cli install [forjas]    Instala uma ou mais Forjas (sem nomes: interativo)
   forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
+  forge-cli update [forjas]     Atualiza (pull + setup); --check só verifica
+  forge-cli versions [forjas]   Lista tags/versões e revisão atual
   forge-cli status [forjas]     Estado local (clonado, versão, alterações)
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
@@ -135,6 +151,9 @@ Opções:
   --jobs <n>         Processa até n repositórios em paralelo (1-8; só não-interativo)
   --only-changed     Pula repositórios cujo HEAD não mudou desde o último ok
   --shallow          Clona com git clone --depth 1 (só clones novos)
+  --ref <rev>        Fixa a Forja (uma só) em commit/tag (checkout destacado)
+  --version <tag>    Fixa a Forja (uma só) em uma versão (tag, com ou sem 'v')
+  --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente
   -h, --help         Mostra esta ajuda
