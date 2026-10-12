@@ -7,6 +7,12 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Ciclo de vida (Cycle 4/5/7): `pin`/`unpin` (install/update respeitam a
+  fixação), `rollback` (só o checkout Git, ao HEAD anterior registrado),
+  `reinstall` (mantém a revisão atual; `--clean` remove e reclona com
+  backup) e `uninstall <forjas>` (plano por padrão, exige `--yes`; recusa
+  tree suja, remote diferente, symlink e diretórios sem .git; faz backup
+  de `.env`/configs em `.forge-cli/backups`).
 - Versões e revisões (Cycle 3/5): `update [forjas]` (sem nomes: todas as
   clonadas), `update --check` (só fetch, sem alterar), `versions`,
   `--ref <sha|tag>` e `--version <tag>` (checkout destacado; recusa

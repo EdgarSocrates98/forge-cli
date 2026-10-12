@@ -29,6 +29,7 @@ export interface RunOptions {
   shallow?: boolean;
   onlyChanged?: boolean;
   ref?: string;
+  refs?: Record<string, string>;
   cloneOnly?: boolean;
   trustCustom?: boolean;
   runAfterSyncFailure?: boolean;
@@ -56,16 +57,17 @@ export async function processRepo(
     ...(head ? { head } : {}),
   });
 
+  const wantedRef = opts.ref ?? opts.refs?.[repo.name];
   reporter.phase?.(S.phaseClone);
   let sync;
   try {
     sync = await syncRepo(repo, targetDir, {
-      shallow: opts.shallow && !opts.ref,
-      noPull: Boolean(opts.ref),
+      shallow: opts.shallow && !wantedRef,
+      noPull: Boolean(wantedRef),
     });
-    if (opts.ref && sync.kind !== 'non-git' && sync.kind !== 'remote-mismatch') {
+    if (wantedRef && sync.kind !== 'non-git' && sync.kind !== 'remote-mismatch') {
       if (sync.dirty) throw new Error(S.errRefDirty);
-      const resolved = await checkoutRef(repoDir, opts.ref);
+      const resolved = await checkoutRef(repoDir, wantedRef);
       notes.push(`${S.refCheckedOut}: ${resolved}`);
     }
   } catch (error) {

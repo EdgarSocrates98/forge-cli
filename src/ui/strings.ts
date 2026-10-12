@@ -64,6 +64,33 @@ export const S = {
   versionsRevision: 'revisão',
   versionsTags: 'tags',
   versionsUnavailable: 'indisponível (offline?)',
+  pinDone: 'Fixada em',
+  unpinDone: 'Fixação removida',
+  unpinNone: 'não estava fixada',
+  errPinNeedsVersion: 'pin exige uma Forja e --version/--ref',
+  errNeedsOneName: 'Informe exatamente uma Forja',
+  rollbackDone: 'Checkout revertido para',
+  rollbackNote:
+    'Apenas o checkout Git foi revertido; efeitos do instalador (dependências, configs) não são desfeitos.',
+  rollbackNoPrevious: 'sem revisão anterior registrada',
+  rollbackNotCloned: 'não clonada',
+  rollbackDirty: 'working tree com alterações locais',
+  uninstallPlanTitle: 'Plano de remoção',
+  uninstallAbsent: 'não clonada — nada a remover',
+  uninstallReady: 'será removida',
+  uninstallBackups: 'backup de',
+  uninstallRefused: 'recusado',
+  uninstallReasonInvalid: 'nome inválido',
+  uninstallReasonSymlink: 'destino é link simbólico/junction',
+  uninstallReasonNonGit: 'diretório não é um clone Git (arquivos desconhecidos)',
+  uninstallReasonRemote: 'remote origin difere do catálogo',
+  uninstallReasonDirty: 'alterações locais não commitadas',
+  uninstallNeedsYes: 'Nada foi removido. Reexecute com --yes para confirmar.',
+  uninstallBackupAt: 'Backup de configurações em',
+  uninstallRemoved: 'removida',
+  errReinstallNeedsNames: 'reinstall exige nomes de Forjas (ou --all/--only)',
+  warnLegacyUninstall:
+    'uninstall sem nomes remove o PATH (legado); prefira: forge-cli self uninstall',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -131,10 +158,15 @@ Uso:
   forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
   forge-cli update [forjas]     Atualiza (pull + setup); --check só verifica
   forge-cli versions [forjas]   Lista tags/versões e revisão atual
+  forge-cli reinstall <forjas>  Reexecuta o setup mantendo a revisão atual; --clean recria o clone
+  forge-cli pin <forja> --version <tag>   Fixa a versão (update/install respeitam)
+  forge-cli unpin <forja>       Remove a fixação
+  forge-cli rollback <forja>    Volta o checkout ao HEAD anterior registrado
+  forge-cli uninstall <forjas>  Remove clones limpos (backup de .env/configs; exige --yes)
   forge-cli status [forjas]     Estado local (clonado, versão, alterações)
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
-  forge-cli uninstall           Remove o registro do PATH (legado)
+  forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
@@ -153,6 +185,7 @@ Opções:
   --shallow          Clona com git clone --depth 1 (só clones novos)
   --ref <rev>        Fixa a Forja (uma só) em commit/tag (checkout destacado)
   --version <tag>    Fixa a Forja (uma só) em uma versão (tag, com ou sem 'v')
+  --clean            Com 'reinstall': remove e reclona na mesma revisão (com backup)
   --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente

@@ -28,6 +28,7 @@ export interface CliOptions {
   onlyChanged: boolean;
   shallow: boolean;
   check: boolean;
+  clean: boolean;
   ref?: string;
   trustCustom: boolean;
   runAfterSyncFailure: boolean;
@@ -60,6 +61,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
         check: { type: 'boolean' },
+        clean: { type: 'boolean' },
         ref: { type: 'string' },
         version: { type: 'string' },
         'trust-custom': { type: 'boolean' },
@@ -114,6 +116,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
     check: values.check ?? false,
+    clean: values.clean ?? false,
     ref,
     trustCustom: values['trust-custom'] ?? false,
     runAfterSyncFailure: values['run-after-sync-failure'] ?? false,

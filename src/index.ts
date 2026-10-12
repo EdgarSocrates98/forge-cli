@@ -13,7 +13,9 @@ import {
 import figlet from 'figlet';
 import standardFont from 'figlet/importable-fonts/Standard.js';
 import {
+  clearPin,
   failedRepoNames,
+  setPin,
   loadCustomRepos,
   loadState,
   mergeCatalog,
@@ -46,6 +48,7 @@ import { S } from './ui/strings.js';
 import { icons, kindIcon, theme } from './ui/theme.js';
 import { currentHead, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { localTags, remoteTags, updateCheck } from './git-revs.js';
+import { executeUninstall, planUninstall, rollbackRepo } from './lifecycle.js';
 import { resolveInside } from './safety.js';
 
 const BANNER_LINE_DELAY_MS = 30;
@@ -280,6 +283,109 @@ async function runVersionsCommand(cli: CliOptions, names: string[]): Promise<voi
   process.exit(0);
 }
 
+function pickOne(cli: CliOptions, names: string[]): ForgeRepo | null {
+  if (names.length !== 1) {
+    log.error(S.errNeedsOneName);
+    process.exit(2);
+  }
+  const picked = reposByNames(catalogFor(resolveTargetDir(cli.dir)), names);
+  if ('error' in picked) {
+    log.error(picked.error);
+    process.exit(2);
+  }
+  return picked[0] ?? null;
+}
+
+async function runPinCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const repo = pickOne(cli, names);
+  if (!repo || !cli.ref) {
+    log.error(S.errPinNeedsVersion);
+    process.exit(2);
+  }
+  setPin(resolveTargetDir(cli.dir), repo.name, cli.ref);
+  log.success(`${icons.ok} ${repo.name}: ${S.pinDone} ${cli.ref}`);
+  process.exit(0);
+}
+
+async function runUnpinCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const repo = pickOne(cli, names);
+  if (!repo) process.exit(2);
+  const removed = clearPin(resolveTargetDir(cli.dir), repo.name);
+  log.success(`${icons.ok} ${repo.name}: ${removed ? S.unpinDone : S.unpinNone}`);
+  process.exit(0);
+}
+
+async function runRollbackCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const repo = pickOne(cli, names);
+  if (!repo) process.exit(2);
+  const res = await rollbackRepo(resolveTargetDir(cli.dir), repo);
+  if (res.ok) {
+    log.success(`${icons.ok} ${repo.name}: ${S.rollbackDone} ${res.to.slice(0, 7)}`);
+    log.info(S.rollbackNote);
+    process.exit(0);
+  }
+  const why =
+    res.reason === 'no-previous'
+      ? S.rollbackNoPrevious
+      : res.reason === 'not-cloned'
+        ? S.rollbackNotCloned
+        : res.reason === 'dirty'
+          ? S.rollbackDirty
+          : (res.detail ?? res.reason);
+  log.error(`${repo.name}: ${why}`);
+  process.exit(1);
+}
+
+const REFUSAL_TEXT = {
+  'invalid-name': S.uninstallReasonInvalid,
+  symlink: S.uninstallReasonSymlink,
+  'non-git': S.uninstallReasonNonGit,
+  'remote-mismatch': S.uninstallReasonRemote,
+  dirty: S.uninstallReasonDirty,
+} as const;
+
+async function runForgeUninstall(cli: CliOptions, names: string[]): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const catalog = catalogFor(targetDir);
+  const wanted = [...names, ...(cli.only ?? [])];
+  const picked = cli.all ? catalog : reposByNames(catalog, wanted);
+  if ('error' in picked) {
+    log.error(picked.error);
+    process.exit(2);
+  }
+  const plans = [];
+  const lines: string[] = [];
+  for (const repo of picked) {
+    const plan = await planUninstall(targetDir, repo);
+    plans.push({ repo, plan });
+    if (plan.kind === 'absent') {
+      lines.push(`${repo.name} — ${theme.dim(S.uninstallAbsent)}`);
+    } else if (plan.kind === 'refused') {
+      lines.push(
+        `${repo.name} — ${theme.err(`${S.uninstallRefused}: ${REFUSAL_TEXT[plan.reason]}`)}`,
+      );
+    } else {
+      const bk = plan.backups.length ? ` · ${S.uninstallBackups}: ${plan.backups.join(', ')}` : '';
+      lines.push(`${repo.name} — ${theme.warn(S.uninstallReady)}${theme.dim(bk)}`);
+    }
+  }
+  note(lines.join('\n'), S.uninstallPlanTitle);
+  const ready = plans.filter((p) => p.plan.kind === 'ready');
+  const refused = plans.some((p) => p.plan.kind === 'refused');
+  if (!ready.length) process.exit(refused ? 1 : 0);
+  if (!cli.yes) {
+    log.info(S.uninstallNeedsYes);
+    process.exit(0);
+  }
+  for (const { repo, plan } of ready) {
+    if (plan.kind !== 'ready') continue;
+    const backup = executeUninstall(targetDir, repo, plan);
+    log.success(`${icons.ok} ${repo.name}: ${S.uninstallRemoved}`);
+    if (backup) log.info(`${S.uninstallBackupAt}: ${theme.dim(backup)}`);
+  }
+  process.exit(refused ? 1 : 0);
+}
+
 async function runInstallCommand(): Promise<void> {
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
@@ -360,9 +466,34 @@ async function main(): Promise<void> {
     await runInstallCommand();
     return;
   }
-  if (resolved.command === 'self-uninstall' || resolved.command === 'uninstall') {
+  if (resolved.command === 'self-uninstall') {
     await runUninstallCommand();
     return;
+  }
+  if (resolved.command === 'uninstall' && !resolved.names.length && !isNonInteractive(cli)) {
+    log.warn(S.warnLegacyUninstall);
+    await runUninstallCommand();
+    return;
+  }
+  if (resolved.command === 'uninstall') {
+    await runForgeUninstall(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'pin') {
+    await runPinCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'unpin') {
+    await runUnpinCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'rollback') {
+    await runRollbackCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'reinstall' && !resolved.names.length && !isNonInteractive(cli)) {
+    log.error(S.errReinstallNeedsNames);
+    process.exit(2);
   }
   if (resolved.names.length) cli = { ...cli, only: [...(cli.only ?? []), ...resolved.names] };
   const cloneOnly = resolved.command === 'clone';
@@ -422,6 +553,38 @@ async function main(): Promise<void> {
     if (interactive && !cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
   }
 
+  const refs: Record<string, string> = {};
+  const pinState = loadState(targetDir);
+  for (const repo of repos) {
+    const pin = pinState?.pins?.[repo.name];
+    if (pin) refs[repo.name] = pin;
+  }
+  if (resolved.command === 'reinstall') {
+    for (const repo of repos) {
+      const dir = resolveInside(targetDir, repo.name);
+      if (!dir || !hasGitRepo(dir) || refs[repo.name]) continue;
+      const head = await currentHead(dir);
+      if (head) refs[repo.name] = head;
+    }
+    if (cli.clean) {
+      if (!cli.yes && !cli.plan) {
+        log.error(S.uninstallNeedsYes);
+        process.exit(2);
+      }
+      for (const repo of repos) {
+        const plan = await planUninstall(targetDir, repo);
+        if (plan.kind === 'refused') {
+          log.error(`${repo.name}: ${S.uninstallRefused} — ${REFUSAL_TEXT[plan.reason]}`);
+          process.exit(1);
+        }
+        if (plan.kind === 'ready' && !cli.plan) {
+          const backup = executeUninstall(targetDir, repo, plan);
+          if (backup) log.info(`${S.uninstallBackupAt}: ${theme.dim(backup)}`);
+        }
+      }
+    }
+  }
+
   if (cli.ref && repos.length !== 1) {
     log.error(S.errRefNeedsOne);
     process.exit(2);
@@ -443,6 +606,7 @@ async function main(): Promise<void> {
   const opts: RunOptions = {
     skipScripts: cli.skipScripts,
     ref: cli.ref,
+    refs,
     cloneOnly,
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,

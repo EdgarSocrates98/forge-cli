@@ -8,6 +8,10 @@ export type Command =
   | 'list'
   | 'status'
   | 'versions'
+  | 'pin'
+  | 'unpin'
+  | 'rollback'
+  | 'reinstall'
   | 'doctor'
   | 'self-install'
   | 'self-uninstall'
@@ -20,7 +24,18 @@ export interface ResolvedCommand {
   unknown?: string;
 }
 
-const REPO_COMMANDS = new Set(['install', 'clone', 'update', 'versions', 'status', 'list']);
+const REPO_COMMANDS = new Set([
+  'install',
+  'clone',
+  'update',
+  'versions',
+  'status',
+  'list',
+  'pin',
+  'unpin',
+  'rollback',
+  'reinstall',
+]);
 
 export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCommand {
   const [head, ...rest] = cli.positionals;

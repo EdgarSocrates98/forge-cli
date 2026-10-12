@@ -6,7 +6,11 @@ import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 
 export interface CliState {
   version: 1;
-  repos: Record<string, { status: RepoStatus; detail: string; at: string; head?: string }>;
+  repos: Record<
+    string,
+    { status: RepoStatus; detail: string; at: string; head?: string; previousHead?: string }
+  >;
+  pins?: Record<string, string>;
 }
 
 export function artifactsRoot(targetDir: string): string {
@@ -64,15 +68,45 @@ export function loadState(targetDir: string): CliState | null {
 
 export function recordResult(targetDir: string, result: RepoResult): void {
   const state = loadState(targetDir) ?? { version: 1 as const, repos: {} };
+  const prior = state.repos[result.repo.name];
+  const previousHead =
+    result.head && prior?.head && prior.head !== result.head ? prior.head : prior?.previousHead;
   state.repos[result.repo.name] = {
     status: result.status,
     detail: result.detail,
     at: new Date().toISOString(),
     ...(result.head ? { head: result.head } : {}),
+    ...(previousHead ? { previousHead } : {}),
   };
+  saveState(targetDir, state);
+}
+
+function saveState(targetDir: string, state: CliState): void {
   const file = stateFileFor(targetDir);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileAtomic(file, JSON.stringify(state, null, 2));
+}
+
+export function setPin(targetDir: string, name: string, ref: string): void {
+  const state = loadState(targetDir) ?? { version: 1 as const, repos: {} };
+  state.pins = { ...state.pins, [name]: ref };
+  saveState(targetDir, state);
+}
+
+export function clearPin(targetDir: string, name: string): boolean {
+  const state = loadState(targetDir);
+  if (!state?.pins || !(name in state.pins)) return false;
+  delete state.pins[name];
+  saveState(targetDir, state);
+  return true;
+}
+
+export function forgetRepo(targetDir: string, name: string): void {
+  const state = loadState(targetDir);
+  if (!state) return;
+  delete state.repos[name];
+  if (state.pins) delete state.pins[name];
+  saveState(targetDir, state);
 }
 
 export function failedRepoNames(state: CliState | null): string[] {
