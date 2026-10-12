@@ -39,6 +39,8 @@ export interface RunOptions {
   offline?: boolean;
   native?: NativeInstallOptions;
   trustCustom?: boolean;
+  trustedRepos?: ReadonlySet<string>;
+  deniedScripts?: ReadonlySet<string>;
   runAfterSyncFailure?: boolean;
   state?: CliState['repos'];
 }
@@ -111,10 +113,13 @@ export async function processRepo(
   }
   const syncFailed = pullFailed || remoteMismatch;
   const syncBlocksScripts = syncFailed && !opts.runAfterSyncFailure;
-  const untrusted = repo.origin === 'custom' && !opts.trustCustom;
-  const skipScripts = opts.skipScripts || syncBlocksScripts || untrusted;
+  const untrusted =
+    repo.origin === 'custom' && !opts.trustCustom && !opts.trustedRepos?.has(repo.name);
+  const denied = opts.deniedScripts?.has(repo.name) === true;
+  const skipScripts = opts.skipScripts || syncBlocksScripts || untrusted || denied;
   if (!opts.skipScripts && syncBlocksScripts) notes.push(S.warnScriptsSkippedSync);
   if (!opts.skipScripts && untrusted) notes.push(S.warnScriptsSkippedUntrusted);
+  if (!opts.skipScripts && denied) notes.push(S.warnScriptsDenied);
 
   let envNote: string | undefined;
   try {

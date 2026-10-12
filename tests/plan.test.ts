@@ -69,3 +69,37 @@ describe('planLines', () => {
     expect(text).toContain('config.yaml');
   });
 });
+
+describe('executionSummary', () => {
+  it('mostra clone e origem para Forja ausente', async () => {
+    const { executionSummary, summaryLines } = await import('../src/plan.js');
+    const s = await executionSummary(repo, tmpDir());
+    expect(s.trust).toBe('builtin');
+    expect(s.commands[0]).toContain('git clone -- https://x/demo');
+    expect(summaryLines(s).join('\n')).toContain(S.trustBuiltin);
+  });
+
+  it('lista comandos exatos e marca repositório customizado', async () => {
+    const { executionSummary } = await import('../src/plan.js');
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const s = await executionSummary({ ...repo, origin: 'custom' }, target, undefined, 'linux');
+    expect(s.trust).toBe('custom');
+    expect(s.commands).toContain('git pull --ff-only');
+    expect(s.commands).toContain('npm install');
+    expect(s.commands).toContain('demo --help');
+  });
+
+  it('inclui o instalador nativo somente quando solicitado', async () => {
+    const { executionSummary } = await import('../src/plan.js');
+    const withNative: ForgeRepo = {
+      ...repo,
+      nativeInstall: { command: ['demo', 'install'], flags: ['profile'] },
+    };
+    const none = await executionSummary(withNative, tmpDir());
+    expect(none.commands.join(' ')).not.toContain('demo install');
+    const asked = await executionSummary(withNative, tmpDir(), { profile: 'full' });
+    expect(asked.commands).toContain('demo install --profile full --dry-run');
+  });
+});

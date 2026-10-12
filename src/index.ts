@@ -37,10 +37,10 @@ import { loadConfig } from './config.js';
 import { reposNeedingFix, runDoctor } from './doctor.js';
 import { install, pathStatus, uninstall } from './install.js';
 import { resolveCommand } from './commands.js';
-import { planLines } from './plan.js';
+import { executionSummary, planLines, summaryLines } from './plan.js';
 import { collectStatus } from './status.js';
 import { runPreflight } from './preflight.js';
-import { askConfirm, askRepos, askWorkspace } from './prompts.js';
+import { askConfirm, askRepos, askTrustCustom, askWorkspace } from './prompts.js';
 import { listLine, mergeResults, renderReport, resultLine } from './report.js';
 import { processPool, processRepo, type RepoReporter, type RunOptions } from './runner.js';
 import type { ForgeRepo, RepoResult } from './types.js';
@@ -433,6 +433,42 @@ async function runSelfUpdateCommand(cli: CliOptions): Promise<void> {
   }
 }
 
+async function reviewExecution(
+  repos: ForgeRepo[],
+  targetDir: string,
+  cli: CliOptions,
+): Promise<{ trusted: Set<string>; denied: Set<string> }> {
+  const trusted = new Set<string>();
+  const denied = new Set<string>();
+  const summaries = await Promise.all(
+    repos.map((repo) =>
+      executionSummary(repo, targetDir, {
+        profile: cli.profile,
+        scope: cli.scope,
+        components: cli.components,
+        approve: cli.yes,
+      }),
+    ),
+  );
+  note(
+    summaries
+      .map(
+        (s) =>
+          `${theme.accent(s.name)}\n${summaryLines(s)
+            .map((l) => `  ${theme.dim(l)}`)
+            .join('\n')}`,
+      )
+      .join('\n\n'),
+    S.approvalTitle,
+  );
+  for (const repo of repos) {
+    if (repo.origin !== 'custom' || cli.trustCustom || cli.skipScripts) continue;
+    if (await askTrustCustom(repo.name)) trusted.add(repo.name);
+    else denied.add(repo.name);
+  }
+  return { trusted, denied };
+}
+
 async function runInstallCommand(): Promise<void> {
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
@@ -618,9 +654,13 @@ async function main(): Promise<void> {
   const nonInteractive = !interactive || (effectiveCli.only?.length ?? 0) > 0;
 
   let repos: ForgeRepo[];
+  let review: { trusted: Set<string>; denied: Set<string> } | undefined;
   if (!nonInteractive) {
     repos = await askRepos(catalog);
-    if (!cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
+    if (!cli.yes) {
+      review = await reviewExecution(repos, targetDir, cli);
+      await askConfirm(targetDir, repos.length, catalog.length);
+    }
   } else if (cli.retryFailed) {
     const state = loadState(targetDir);
     if (!state) {
@@ -642,7 +682,10 @@ async function main(): Promise<void> {
     }
     repos = selection.repos;
     log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
-    if (interactive && !cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
+    if (interactive && !cli.yes) {
+      review = await reviewExecution(repos, targetDir, cli);
+      await askConfirm(targetDir, repos.length, catalog.length);
+    }
   }
 
   const refs: Record<string, string> = {};
@@ -711,6 +754,8 @@ async function main(): Promise<void> {
     timeoutMs: effectiveCli.timeoutSecs * 1000,
     shallow: effectiveCli.shallow,
     trustCustom: cli.trustCustom,
+    trustedRepos: review?.trusted,
+    deniedScripts: review?.denied,
     runAfterSyncFailure: cli.runAfterSyncFailure,
     onlyChanged: effectiveCli.onlyChanged,
     state: effectiveCli.onlyChanged ? loadState(targetDir)?.repos : undefined,

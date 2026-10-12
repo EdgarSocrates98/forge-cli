@@ -516,3 +516,20 @@ describe('instalador nativo (--profile/--scope/--components)', () => {
     expect(result.notes?.some((n) => n.startsWith(S.nativeFailed))).toBe(true);
   });
 });
+
+describe('aprovação por repositório customizado', () => {
+  it('trustedRepos libera e deniedScripts bloqueia scripts', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repo: ForgeRepo = { ...baseRepo, origin: 'custom' };
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+
+    const trusted = await processRepo(repo, target, {}, { trustedRepos: new Set(['demo']) });
+    expect(trusted.detail).toBe(`${S.installedVia} npm install`);
+
+    const denied = await processRepo(baseRepo, target, {}, { deniedScripts: new Set(['demo']) });
+    expect(denied.notes).toContain(S.warnScriptsDenied);
+    expect(denied.detail).toBe(S.noSetupSteps);
+  });
+});

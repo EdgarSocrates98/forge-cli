@@ -49,3 +49,12 @@ export async function askConfirm(targetDir: string, count: number, total: number
   const proceed = await confirm({ message: S.confirmRun });
   if (isCancel(proceed) || !proceed) exitCancelled();
 }
+
+export async function askTrustCustom(name: string): Promise<boolean> {
+  const answer = await confirm({
+    message: `${S.askTrustCustom} ${name}?`,
+    initialValue: false,
+  });
+  if (isCancel(answer)) exitCancelled();
+  return answer;
+}
