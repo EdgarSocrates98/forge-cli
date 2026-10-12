@@ -19,6 +19,8 @@ export interface CliOptions {
   reportPath?: string;
   retryFailed: boolean;
   fix: boolean;
+  timeoutSet: boolean;
+  jsonSet: boolean;
   positionals: string[];
 }
 
@@ -75,6 +77,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
     reportPath: values.report,
     retryFailed: values['retry-failed'] ?? false,
     fix: values.fix ?? false,
+    timeoutSet: values.timeout !== undefined,
+    jsonSet: values.json !== undefined || values.report !== undefined,
     positionals,
   };
 }

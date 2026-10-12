@@ -1,7 +1,8 @@
 import { note } from '@clack/prompts';
-import type { RepoResult, RepoStatus } from './types.js';
+import type { CliState } from './artifacts.js';
+import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 import { S } from './ui/strings.js';
-import { icons, theme } from './ui/theme.js';
+import { icons, kindIcon, theme } from './ui/theme.js';
 
 export function statusBadge(status: RepoStatus): string {
   if (status === 'ok') return `${icons.ok} ${theme.ok(S.labelOk)}`;
@@ -41,6 +42,13 @@ export function mergeResults(prev: RepoResult[], next: RepoResult[]): RepoResult
     if (!prev.some((p) => p.repo.name === r.repo.name)) merged.push(r);
   }
   return merged;
+}
+
+export function listLine(repo: ForgeRepo, entry?: CliState['repos'][string]): string {
+  const prefix = `${kindIcon[repo.kind]} ${repo.name}`;
+  if (!entry) return `${prefix} — ${theme.dim(S.listNever)}`;
+  const when = entry.at.slice(0, 16).replace('T', ' ');
+  return `${prefix} — ${statusBadge(entry.status)} ${theme.dim(`(${when})`)}`;
 }
 
 export function renderReport(results: RepoResult[]): void {

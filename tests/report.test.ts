@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatElapsed,
+  listLine,
   mergeResults,
   renderReport,
   resultLine,
@@ -82,6 +83,24 @@ describe('renderReport', () => {
 
   it('renders an empty run without throwing', () => {
     expect(() => renderReport([])).not.toThrow();
+  });
+});
+
+describe('listLine', () => {
+  it('shows never-run state when no state entry exists', () => {
+    const line = listLine(base().repo);
+    expect(line).toContain('demo');
+    expect(line).toContain(S.listNever);
+  });
+
+  it('shows status badge and timestamp when a state entry exists', () => {
+    const line = listLine(base().repo, {
+      status: 'error',
+      detail: 'boom',
+      at: '2026-10-12T14:30:00.000Z',
+    });
+    expect(line).toContain(S.labelErr);
+    expect(line).toContain('2026-10-12 14:30');
   });
 });
 

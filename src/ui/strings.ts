@@ -74,6 +74,9 @@ export const S = {
   doctorAllOk: 'Tudo saudável — nada a reparar.',
   doctorNeedsInstall: 'Sem checkout — instale com o modo normal',
   doctorFixing: 'Reparando',
+  configInvalid: 'forge-cli.config.json inválido — ignorando',
+  listTitle: 'Catálogo e último estado',
+  listNever: 'nunca executado',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:
@@ -82,6 +85,7 @@ Uso:
   forge-cli --only a,b --yes    Instala uma seleção sem perguntar
   forge-cli --plan              Mostra o plano por repositório e sai
   forge-cli doctor [--fix]      Diagnostica; --fix repara os que falharem
+  forge-cli list                Lista o catálogo e o último estado conhecido
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
@@ -99,6 +103,8 @@ Opções:
 
 Extras:
   forge-cli.repos.json no diretório alvo adiciona repositórios ao catálogo.
+  forge-cli.config.json no diretório alvo define padrões (only, timeout,
+  json, shallow, jobs) — flags explícitas sempre vencem o arquivo.
   Artefatos (logs, estado, relatórios) ficam em <dir>/.forge-cli/
 `,
 };

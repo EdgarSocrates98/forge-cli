@@ -30,11 +30,12 @@ import {
   usage,
 } from './cli-args.js';
 import { FORGE_REPOS } from './constants/repos.js';
+import { loadConfig } from './config.js';
 import { reposNeedingFix, runDoctor } from './doctor.js';
 import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
-import { mergeResults, renderReport, resultLine } from './report.js';
+import { listLine, mergeResults, renderReport, resultLine } from './report.js';
 import { processRepo, type RepoReporter, type RunOptions } from './runner.js';
 import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
@@ -173,6 +174,16 @@ async function runDoctorCommand(cli: CliOptions): Promise<void> {
   process.exit(healed && !skipped.length ? 0 : 1);
 }
 
+async function runListCommand(cli: CliOptions): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const state = loadState(targetDir);
+  const body = catalogFor(targetDir)
+    .map((repo) => listLine(repo, state?.repos[repo.name]))
+    .join('\n');
+  note(body, S.listTitle);
+  process.exit(0);
+}
+
 async function main(): Promise<void> {
   await printBanner();
   intro(theme.accent(S.intro));
@@ -193,6 +204,10 @@ async function main(): Promise<void> {
     await runDoctorCommand(cli);
     return;
   }
+  if (cli.positionals[0] === 'list') {
+    await runListCommand(cli);
+    return;
+  }
 
   await checkEnvironment();
 
@@ -204,8 +219,19 @@ async function main(): Promise<void> {
     : resolveTargetDir(cli.dir);
   const catalog = catalogFor(targetDir);
 
+  const cfgResult = loadConfig(targetDir);
+  if (cfgResult && 'error' in cfgResult) log.warn(S.configInvalid);
+  const cfg = cfgResult && 'config' in cfgResult ? cfgResult.config : {};
+  const effectiveCli: CliOptions = {
+    ...cli,
+    only: cli.only ?? cfg.only,
+    timeoutSecs: cli.timeoutSet ? cli.timeoutSecs : (cfg.timeout ?? cli.timeoutSecs),
+    jsonReport: cli.jsonSet ? cli.jsonReport : cli.jsonReport || cfg.json === true,
+  };
+  const nonInteractive = !interactive || (effectiveCli.only?.length ?? 0) > 0;
+
   let repos: ForgeRepo[];
-  if (interactive) {
+  if (!nonInteractive) {
     repos = await askRepos(catalog);
     if (!cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
   } else if (cli.retryFailed) {
@@ -222,13 +248,14 @@ async function main(): Promise<void> {
     }
     log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
   } else {
-    const selection = resolveSelection(cli, catalog);
+    const selection = resolveSelection(effectiveCli, catalog);
     if ('error' in selection) {
       log.error(selection.error);
       process.exit(2);
     }
     repos = selection.repos;
     log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
+    if (interactive && !cli.yes) await askConfirm(targetDir, repos.length, catalog.length);
   }
 
   if (cli.plan) {
@@ -247,7 +274,7 @@ async function main(): Promise<void> {
   const opts: RunOptions = {
     skipScripts: cli.skipScripts,
     skipVerify: cli.skipVerify,
-    timeoutMs: cli.timeoutSecs * 1000,
+    timeoutMs: effectiveCli.timeoutSecs * 1000,
   };
   const runLog = openRunLog(targetDir);
   runLog.write(`# forge-cli ${new Date().toISOString()} dir=${targetDir}`);
@@ -269,7 +296,7 @@ async function main(): Promise<void> {
     }
   }
 
-  if (cli.jsonReport) {
+  if (effectiveCli.jsonReport) {
     const file = writeJsonReport(targetDir, results, cli.reportPath);
     log.info(`${S.reportSaved}: ${theme.dim(file)}`);
   }
