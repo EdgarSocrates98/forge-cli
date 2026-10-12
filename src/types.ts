@@ -2,6 +2,7 @@ export interface ForgeRepo {
   name: string;
   url: string;
   description: string;
+  verify?: readonly string[];
 }
 
 export type RepoStatus = 'ok' | 'warning' | 'error';
@@ -13,13 +14,21 @@ export interface RepoResult {
   status: RepoStatus;
   detail: string;
   envNote?: string;
+  notes?: string[];
   elapsedMs: number;
 }
 
-export interface InstallScript {
+export interface SetupScript {
   file: string;
   command: string;
   args: string[];
+}
+
+export type SyncKind = 'cloned' | 'pulled' | 'pull-failed' | 'non-git';
+
+export interface SyncResult {
+  kind: SyncKind;
+  dirty: boolean;
 }
 
 export interface PreflightCheck {

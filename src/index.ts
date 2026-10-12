@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { cancel, intro, log, outro, spinner } from '@clack/prompts';
+import { cancel, intro, log, outro, spinner, taskLog } from '@clack/prompts';
 import figlet from 'figlet';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
 import { renderReport, resultLine } from './report.js';
-import { processRepo } from './runner.js';
+import { processRepo, type RepoReporter } from './runner.js';
 import type { RepoResult } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, theme } from './ui/theme.js';
@@ -47,13 +47,41 @@ async function main(): Promise<void> {
 
   const results: RepoResult[] = [];
   for (const repo of repos) {
-    const s = spinner({ indicator: 'timer' });
-    s.start(theme.accent(repo.name));
-    const result = await processRepo(repo, targetDir, (phase) =>
-      s.message(`${theme.accent(repo.name)} — ${phase}`),
-    );
+    const label = theme.accent(repo.name);
+    let s = spinner({ indicator: 'timer' });
+    s.start(label);
+    let live: ReturnType<typeof taskLog> | undefined;
+
+    const restartSpinner = () => {
+      s = spinner({ indicator: 'timer' });
+      s.start(label);
+    };
+
+    const reporter: RepoReporter = {
+      phase: (phase) => s.message(`${label} — ${phase}`),
+      commandStart: (title) => {
+        s.stop(`${label} — ${title}`);
+        live = taskLog({ title: theme.accent(`${repo.name} › ${title}`), limit: 8 });
+      },
+      commandLine: (line) => live?.message(theme.dim(line)),
+      commandEnd: (ok, title) => {
+        if (ok) {
+          live?.success(`${repo.name} › ${title} ${theme.ok(icons.ok)}`);
+        } else {
+          live?.error(`${repo.name} › ${title} ${theme.err(icons.err)}`);
+        }
+        live = undefined;
+        restartSpinner();
+      },
+    };
+
+    const result = await processRepo(repo, targetDir, reporter);
     results.push(result);
-    s.stop(resultLine(result), result.status === 'error' ? 1 : 0);
+    if (result.status === 'error') {
+      s.error(resultLine(result));
+    } else {
+      s.stop(resultLine(result));
+    }
   }
 
   renderReport(results);

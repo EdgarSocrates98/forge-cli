@@ -2,9 +2,12 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { execa } from 'execa';
-import type { ForgeRepo, InstallScript } from '../types.js';
+import type { ForgeRepo, SetupScript, SyncResult } from '../types.js';
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
+
+const WIN_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
+const POSIX_SETUP_CANDIDATES = ['setup.sh', 'install.sh'];
 
 export function resolveTargetDir(input: string | undefined, cwd = process.cwd()): string {
   const trimmed = input?.trim();
@@ -19,26 +22,75 @@ export function hasGitRepo(dir: string): boolean {
   return existsSync(path.join(dir, '.git'));
 }
 
-export function findInstallScript(
+export function findSetupScript(
   repoDir: string,
   platform: NodeJS.Platform = process.platform,
-): InstallScript | null {
+): SetupScript | null {
   if (platform === 'win32') {
-    return existsSync(path.join(repoDir, 'install.ps1'))
-      ? {
-          file: 'install.ps1',
+    for (const file of WIN_SETUP_CANDIDATES) {
+      if (existsSync(path.join(repoDir, file))) {
+        return {
+          file,
           command: 'powershell.exe',
-          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'install.ps1'],
-        }
-      : null;
-  }
-  return existsSync(path.join(repoDir, 'install.sh'))
-    ? {
-        file: 'install.sh',
-        command: 'sh',
-        args: ['-c', 'chmod +x install.sh && ./install.sh'],
+          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file],
+        };
       }
-    : null;
+    }
+    return null;
+  }
+  for (const file of POSIX_SETUP_CANDIDATES) {
+    if (existsSync(path.join(repoDir, file))) {
+      return { file, command: 'sh', args: ['-c', `chmod +x ${file} && ./${file}`] };
+    }
+  }
+  return null;
+}
+
+export function npmInstallArgs(repoDir: string): string[] | null {
+  if (!existsSync(path.join(repoDir, 'package.json'))) return null;
+  return existsSync(path.join(repoDir, 'package-lock.json')) ? ['ci'] : ['install'];
+}
+
+export function withCmdExt(bin: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' && /^(npm|npx|pnpm|yarn)$/i.test(bin) ? `${bin}.cmd` : bin;
+}
+
+export async function isGitDirty(repoDir: string): Promise<boolean> {
+  try {
+    const { stdout } = await execa('git', ['status', '--porcelain'], { cwd: repoDir });
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function syncRepo(repo: ForgeRepo, targetDir: string): Promise<SyncResult> {
+  const repoDir = path.join(targetDir, repo.name);
+  if (existsSync(repoDir)) {
+    if (!hasGitRepo(repoDir)) return { kind: 'non-git', dirty: false };
+    const dirty = await isGitDirty(repoDir);
+    try {
+      await execa('git', ['pull', '--ff-only'], { cwd: repoDir });
+      return { kind: 'pulled', dirty };
+    } catch {
+      return { kind: 'pull-failed', dirty };
+    }
+  }
+  await execa('git', ['clone', repo.url, repoDir]);
+  return { kind: 'cloned', dirty: false };
+}
+
+export async function runStreamed(
+  argv: readonly string[],
+  cwd: string,
+  onLine?: (line: string) => void,
+): Promise<void> {
+  const [bin, ...args] = argv;
+  const sub = execa(withCmdExt(bin), args, { cwd, all: true, buffer: false });
+  for await (const line of sub.iterable({ from: 'all' })) {
+    onLine?.(line);
+  }
+  await sub;
 }
 
 export function errorDetail(error: unknown): string {
@@ -47,14 +99,4 @@ export function errorDetail(error: unknown): string {
     return err.stderr?.trim() || err.shortMessage || err.message || String(error);
   }
   return String(error);
-}
-
-export async function cloneOrPull(repo: ForgeRepo, targetDir: string): Promise<'cloned' | 'pulled'> {
-  const repoDir = path.join(targetDir, repo.name);
-  if (hasGitRepo(repoDir)) {
-    await execa('git', ['pull'], { cwd: repoDir });
-    return 'pulled';
-  }
-  await execa('git', ['clone', repo.url, repoDir]);
-  return 'cloned';
 }

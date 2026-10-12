@@ -15,7 +15,8 @@ export function formatElapsed(elapsedMs: number): string {
 
 export function resultLine(result: RepoResult): string {
   const envPart = result.envNote ? ` · ${icons.env} ${result.envNote}` : '';
-  return `${statusBadge(result.status)} ${result.repo.name} — ${result.detail}${envPart} ${theme.dim(formatElapsed(result.elapsedMs))}`;
+  const notesPart = result.notes?.length ? ` · ${theme.dim(result.notes.join(' · '))}` : '';
+  return `${statusBadge(result.status)} ${result.repo.name} — ${result.detail}${envPart}${notesPart} ${theme.dim(formatElapsed(result.elapsedMs))}`;
 }
 
 export function renderReport(results: RepoResult[]): void {

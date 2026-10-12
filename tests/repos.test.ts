@@ -29,4 +29,15 @@ describe('FORGE_REPOS catalog', () => {
       expect(repo.description.length).toBeGreaterThan(0);
     }
   });
+
+  it('defines a verify command for every repo', () => {
+    for (const repo of FORGE_REPOS) {
+      expect(repo.verify?.length, repo.name).toBeGreaterThan(0);
+    }
+  });
+
+  it('uses npx --no-install ng version for the Angular portal', () => {
+    const portal = FORGE_REPOS.find((r) => r.name === 'forge-portal');
+    expect(portal?.verify).toEqual(['npx', '--no-install', 'ng', 'version']);
+  });
 });
