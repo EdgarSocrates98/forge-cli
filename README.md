@@ -206,7 +206,8 @@ repositório é marcado como `[ERRO]` e o script de instalação **não**
 
 ```text
 src/
-  index.ts           # orquestrador do fluxo interativo
+  index.ts           # despacho: args, menu, subcomando
+  cmd/               # implementação dos comandos (query, manage, run, batch, shared)
   prompts.ts         # prompts: diretório, seleção, confirmação
   menu.ts            # menu principal (TUI)
   commands.ts        # resolução de subcomandos

@@ -9,7 +9,12 @@ vive em módulos especializados.**
 
 | Módulo                   | Responsabilidade                                                                                       |
 | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `src/index.ts`           | Orquestra o fluxo: banner → preflight → prompts → execução → relatório. Trata `SIGINT` e erros fatais. |
+| `src/index.ts`           | Só despacha: parse de args, menu, resolução do subcomando, SIGINT e erros fatais.                      |
+| `src/cmd/shared.ts`      | Banner, preflight, catálogo efetivo, `--json`, seleção de Forjas por nome.                             |
+| `src/cmd/batch.ts`       | Execução sequencial com spinner/taskLog por Forja.                                                     |
+| `src/cmd/query.ts`       | `doctor`, `list`, `status`, `update --check`, `versions` (com `--json`).                               |
+| `src/cmd/manage.ts`      | `pin`, `unpin`, `rollback`, `uninstall <forjas>`, `self update`, PATH.                                 |
+| `src/cmd/run.ts`         | Fluxo de instalação/clone/update/reinstall e resumo de execução com aprovação.                         |
 | `src/prompts.ts`         | Prompts interativos (diretório, seleção, confirmação) e tratamento de cancelamento via `isCancel()`.   |
 | `src/preflight.ts`       | Verificações de ambiente antes de qualquer prompt: `git`, Node.js >= 20, `powershell.exe` no Windows.  |
 | `src/runner.ts`          | Pipeline por repositório com cronômetro e fases: sincronizar → `.env` → script de instalação.          |
