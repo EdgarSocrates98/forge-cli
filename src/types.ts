@@ -44,3 +44,9 @@ export interface PreflightCheck {
   detail: string;
   severity: CheckSeverity;
 }
+
+export interface PrereqCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}

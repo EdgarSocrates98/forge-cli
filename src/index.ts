@@ -138,7 +138,10 @@ async function runDoctorCommand(cli: CliOptions): Promise<void> {
           : r.status === 'fail'
             ? `${icons.err} ${theme.err(S.labelErr)}`
             : `${icons.warn} ${theme.warn('skip')}`;
-      return `${badge} ${kindIcon[r.repo.kind]} ${r.repo.name} — ${theme.dim(r.detail)}`;
+      const prereqPart = r.prereqFails?.length
+        ? ` ${theme.err(`· ${S.doctorPrereqsFail}: ${r.prereqFails.join(', ')}`)}`
+        : '';
+      return `${badge} ${kindIcon[r.repo.kind]} ${r.repo.name} — ${theme.dim(r.detail)}${prereqPart}`;
     })
     .join('\n');
   note(body, S.doctorTitle);

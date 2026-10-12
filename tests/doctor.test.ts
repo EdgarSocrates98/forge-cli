@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,9 +19,12 @@ function tmpDir(): string {
   return dir;
 }
 
-function proc(outcome: { stdout?: string } | Error) {
+function proc(outcome: { stdout?: string; exitCode?: number } | Error) {
   const iterable = async function* () {};
-  const p = outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
+  const p =
+    outcome instanceof Error
+      ? Promise.reject(outcome)
+      : Promise.resolve({ exitCode: 0, ...outcome });
   p.catch(() => {});
   return Object.assign(p, { iterable: () => iterable() });
 }
@@ -76,6 +79,34 @@ describe('runDoctor', () => {
     checkout(dir, 'a');
     const results = await runDoctor([repo('a', ['a', '--help'])], dir);
     expect(results[0].status).toBe('fail');
+  });
+
+  it('fails a repo whose verify passes but prereqs are unmet', async () => {
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.10.4' });
+      return proc({ stdout: '' });
+    }) as never);
+    const dir = tmpDir();
+    checkout(dir, 'a');
+    writeFileSync(path.join(dir, 'a', 'pyproject.toml'), '[project]\nrequires-python = ">=3.12"\n');
+    const results = await runDoctor([repo('a', ['a', '--help'])], dir);
+    expect(results[0].status).toBe('fail');
+    expect(results[0].prereqFails?.some((f) => f.includes('Python >=3.12'))).toBe(true);
+  });
+
+  it('reports ok when verify and prereqs both pass', async () => {
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.14.0' });
+      return proc({ stdout: '' });
+    }) as never);
+    const dir = tmpDir();
+    checkout(dir, 'a');
+    writeFileSync(path.join(dir, 'a', 'pyproject.toml'), '[project]\nrequires-python = ">=3.10"\n');
+    const results = await runDoctor([repo('a', ['a', '--help'])], dir);
+    expect(results[0].status).toBe('ok');
+    expect(results[0].prereqFails).toBeUndefined();
   });
 
   it('never runs setup, env or npm steps', async () => {

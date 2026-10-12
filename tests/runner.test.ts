@@ -19,9 +19,12 @@ function tmpDir(): string {
   return dir;
 }
 
-function proc(outcome: { stdout?: string } | Error) {
+function proc(outcome: { stdout?: string; exitCode?: number } | Error) {
   const iterable = async function* () {};
-  const p = outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
+  const p =
+    outcome instanceof Error
+      ? Promise.reject(outcome)
+      : Promise.resolve({ exitCode: 0, ...outcome });
   p.catch(() => {});
   return Object.assign(p, { iterable: () => iterable() });
 }
@@ -97,8 +100,10 @@ describe('processRepo', () => {
     const result = await processRepo(baseRepo, target);
     expect(result.status).toBe('ok');
     expect(result.detail).toBe(`${S.installedVia} npm ci`);
-    const npmCall = mockedExeca.mock.calls.find(([cmd]) => /^npm/.test(String(cmd)));
-    expect(npmCall?.[1]).toEqual(['ci']);
+    const npmCall = mockedExeca.mock.calls.find(
+      ([cmd, args]) => /^npm/.test(String(cmd)) && (args as string[])[0] === 'ci',
+    );
+    expect(npmCall).toBeDefined();
   });
 
   it('runs npm install when no lockfile exists', async () => {
@@ -143,6 +148,47 @@ describe('processRepo', () => {
     expect(result.notes).toContain(`${S.configCopied}: config.yaml`);
   });
 
+  it('fails fast on unmet prereqs and skips setup/npm/verify', async () => {
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'pyproject.toml'), '[project]\nrequires-python = ">=3.12"\n');
+    writeFileSync(path.join(repoDir, 'setup.ps1'), '# never run');
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    writeFileSync(path.join(repoDir, 'package-lock.json'), '{}');
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
+      if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.10.4' });
+      if (joined === '-m pip --version') return proc({ stdout: 'pip 25.0' });
+      return proc({ stdout: '' });
+    }) as never);
+    const result = await processRepo(baseRepo, target);
+    expect(result.status).toBe('error');
+    expect(result.detail).toContain('Python >=3.12');
+    expect(result.notes?.some((n) => n.includes('Python >=3.12'))).toBe(true);
+    const invoked = mockedExeca.mock.calls.map(
+      ([cmd, args]) => `${String(cmd)} ${(args as string[]).join(' ')}`,
+    );
+    expect(invoked.some((c) => c.includes('powershell'))).toBe(false);
+    expect(invoked.some((c) => c === 'npm ci' || c === 'npm install')).toBe(false);
+  });
+
+  it('passes prereqs and runs setup when requirements are met', async () => {
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'pyproject.toml'), '[project]\nrequires-python = ">=3.10"\n');
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
+      if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.14.0' });
+      return proc({ stdout: '' });
+    }) as never);
+    const result = await processRepo(baseRepo, target);
+    expect(result.status).not.toBe('error');
+  });
+
   it('marks verify failure as a soft warning, never an error', async () => {
     mockExeca();
     const target = tmpDir();
@@ -183,7 +229,10 @@ describe('processRepo', () => {
     writeFileSync(path.join(repoDir, 'package.json'), '{}');
     writeFileSync(path.join(repoDir, 'package-lock.json'), '{}');
     const result = await processRepo(baseRepo, target, {}, { skipScripts: true });
-    expect(mockedExeca.mock.calls.some(([cmd]) => /^npm/.test(String(cmd)))).toBe(false);
+    const npmRuns = mockedExeca.mock.calls.filter(
+      ([cmd, args]) => /^npm/.test(String(cmd)) && (args as string[])[0] !== '--version',
+    );
+    expect(npmRuns).toHaveLength(0);
     expect(result.status).toBe('warning');
     expect(result.detail).toBe(S.noSetupSteps);
   });
@@ -207,6 +256,7 @@ describe('processRepo', () => {
         if (joined.startsWith('status')) return proc({ stdout: '' });
         return proc({ stdout: '' });
       }
+      if (cmd === 'npm' && joined === '--version') return proc({ stdout: '12.0.2' });
       return proc(new Error('script boom'));
     }) as never);
     const target = tmpDir();
@@ -216,6 +266,9 @@ describe('processRepo', () => {
     const result = await processRepo(baseRepo, target);
     expect(result.status).toBe('error');
     expect(result.detail).toContain(S.installFailed);
-    expect(mockedExeca.mock.calls.some(([cmd]) => /^npm/.test(String(cmd)))).toBe(false);
+    const npmRuns = mockedExeca.mock.calls.filter(
+      ([cmd, args]) => /^npm/.test(String(cmd)) && (args as string[])[0] !== '--version',
+    );
+    expect(npmRuns).toHaveLength(0);
   });
 });

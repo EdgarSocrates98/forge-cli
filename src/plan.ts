@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { planEnvFile } from './env.js';
+import { declaredPrereqs } from './prereqs.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 import { findSetupScript, hasGitRepo, npmInstallArgs } from './utils/system.js';
@@ -11,7 +12,14 @@ export function planLines(repo: ForgeRepo, targetDir: string): string[] {
 
   if (!existsSync(repoDir)) {
     lines.push(`${S.planSync}: git clone (${S.planDetectAfter})`);
-    for (const step of [S.phaseEnv, S.phaseConfigs, S.phaseInstall, 'npm', S.phaseVerify]) {
+    for (const step of [
+      S.phaseEnv,
+      S.phaseConfigs,
+      S.phasePrereqs,
+      S.phaseInstall,
+      'npm',
+      S.phaseVerify,
+    ]) {
       lines.push(`${step}: ${S.planDetectAfter}`);
     }
     return lines;
@@ -41,6 +49,9 @@ export function planLines(repo: ForgeRepo, targetDir: string): string[] {
       ? `${S.phaseConfigs}: ${examples.map((f) => f.replace('.example.', '.')).join(', ')}`
       : `${S.phaseConfigs}: ${S.planNone}`,
   );
+
+  const prereqs = declaredPrereqs(repoDir);
+  lines.push(`${S.phasePrereqs}: ${prereqs.length ? prereqs.join(', ') : S.planNone}`);
 
   const script = findSetupScript(repoDir);
   lines.push(`${S.phaseInstall}: ${script ? script.file : S.planNone}`);

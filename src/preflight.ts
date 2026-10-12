@@ -1,6 +1,6 @@
-import { execa } from 'execa';
 import type { PreflightCheck } from './types.js';
 import { S } from './ui/strings.js';
+import { commandOutput, commandWorks } from './utils/system.js';
 
 const MIN_NODE_MAJOR = 20;
 
@@ -9,37 +9,29 @@ export function isNodeSupported(version: string): boolean {
   return Number.isFinite(major) && major >= MIN_NODE_MAJOR;
 }
 
-async function commandWorks(command: string, args: string[]): Promise<boolean> {
-  try {
-    const result = await execa(command, args, { reject: false });
-    return result.exitCode === 0;
-  } catch {
-    return false;
-  }
+export interface PythonInfo {
+  exe: string;
+  version: string;
 }
 
-async function commandOutput(command: string, args: string[]): Promise<string | null> {
-  try {
-    const result = await execa(command, args, { reject: false });
-    if (result.exitCode !== 0) return null;
-    return (result.stdout || result.stderr || '').trim() || 'ok';
-  } catch {
-    return null;
+export async function pythonInfo(
+  platform: NodeJS.Platform = process.platform,
+): Promise<PythonInfo | null> {
+  const candidates =
+    platform === 'win32'
+      ? (['python', 'python3', 'py'] as const)
+      : (['python3', 'python'] as const);
+  for (const exe of candidates) {
+    const out = await commandOutput(exe, ['--version']);
+    if (out) return { exe, version: out };
   }
+  return null;
 }
 
 export async function pythonVersion(
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
-  const candidates =
-    platform === 'win32'
-      ? (['python', 'python3', 'py'] as const)
-      : (['python3', 'python'] as const);
-  for (const cmd of candidates) {
-    const out = await commandOutput(cmd, ['--version']);
-    if (out) return out;
-  }
-  return null;
+  return (await pythonInfo(platform))?.version ?? null;
 }
 
 export async function runPreflight(

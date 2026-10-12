@@ -18,6 +18,10 @@ export const S = {
   phaseClone: 'Sincronizando',
   phaseEnv: 'Provisionando .env',
   phaseConfigs: 'Copiando configs de exemplo',
+  phasePrereqs: 'Verificando pré-requisitos',
+  prereqsFailed: 'Pré-requisitos não atendidos',
+  prereqFound: 'encontrado',
+  prereqNotDeclared: 'não declarado',
   phaseInstall: 'Executando script',
   phaseVerify: 'Verificando',
   reportTitle: 'Relatório final',
@@ -66,6 +70,7 @@ export const S = {
   doctorTitle: 'Diagnóstico — verificação dos repositórios',
   doctorNoCheckout: 'sem checkout neste diretório',
   doctorNoVerify: 'sem comando de verificação',
+  doctorPrereqsFail: 'pré-reqs falhos',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:

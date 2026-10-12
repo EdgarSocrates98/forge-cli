@@ -55,6 +55,25 @@ export function withCmdExt(bin: string, platform: NodeJS.Platform = process.plat
   return platform === 'win32' && /^(npm|npx|pnpm|yarn)$/i.test(bin) ? `${bin}.cmd` : bin;
 }
 
+export async function commandWorks(command: string, args: string[]): Promise<boolean> {
+  try {
+    const result = await execa(command, args, { reject: false });
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function commandOutput(command: string, args: string[]): Promise<string | null> {
+  try {
+    const result = await execa(command, args, { reject: false });
+    if (result.exitCode !== 0) return null;
+    return (result.stdout || result.stderr || '').trim() || 'ok';
+  } catch {
+    return null;
+  }
+}
+
 export async function isGitDirty(repoDir: string): Promise<boolean> {
   try {
     const { stdout } = await execa('git', ['status', '--porcelain'], { cwd: repoDir });

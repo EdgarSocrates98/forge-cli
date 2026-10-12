@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { copyConfigExamples } from './configs.js';
 import { ensureEnvFile, envNoteFor } from './env.js';
+import { checkRepoPrereqs } from './prereqs.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 import { S } from './ui/strings.js';
 import {
@@ -70,6 +71,14 @@ export async function processRepo(
     }
   } catch (error) {
     return finish('error', `${S.configFailed}: ${errorDetail(error)}`, envNote);
+  }
+
+  reporter.phase?.(S.phasePrereqs);
+  const prereqs = await checkRepoPrereqs(repoDir);
+  const unmet = prereqs.filter((check) => !check.ok);
+  if (unmet.length) {
+    for (const check of unmet) notes.push(`${check.name} (${check.detail})`);
+    return finish('error', `${S.prereqsFailed}: ${unmet.map((c) => c.name).join(', ')}`, envNote);
   }
 
   const ran: string[] = [];
