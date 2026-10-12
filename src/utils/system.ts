@@ -84,9 +84,15 @@ export async function runStreamed(
   argv: readonly string[],
   cwd: string,
   onLine?: (line: string) => void,
+  timeoutMs?: number,
 ): Promise<void> {
   const [bin, ...args] = argv;
-  const sub = execa(withCmdExt(bin), args, { cwd, all: true, buffer: false });
+  const sub = execa(withCmdExt(bin), args, {
+    cwd,
+    all: true,
+    buffer: false,
+    timeout: timeoutMs,
+  });
   for await (const line of sub.iterable({ from: 'all' })) {
     onLine?.(line);
   }

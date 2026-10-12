@@ -172,6 +172,30 @@ describe('processRepo', () => {
     expect(result.detail).toBe(`${S.installedVia} ${file}`);
   });
 
+  it('skips script and npm steps with --skip-scripts', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    writeFileSync(path.join(repoDir, 'package-lock.json'), '{}');
+    const result = await processRepo(baseRepo, target, {}, { skipScripts: true });
+    expect(mockedExeca.mock.calls.some(([cmd]) => /^npm/.test(String(cmd)))).toBe(false);
+    expect(result.status).toBe('warning');
+    expect(result.detail).toBe(S.noSetupSteps);
+  });
+
+  it('skips verify with --skip-verify', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const repo: ForgeRepo = { ...baseRepo, verify: ['verify-ok', '--help'] };
+    const result = await processRepo(repo, target, {}, { skipVerify: true });
+    expect(result.status).toBe('ok');
+    expect(mockedExeca.mock.calls.some(([cmd]) => cmd === 'verify-ok')).toBe(false);
+    expect(result.notes?.join(' ') ?? '').not.toContain(S.verifyOk);
+  });
+
   it('returns error and skips npm when the setup script fails', async () => {
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');

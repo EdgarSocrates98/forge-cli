@@ -18,10 +18,17 @@ export interface RepoReporter {
   commandEnd?: (ok: boolean, title: string) => void;
 }
 
+export interface RunOptions {
+  skipScripts?: boolean;
+  skipVerify?: boolean;
+  timeoutMs?: number;
+}
+
 export async function processRepo(
   repo: ForgeRepo,
   targetDir: string,
   reporter: RepoReporter = {},
+  opts: RunOptions = {},
 ): Promise<RepoResult> {
   const start = Date.now();
   const elapsedMs = () => Date.now() - start;
@@ -66,12 +73,17 @@ export async function processRepo(
   }
 
   const ran: string[] = [];
-  const script = findSetupScript(repoDir);
+  const script = opts.skipScripts ? null : findSetupScript(repoDir);
   if (script) {
     reporter.phase?.(`${S.phaseInstall} ${script.file}`);
     reporter.commandStart?.(script.file);
     try {
-      await runStreamed([script.command, ...script.args], repoDir, reporter.commandLine);
+      await runStreamed(
+        [script.command, ...script.args],
+        repoDir,
+        reporter.commandLine,
+        opts.timeoutMs,
+      );
       reporter.commandEnd?.(true, script.file);
       ran.push(script.file);
     } catch (error) {
@@ -80,13 +92,13 @@ export async function processRepo(
     }
   }
 
-  const npmArgs = npmInstallArgs(repoDir);
+  const npmArgs = opts.skipScripts ? null : npmInstallArgs(repoDir);
   if (npmArgs) {
     const title = `npm ${npmArgs[0]}`;
     reporter.phase?.(title);
     reporter.commandStart?.(title);
     try {
-      await runStreamed(['npm', ...npmArgs], repoDir, reporter.commandLine);
+      await runStreamed(['npm', ...npmArgs], repoDir, reporter.commandLine, opts.timeoutMs);
       reporter.commandEnd?.(true, title);
       ran.push(title);
     } catch (error) {
@@ -98,10 +110,10 @@ export async function processRepo(
   if (!ran.length) return finish('warning', S.noSetupSteps, envNote);
 
   let status: RepoStatus = pullFailed ? 'warning' : 'ok';
-  if (repo.verify?.length) {
+  if (repo.verify?.length && !opts.skipVerify) {
     reporter.phase?.(S.phaseVerify);
     try {
-      await runStreamed(repo.verify, repoDir);
+      await runStreamed(repo.verify, repoDir, undefined, opts.timeoutMs);
       notes.push(`${S.verifyOk}: ${repo.verify.join(' ')}`);
     } catch {
       status = 'warning';

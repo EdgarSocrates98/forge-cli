@@ -43,4 +43,34 @@ export const S = {
   cloneFailed: 'Falha no clone/pull',
   installFailed: 'Falha na execução do script',
   installedVia: 'Instalado via',
+  planTitle: 'Plano de execução',
+  planSync: 'Sincronizar',
+  planDetectAfter: 'detectado após clone',
+  planEnvKeep: 'manter .env existente',
+  planEnvCopy: 'copiar .env.example',
+  planEnvStub: 'criar .env (modelo)',
+  planNone: 'nenhum',
+  selectedRepos: 'Repositórios selecionados',
+  errUnknownRepos: 'Repositórios desconhecidos',
+  validAre: 'válidos',
+  errTimeoutInvalid: '--timeout deve ser um inteiro positivo (segundos)',
+  usage: `forge-cli — instalador do ecossistema Forge
+
+Uso:
+  forge-cli [opções]            Modo interativo (padrão)
+  forge-cli --all --yes         Instala tudo sem perguntar
+  forge-cli --only a,b --yes    Instala uma seleção sem perguntar
+  forge-cli --plan              Mostra o plano por repositório e sai
+
+Opções:
+  --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
+  --all              Seleciona todos os repositórios do catálogo
+  --only a,b         Seleciona repositórios por nome
+  -y, --yes          Não pede confirmação
+  --plan, --dry-run  Só mostra o que seria executado
+  --skip-scripts     Pula scripts de setup e npm
+  --skip-verify      Pula a verificação pós-setup
+  --timeout <seg>    Timeout por comando (padrão: 900)
+  -h, --help         Mostra esta ajuda
+`,
 };

@@ -1,13 +1,22 @@
 #!/usr/bin/env node
-import { cancel, intro, log, outro, spinner, taskLog } from '@clack/prompts';
+import { cancel, intro, log, note, outro, spinner, taskLog } from '@clack/prompts';
 import figlet from 'figlet';
+import {
+  CliError,
+  isNonInteractive,
+  parseCliArgs,
+  resolveSelection,
+  usage,
+} from './cli-args.js';
+import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
 import { renderReport, resultLine } from './report.js';
-import { processRepo, type RepoReporter } from './runner.js';
-import type { RepoResult } from './types.js';
+import { processRepo, type RepoReporter, type RunOptions } from './runner.js';
+import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, theme } from './ui/theme.js';
+import { resolveTargetDir } from './utils/system.js';
 
 const BANNER_LINE_DELAY_MS = 30;
 
@@ -37,27 +46,17 @@ async function checkEnvironment(): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
-  await printBanner();
-  intro(theme.accent(S.intro));
-
-  await checkEnvironment();
-
-  const targetDir = await askWorkspace();
-  const repos = await askRepos();
-  await askConfirm(targetDir, repos.length);
-
+async function processBatch(
+  repos: ForgeRepo[],
+  targetDir: string,
+  opts: RunOptions,
+): Promise<RepoResult[]> {
   const results: RepoResult[] = [];
   for (const repo of repos) {
     const label = theme.accent(repo.name);
     let s = spinner({ indicator: 'timer' });
     s.start(label);
     let live: ReturnType<typeof taskLog> | undefined;
-
-    const restartSpinner = () => {
-      s = spinner({ indicator: 'timer' });
-      s.start(label);
-    };
 
     const reporter: RepoReporter = {
       phase: (phase) => s.message(`${label} — ${phase}`),
@@ -73,11 +72,12 @@ async function main(): Promise<void> {
           live?.error(`${repo.name} › ${title} ${theme.err(icons.err)}`);
         }
         live = undefined;
-        restartSpinner();
+        s = spinner({ indicator: 'timer' });
+        s.start(label);
       },
     };
 
-    const result = await processRepo(repo, targetDir, reporter);
+    const result = await processRepo(repo, targetDir, reporter, opts);
     results.push(result);
     if (result.status === 'error') {
       s.error(resultLine(result));
@@ -85,6 +85,65 @@ async function main(): Promise<void> {
       s.stop(resultLine(result));
     }
   }
+  return results;
+}
+
+async function main(): Promise<void> {
+  await printBanner();
+  intro(theme.accent(S.intro));
+
+  let cli;
+  try {
+    cli = parseCliArgs(process.argv.slice(2));
+  } catch (error) {
+    log.error(error instanceof CliError ? error.message : String(error));
+    console.log(usage());
+    process.exit(2);
+  }
+  if (cli.help) {
+    console.log(usage());
+    process.exit(0);
+  }
+
+  await checkEnvironment();
+
+  const interactive = !isNonInteractive(cli);
+  let targetDir: string;
+  let repos: ForgeRepo[];
+  if (interactive) {
+    targetDir = cli.dir ? resolveTargetDir(cli.dir) : await askWorkspace();
+    repos = await askRepos();
+    if (!cli.yes) await askConfirm(targetDir, repos.length);
+  } else {
+    targetDir = resolveTargetDir(cli.dir);
+    const selection = resolveSelection(cli);
+    if ('error' in selection) {
+      log.error(selection.error);
+      process.exit(2);
+    }
+    repos = selection.repos;
+    log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
+  }
+
+  if (cli.plan) {
+    const body = repos
+      .map(
+        (repo) =>
+          `${theme.accent(repo.name)}\n${planLines(repo, targetDir)
+            .map((line) => `  ${theme.dim(line)}`)
+            .join('\n')}`,
+      )
+      .join('\n\n');
+    note(body, S.planTitle);
+    return;
+  }
+
+  const opts: RunOptions = {
+    skipScripts: cli.skipScripts,
+    skipVerify: cli.skipVerify,
+    timeoutMs: cli.timeoutSecs * 1000,
+  };
+  const results = await processBatch(repos, targetDir, opts);
 
   renderReport(results);
 
