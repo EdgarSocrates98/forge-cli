@@ -1,0 +1,35 @@
+{
+  "name": "forge-cli",
+  "version": "0.1.0",
+  "description": "CLI interativa para clonar e configurar o ecossistema Forge",
+  "type": "module",
+  "bin": {
+    "forge-cli": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "execa": "^9.0.0",
+    "figlet": "^1.9.0",
+    "picocolors": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.0.3"
+  }
+}

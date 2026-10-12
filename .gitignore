@@ -1,1 +1,4 @@
 prompt_evo*.md
+node_modules/
+dist/
+forge-workspace/
