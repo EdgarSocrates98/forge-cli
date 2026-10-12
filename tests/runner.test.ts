@@ -450,3 +450,69 @@ describe('processPool', () => {
     expect(await processPool([], target, {}, 4, () => ({}))).toEqual([]);
   });
 });
+
+describe('instalador nativo (--profile/--scope/--components)', () => {
+  const nativeRepo: ForgeRepo = {
+    ...baseRepo,
+    nativeInstall: { command: ['demo-cli', 'install'], flags: ['scope', 'profile'] },
+  };
+  const nativeCall = () =>
+    mockedExeca.mock.calls.find(([cmd]) => cmd === 'demo-cli')?.[1] as string[] | undefined;
+
+  it('roda com --dry-run quando não há aprovação e ignora flags não suportadas', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(
+      nativeRepo,
+      target,
+      {},
+      { native: { profile: 'minimal', scope: 'user', components: 'skills' } },
+    );
+    expect(nativeCall()).toEqual([
+      'install',
+      '--scope',
+      'user',
+      '--profile',
+      'minimal',
+      '--dry-run',
+    ]);
+    expect(result.notes).toContain(S.nativeNeedsYes);
+    expect(result.notes?.some((n) => n.includes('--components'))).toBe(true);
+  });
+
+  it('aplica com --yes somente quando aprovado', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    await processRepo(nativeRepo, target, {}, { native: { profile: 'full', approve: true } });
+    expect(nativeCall()).toEqual(['install', '--profile', 'full', '--yes']);
+  });
+
+  it('não simula suporte quando a Forja não declara instalador nativo', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(baseRepo, target, {}, { native: { profile: 'full' } });
+    expect(result.status).toBe('warning');
+    expect(result.notes).toContain(S.nativeUnsupported);
+    expect(nativeCall()).toBeUndefined();
+  });
+
+  it('falha do instalador nativo vira aviso, não erro', async () => {
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      if (cmd === 'demo-cli') return proc(new Error('native boom'));
+      if (cmd === 'git' && args[0] === 'status') return proc({ stdout: '' });
+      return proc({ stdout: 'sha-1' });
+    }) as never);
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(nativeRepo, target, {}, { native: { profile: 'full' } });
+    expect(result.status).toBe('warning');
+    expect(result.notes?.some((n) => n.startsWith(S.nativeFailed))).toBe(true);
+  });
+});

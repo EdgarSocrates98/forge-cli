@@ -7,6 +7,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Framework base e utilitários',
     kind: 'python',
     verify: ['theforge', '--help'],
+    nativeInstall: {
+      command: ['theforge', 'install', 'apply'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['theforge install apply --yes', 'theforge doctor'],
   },
   {
@@ -15,6 +19,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Pipelines Spark para AWS',
     kind: 'python',
     verify: ['sparkforge-aws', '--help'],
+    nativeInstall: {
+      command: ['sparkforge-aws', 'install'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['sparkforge-aws install'],
   },
   {
@@ -23,6 +31,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Pipelines Spark para Azure',
     kind: 'python',
     verify: ['sparkforge-azure', '--help'],
+    nativeInstall: {
+      command: ['sparkforge-azure', 'install'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['sparkforge-azure install'],
   },
   {
@@ -31,6 +43,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Serviços e infra de plataforma',
     kind: 'python',
     verify: ['platformforge', '--help'],
+    nativeInstall: {
+      command: ['platformforge', 'install'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['platformforge doctor', 'platformforge init --repo .'],
   },
   {
@@ -39,6 +55,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Backend central e APIs',
     kind: 'python',
     verify: ['apiforge', '--help'],
+    nativeInstall: { command: ['apiforge', 'install'], flags: ['scope', 'profile', 'components'] },
     envKeys: ['APIFORGE_HOME', 'APIFORGE_CONFIG', 'APIFORGE_CACHE'],
     nextSteps: ['apiforge install --yes'],
   },
@@ -56,6 +73,10 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Pipeline de dados de diagnóstico',
     kind: 'python',
     verify: ['forge-doctor-data', '--help'],
+    nativeInstall: {
+      command: ['forge-doctor-data', 'install'],
+      flags: ['scope', 'profile', 'components'],
+    },
     nextSteps: ['forge-doctor-data install'],
   },
   {

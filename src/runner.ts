@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { copyConfigExamples } from './configs.js';
 import { checkoutRef } from './git-revs.js';
+import {
+  buildNativeInstall,
+  hasNativeRequest,
+  type NativeInstallOptions,
+} from './native-install.js';
 import { ensureEnvFile, envNoteFor } from './env.js';
 import { checkRepoPrereqs } from './prereqs.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
@@ -31,6 +36,7 @@ export interface RunOptions {
   ref?: string;
   refs?: Record<string, string>;
   cloneOnly?: boolean;
+  native?: NativeInstallOptions;
   trustCustom?: boolean;
   runAfterSyncFailure?: boolean;
   state?: CliState['repos'];
@@ -168,7 +174,8 @@ export async function processRepo(
     }
   }
 
-  if (!ran.length) return finish('warning', S.noSetupSteps, envNote);
+  const nativeRequested = hasNativeRequest(opts.native);
+  if (!ran.length && !nativeRequested) return finish('warning', S.noSetupSteps, envNote);
 
   let status: RepoStatus = syncFailed ? 'warning' : 'ok';
   if (repo.verify?.length && !opts.skipVerify) {
@@ -182,6 +189,30 @@ export async function processRepo(
     }
   }
 
+  if (nativeRequested && opts.native) {
+    const built = buildNativeInstall(repo, opts.native);
+    if (!built) {
+      status = 'warning';
+      notes.push(S.nativeUnsupported);
+    } else {
+      for (const flag of built.ignored) notes.push(`${S.nativeFlagIgnored}: --${flag}`);
+      const title = built.argv.join(' ');
+      reporter.phase?.(S.phaseNative);
+      reporter.commandStart?.(title);
+      try {
+        await runStreamed(built.argv, repoDir, reporter.commandLine, opts.timeoutMs);
+        reporter.commandEnd?.(true, title);
+        ran.push(built.dryRun ? S.nativeDryRun : S.nativeApplied);
+        if (built.dryRun) notes.push(S.nativeNeedsYes);
+      } catch (error) {
+        reporter.commandEnd?.(false, title);
+        status = 'warning';
+        notes.push(`${S.nativeFailed}: ${errorDetail(error)}`);
+      }
+    }
+  }
+
+  if (!ran.length) return finish(status, S.noSetupSteps, envNote);
   return finish(status, `${S.installedVia} ${ran.join(' + ')}`, envNote);
 }
 

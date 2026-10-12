@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { FORGE_REPOS } from './constants/repos.js';
 import { isValidRef } from './git-revs.js';
+import { validateNativeOptions } from './native-install.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 
@@ -28,6 +29,9 @@ export interface CliOptions {
   onlyChanged: boolean;
   shallow: boolean;
   check: boolean;
+  profile?: string;
+  scope?: string;
+  components?: string;
   clean: boolean;
   ref?: string;
   trustCustom: boolean;
@@ -61,6 +65,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'only-changed': { type: 'boolean' },
         shallow: { type: 'boolean' },
         check: { type: 'boolean' },
+        profile: { type: 'string' },
+        scope: { type: 'string' },
+        components: { type: 'string' },
         clean: { type: 'boolean' },
         ref: { type: 'string' },
         version: { type: 'string' },
@@ -87,6 +94,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
   if (values.ref !== undefined && values.version !== undefined) {
     throw new CliError(S.errRefExclusive);
   }
+  const nativeError = validateNativeOptions({
+    profile: values.profile,
+    scope: values.scope,
+    components: values.components,
+  });
+  if (nativeError) throw new CliError(nativeError);
   const ref = values.ref ?? values.version;
   if (ref !== undefined && !isValidRef(ref)) {
     throw new CliError(`${S.errRefInvalid}: ${ref}`);
@@ -116,6 +129,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
     onlyChanged: values['only-changed'] ?? false,
     shallow: values.shallow ?? false,
     check: values.check ?? false,
+    profile: values.profile,
+    scope: values.scope,
+    components: values.components,
     clean: values.clean ?? false,
     ref,
     trustCustom: values['trust-custom'] ?? false,

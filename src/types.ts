@@ -9,6 +9,11 @@ export interface ForgeRepo {
   nextSteps?: readonly string[];
   envKeys?: readonly string[];
   origin?: 'builtin' | 'custom';
+  /** Instalador nativo documentado pela Forja (após o bootstrap), com as flags realmente suportadas. */
+  nativeInstall?: {
+    command: readonly string[];
+    flags: readonly ('scope' | 'profile' | 'components')[];
+  };
 }
 
 export type RepoStatus = 'ok' | 'warning' | 'error';

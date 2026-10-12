@@ -674,6 +674,12 @@ async function main(): Promise<void> {
     ref: cli.ref,
     refs,
     cloneOnly,
+    native: {
+      profile: cli.profile,
+      scope: cli.scope,
+      components: cli.components,
+      approve: cli.yes,
+    },
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,
     shallow: effectiveCli.shallow,

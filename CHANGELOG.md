@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Adaptadores leves (Cycle 0/6): `--profile`, `--scope` e `--components`
+  acionam o instalador nativo da Forja (`<cli> install ...`) depois do
+  bootstrap, somente para Forjas que o documentam; sempre `--dry-run`
+  salvo `--yes`. Matriz de capacidades real em `docs/capabilities.md`.
 - Portabilidade/distribuição (Cycle 8/9): `self update` respeitando o
   método de instalação (npm global automático com `--yes`; shim e
   código-fonte mostram o passo manual), CI em Linux/Windows/macOS e

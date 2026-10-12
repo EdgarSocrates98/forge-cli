@@ -112,6 +112,14 @@ export const S = {
   selfUpdateNeedsYes: 'Nada foi executado. Reexecute com --yes para atualizar.',
   selfUpdateDone: 'forge-cli atualizado',
   selfUpdateFailed: 'Falha ao atualizar o forge-cli',
+  phaseNative: 'Instalador nativo da Forja',
+  nativeUnsupported:
+    'Forja sem instalador nativo documentado para --profile/--scope/--components — use o método oficial do repositório',
+  nativeFlagIgnored: 'Flag não suportada por esta Forja (ignorada)',
+  nativeDryRun: 'instalador nativo (--dry-run)',
+  nativeApplied: 'instalador nativo',
+  nativeNeedsYes: 'Plano nativo exibido sem escrever; reexecute com --yes para aplicar',
+  nativeFailed: 'Instalador nativo falhou',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -208,6 +216,9 @@ Opções:
   --ref <rev>        Fixa a Forja (uma só) em commit/tag (checkout destacado)
   --version <tag>    Fixa a Forja (uma só) em uma versão (tag, com ou sem 'v')
   --clean            Com 'reinstall': remove e reclona na mesma revisão (com backup)
+  --profile <p>      Instalador nativo da Forja: minimal|recommended|full
+  --scope <s>        Instalador nativo da Forja: project|workspace|user
+  --components <a,b> Instalador nativo da Forja: ex. skills,agents,mcp
   --check            Com 'update': só verifica atualizações, sem alterar nada
   --trust-custom     Executa scripts de repositórios do forge-cli.repos.json
   --run-after-sync-failure  Executa scripts mesmo após falha de pull/remote divergente

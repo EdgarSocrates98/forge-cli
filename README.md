@@ -82,6 +82,17 @@ acessível no PATH.
 
 Para atualizar o próprio CLI: `forge-cli self update` (npm global executa `npm i -g` com `--yes`; demais métodos mostram o passo manual).
 
+## Instalador nativo (perfil, escopo, componentes)
+
+```bash
+forge-cli install spark-forge-aws --profile recommended --scope project --components skills,agents        # plano (--dry-run)
+forge-cli install spark-forge-aws --profile recommended --scope project --components skills,agents --yes  # aplica
+```
+
+O forge-cli só delega ao `<cli> install` que a Forja documenta; Forjas sem
+instalador nativo (ex.: forge-portal) recebem um aviso, sem substituto
+silencioso. Veja [docs/capabilities.md](docs/capabilities.md).
+
 ## Independência
 
 O forge-cli é uma conveniência opcional: nenhuma Forja depende dele e remover o CLI (`self uninstall`) não afeta Forjas já instaladas. Instalações feitas à mão são reconhecidas (`forge-cli status`) sem precisar reinstalar. Estes cenários estão cobertos em `tests/independence.test.ts`.
