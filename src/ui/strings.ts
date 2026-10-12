@@ -106,6 +106,12 @@ export const S = {
   menuDoctor: 'Diagnosticar ambiente',
   menuExit: 'Sair',
   askConfirmUninstall: 'Remover as Forjas listadas (com backup de configurações)?',
+  selfUpdateTitle: 'Atualização do forge-cli',
+  selfUpdateMethod: 'Método de instalação detectado',
+  selfUpdateRun: 'Comando',
+  selfUpdateNeedsYes: 'Nada foi executado. Reexecute com --yes para atualizar.',
+  selfUpdateDone: 'forge-cli atualizado',
+  selfUpdateFailed: 'Falha ao atualizar o forge-cli',
   warnPullFailed: 'Pull falhou — seguindo com a versão local',
   warnPullDiverged: 'Branch local divergente do remoto (pull --ff-only não aplicável)',
   warnPullNetwork: 'Falha de rede ao atualizar o repositório',
@@ -181,6 +187,7 @@ Uso:
   forge-cli status [forjas]     Estado local (clonado, versão, alterações)
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
+  forge-cli self update         Atualiza o próprio CLI conforme o método de instalação
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
 
 Opções:

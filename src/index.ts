@@ -46,9 +46,16 @@ import { processPool, processRepo, type RepoReporter, type RunOptions } from './
 import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, kindIcon, theme } from './ui/theme.js';
-import { currentHead, hasGitRepo, resolveTargetDir } from './utils/system.js';
+import {
+  currentHead,
+  errorDetail,
+  hasGitRepo,
+  resolveTargetDir,
+  runStreamed,
+} from './utils/system.js';
 import { localTags, remoteTags, updateCheck } from './git-revs.js';
 import { executeUninstall, planUninstall, rollbackRepo } from './lifecycle.js';
+import { detectInstallMethod, planSelfUpdate } from './self.js';
 import { actionNeedsRepos, actionToPositionals, askMenu, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 
@@ -394,6 +401,32 @@ async function runForgeUninstall(cli: CliOptions, names: string[]): Promise<void
   process.exit(refused ? 1 : 0);
 }
 
+async function runSelfUpdateCommand(cli: CliOptions): Promise<void> {
+  const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+  const method = detectInstallMethod(process.argv[1] ?? '', home);
+  const plan = planSelfUpdate(method);
+  const lines = [`${S.selfUpdateMethod}: ${method}`];
+  if (plan.command)
+    lines.push(`${S.selfUpdateRun}: ${plan.command.bin} ${plan.command.args.join(' ')}`);
+  if (plan.manual) lines.push(plan.manual);
+  note(lines.join('\n'), S.selfUpdateTitle);
+  if (!plan.command) process.exit(0);
+  if (!cli.yes) {
+    log.info(S.selfUpdateNeedsYes);
+    process.exit(0);
+  }
+  try {
+    await runStreamed([plan.command.bin, ...plan.command.args], process.cwd(), (l) =>
+      log.message(theme.dim(l)),
+    );
+    log.success(`${icons.ok} ${S.selfUpdateDone}`);
+    process.exit(0);
+  } catch (error) {
+    log.error(`${S.selfUpdateFailed}: ${errorDetail(error)}`);
+    process.exit(1);
+  }
+}
+
 async function runInstallCommand(): Promise<void> {
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
@@ -493,6 +526,10 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'self-install') {
     await runInstallCommand();
+    return;
+  }
+  if (resolved.command === 'self-update') {
+    await runSelfUpdateCommand(cli);
     return;
   }
   if (resolved.command === 'self-uninstall') {

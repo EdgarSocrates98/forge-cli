@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Portabilidade/distribuição (Cycle 8/9): `self update` respeitando o
+  método de instalação (npm global automático com `--yes`; shim e
+  código-fonte mostram o passo manual), CI em Linux/Windows/macOS e
+  testes dos cenários de independência A–F.
 - TUI (Cycle 2): menu principal ao rodar `forge-cli` em terminal
   interativo (instalar, atualizar, reinstalar, reparar, versões, estado,
   desinstalar, diagnosticar, sair). Sem TTY ou com comando/flags de

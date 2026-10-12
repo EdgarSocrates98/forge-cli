@@ -73,6 +73,19 @@ Após `self install`, abra um terminal novo — o PATH do usuário só é lido p
 processos novos. `forge-cli doctor` avisa quando o binário não está
 acessível no PATH.
 
+## Quickstart
+
+1. Instale o forge-cli (`npm run build && node dist/index.js self install` a partir do clone, ou `npm i -g` quando publicado).
+2. Abra um terminal novo e rode `forge-cli`.
+3. Escolha **Instalar Forjas**, selecione as Forjas desejadas e confirme.
+4. Use os comandos oficiais de cada Forja (a seção "próximos passos" do relatório lista os principais).
+
+Para atualizar o próprio CLI: `forge-cli self update` (npm global executa `npm i -g` com `--yes`; demais métodos mostram o passo manual).
+
+## Independência
+
+O forge-cli é uma conveniência opcional: nenhuma Forja depende dele e remover o CLI (`self uninstall`) não afeta Forjas já instaladas. Instalações feitas à mão são reconhecidas (`forge-cli status`) sem precisar reinstalar. Estes cenários estão cobertos em `tests/independence.test.ts`.
+
 ## Comandos
 
 ```bash
@@ -80,7 +93,13 @@ forge-cli install api-forge platform-forge   # instala Forjas escolhidas
 forge-cli install                            # fluxo interativo
 forge-cli clone api-forge                    # só clona/sincroniza, sem scripts
 forge-cli status                             # estado local (clonado, versão, alterações)
-forge-cli self install | self uninstall      # registra/remove o CLI no PATH
+forge-cli update [--check]                   # atualiza (ou só verifica) Forjas clonadas
+forge-cli versions api-forge                 # revisão e tags
+forge-cli install api-forge --version 1.2.0  # fixa em tag/sha (checkout destacado)
+forge-cli pin|unpin|rollback api-forge       # fixação e retorno ao HEAD anterior
+forge-cli reinstall api-forge [--clean]      # mantém a revisão; --clean reclona com backup
+forge-cli uninstall api-forge [--yes]        # plano + backup de .env/configs
+forge-cli self install | self uninstall | self update
 ```
 
 > `forge-cli install` agora instala Forjas; o registro no PATH passou a

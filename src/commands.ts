@@ -14,6 +14,7 @@ export type Command =
   | 'reinstall'
   | 'doctor'
   | 'self-install'
+  | 'self-update'
   | 'self-uninstall'
   | 'uninstall'
   | 'unknown';
@@ -43,6 +44,7 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
   if (head === 'self') {
     if (rest[0] === 'install') return { command: 'self-install', names: [] };
     if (rest[0] === 'uninstall') return { command: 'self-uninstall', names: [] };
+    if (rest[0] === 'update') return { command: 'self-update', names: [] };
     return { command: 'unknown', names: [], unknown: `self ${rest[0] ?? ''}`.trim() };
   }
   if (head === 'doctor') return { command: 'doctor', names: rest };
