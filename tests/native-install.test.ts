@@ -46,9 +46,8 @@ describe('catálogo: instalador nativo', () => {
       'install',
     ]);
   });
-  it('toda Forja com instalador nativo (exceto script) declara update e uninstall', () => {
+  it('toda Forja com instalador nativo declara update e uninstall', () => {
     for (const repo of FORGE_REPOS.filter((r) => r.nativeInstall)) {
-      if (repo.nativeInstall!.command[0] === '{python}') continue;
       expect(repo.nativeInstall!.ops?.update?.length).toBeGreaterThan(0);
       expect(repo.nativeInstall!.ops?.uninstall?.length).toBeGreaterThan(0);
     }

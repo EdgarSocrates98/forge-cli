@@ -61,8 +61,15 @@ export function actionToPositionals(action: MenuAction, names: string[]): string
   }
 }
 
-export async function askMenu(): Promise<MenuAction> {
+export interface PromptIo {
+  input?: NodeJS.ReadableStream;
+  output?: NodeJS.WritableStream;
+}
+
+export async function askMenu(io: PromptIo = {}): Promise<MenuAction> {
   const choice = await select({
+    ...(io.input ? { input: io.input as NodeJS.ReadStream } : {}),
+    ...(io.output ? { output: io.output as NodeJS.WriteStream } : {}),
     message: S.menuTitle,
     options: MENU_ITEMS.map((item) => ({
       value: item.value,
@@ -73,4 +80,29 @@ export async function askMenu(): Promise<MenuAction> {
   });
   if (isCancel(choice)) exitCancelled();
   return choice;
+}
+
+export interface MenuDeps {
+  ask(): Promise<MenuAction>;
+  workspace(): Promise<string>;
+  resolveDir(dir: string): string;
+  pickRepos(dir: string): Promise<string[]>;
+}
+
+/**
+ * Traduz a escolha do menu em opções do CLI. Retorna `null` quando o usuário escolhe sair.
+ * Sem efeitos colaterais além das perguntas, o que permite testar o fluxo sem TTY.
+ */
+export async function applyMenu(cli: CliOptions, deps: MenuDeps): Promise<CliOptions | null> {
+  const action = await deps.ask();
+  if (action === 'exit') return null;
+  if (action === 'install') return cli;
+  const dir = cli.dir ? deps.resolveDir(cli.dir) : await deps.workspace();
+  const names = actionNeedsRepos(action) ? await deps.pickRepos(dir) : [];
+  return {
+    ...cli,
+    dir,
+    positionals: actionToPositionals(action, names),
+    fix: action === 'repair',
+  };
 }

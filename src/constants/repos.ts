@@ -84,7 +84,11 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-api', '--help'],
     nativeInstall: {
       command: ['{python}', 'scripts/forge_install.py', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      ops: {
+        update: ['{python}', 'scripts/forge_install.py', 'update'],
+        uninstall: ['{python}', 'scripts/forge_install.py', 'uninstall'],
+      },
     },
     nextSteps: ['forge-doctor-api install'],
   },

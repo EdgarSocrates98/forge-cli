@@ -91,8 +91,7 @@ inglês, com o id da spec quando aplicável — por exemplo,
 3. O workflow `release` valida a tag contra o `package.json`, roda testes e build,
    cria o GitHub Release com o tarball (`npm pack`) e só publica no npm se o
    segredo `NPM_TOKEN` estiver configurado (com provenance).
-4. Defina uma licença (`license` no `package.json` e arquivo `LICENSE`) antes da
-   primeira publicação pública.
+4. A licença é MIT (arquivo `LICENSE`, campo `license` no `package.json`).
 
 ## Governança do repositório
 

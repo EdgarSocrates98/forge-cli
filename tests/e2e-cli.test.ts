@@ -180,11 +180,8 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
   });
 
   it('uninstall --native sem a operação nativa preserva o clone', async () => {
-    const dir = fakeClone(
-      'forge-doctor-api',
-      'https://github.com/EdgarSocrates98/forge-doctor-api',
-    );
-    const res = await cli('uninstall', 'forge-doctor-api', '--native', '--yes', '--dir', ws);
+    const dir = fakeClone('forge-portal', 'https://github.com/EdgarSocrates98/forge-portal');
+    const res = await cli('uninstall', 'forge-portal', '--native', '--yes', '--dir', ws);
     expect(res.code).toBe(1);
     expect(existsSync(dir)).toBe(true);
   });

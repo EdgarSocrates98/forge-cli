@@ -7,6 +7,15 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Licença MIT (`LICENSE`, campo `license`), alinhada às demais Forjas.
+- `forge-doctor-api`: `update`/`uninstall` nativos e `--host`/`--gateway-profile`
+  confirmados em `scripts/forge_install.py`.
+- Testes de TUI com teclas reais simuladas (menu e seleção com busca) e fluxo
+  do menu testável sem TTY (`applyMenu`).
+
+### Corrigido
+
+- Ajuda da seleção de Forjas dizia "espaço marca"; a tecla correta é Tab.
 - Instaladores nativos (itens 6/7/9/10): `forge-doctor-api` via
   `scripts/forge_install.py` (Python resolvido em runtime), `--host` e
   `--gateway-profile` repassados onde a Forja suporta, `--native` em

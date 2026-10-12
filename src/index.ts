@@ -9,7 +9,7 @@ import { S } from './ui/strings.js';
 import { theme } from './ui/theme.js';
 import { hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
-import { actionNeedsRepos, actionToPositionals, askMenu, shouldShowMenu } from './menu.js';
+import { applyMenu, askMenu, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
@@ -61,30 +61,25 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
-    const action = await askMenu();
-    if (action === 'exit') {
-      outro(S.menuExit);
-      process.exit(0);
-    }
-    if (action !== 'install') {
-      const dir = cli.dir ? resolveTargetDir(cli.dir) : await askWorkspace();
-      let names: string[] = [];
-      if (actionNeedsRepos(action)) {
+    const next = await applyMenu(cli, {
+      ask: () => askMenu(),
+      workspace: askWorkspace,
+      resolveDir: resolveTargetDir,
+      pickRepos: async (dir) => {
         const cat = catalogFor(dir);
         const infos = await collectStatus(cat, dir, loadState(dir));
         const chosen = await askRepos(cat, {
           initialAll: false,
           status: new Map(infos.map((i) => [i.name, i])),
         });
-        names = chosen.map((r) => r.name);
-      }
-      cli = {
-        ...cli,
-        dir,
-        positionals: actionToPositionals(action, names),
-        fix: action === 'repair',
-      };
+        return chosen.map((r) => r.name);
+      },
+    });
+    if (!next) {
+      outro(S.menuExit);
+      process.exit(0);
     }
+    cli = next;
   }
   if (cli.verbose) setTaskLogLimit(200);
   const resolved = resolveCommand(cli);

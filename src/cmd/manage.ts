@@ -4,7 +4,7 @@ import { type CliOptions } from '../cli-args.js';
 import { install, uninstall } from '../install.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { errorDetail, resolveTargetDir, runStreamed } from '../utils/system.js';
+import { errorDetail, resolvePython, resolveTargetDir, runStreamed } from '../utils/system.js';
 import { executeUninstall, planUninstall, rollbackRepo } from '../lifecycle.js';
 import { buildNativeOp } from '../native-install.js';
 import { detectInstallMethod, planSelfUpdate } from '../self.js';
@@ -106,8 +106,18 @@ export async function runForgeUninstall(cli: CliOptions, names: string[]): Promi
         refusedNative = true;
         continue;
       }
+      const argv = [...op.argv];
+      if (argv[0] === '{python}') {
+        const py = await resolvePython();
+        if (!py) {
+          log.error(`${repo.name}: ${S.nativeNoPython}`);
+          refusedNative = true;
+          continue;
+        }
+        argv.splice(0, 1, ...py);
+      }
       try {
-        await runStreamed(op.argv, plan.dir, undefined, cli.timeoutSecs * 1000);
+        await runStreamed(argv, plan.dir, undefined, cli.timeoutSecs * 1000);
       } catch (error) {
         log.error(`${repo.name}: ${S.nativeUninstallFailed}: ${errorDetail(error)}`);
         refusedNative = true;

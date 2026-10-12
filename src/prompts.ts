@@ -43,9 +43,16 @@ export function repoHint(repo: ForgeRepo, info?: RepoStatusInfo): string {
 
 export async function askRepos(
   catalog: readonly ForgeRepo[] = FORGE_REPOS,
-  opts: { initialAll?: boolean; status?: ReadonlyMap<string, RepoStatusInfo> } = {},
+  opts: {
+    initialAll?: boolean;
+    status?: ReadonlyMap<string, RepoStatusInfo>;
+    input?: NodeJS.ReadableStream;
+    output?: NodeJS.WritableStream;
+  } = {},
 ): Promise<ForgeRepo[]> {
   const selected = await autocompleteMultiselect({
+    ...(opts.input ? { input: opts.input as NodeJS.ReadStream } : {}),
+    ...(opts.output ? { output: opts.output as NodeJS.WriteStream } : {}),
     message: `${S.askRepos} ${theme.dim(S.askReposHelp)}`,
     placeholder: S.askReposPlaceholder,
     options: catalog.map((repo) => ({

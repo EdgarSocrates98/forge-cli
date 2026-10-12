@@ -240,3 +240,7 @@ factory/             # fluxo spec-driven (Loop Factory)
 - [Solução de problemas](docs/solucao-de-problemas.md)
 - [Como contribuir](CONTRIBUTING.md)
 - [Registro de mudanças](CHANGELOG.md)
+
+## Licença
+
+[MIT](LICENSE) © 2026 Edgar Sócrates Caria

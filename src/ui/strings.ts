@@ -135,7 +135,7 @@ export const S = {
   approvalTitle: 'Execução planejada',
   askTrustCustom: 'Executar os scripts do repositório customizado',
   warnScriptsDenied: 'Scripts não executados: não aprovados pelo usuário',
-  askReposHelp: '(digite para pesquisar · espaço marca · Enter confirma)',
+  askReposHelp: '(digite para pesquisar · Tab marca · Enter confirma)',
   askReposPlaceholder: 'Pesquisar Forjas…',
   verboseLimit: 'Saída completa dos comandos habilitada (--verbose)',
   nativeNoPython: 'Python não encontrado (python3, python, py) para o instalador nativo',
