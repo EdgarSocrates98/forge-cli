@@ -23,7 +23,10 @@ export async function askWorkspace(): Promise<string> {
   return targetDir;
 }
 
-export async function askRepos(catalog: readonly ForgeRepo[] = FORGE_REPOS): Promise<ForgeRepo[]> {
+export async function askRepos(
+  catalog: readonly ForgeRepo[] = FORGE_REPOS,
+  opts: { initialAll?: boolean } = {},
+): Promise<ForgeRepo[]> {
   const selected = await multiselect({
     message: S.askRepos,
     options: catalog.map((repo) => ({
@@ -31,7 +34,7 @@ export async function askRepos(catalog: readonly ForgeRepo[] = FORGE_REPOS): Pro
       label: repo.name,
       hint: repo.description,
     })),
-    initialValues: catalog.map((repo) => repo.name),
+    initialValues: opts.initialAll === false ? [] : catalog.map((repo) => repo.name),
     required: true,
   });
   if (isCancel(selected)) exitCancelled();

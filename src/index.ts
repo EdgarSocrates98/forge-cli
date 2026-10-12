@@ -49,6 +49,7 @@ import { icons, kindIcon, theme } from './ui/theme.js';
 import { currentHead, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { localTags, remoteTags, updateCheck } from './git-revs.js';
 import { executeUninstall, planUninstall, rollbackRepo } from './lifecycle.js';
+import { actionNeedsRepos, actionToPositionals, askMenu, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 
 const BANNER_LINE_DELAY_MS = 30;
@@ -374,8 +375,15 @@ async function runForgeUninstall(cli: CliOptions, names: string[]): Promise<void
   const refused = plans.some((p) => p.plan.kind === 'refused');
   if (!ready.length) process.exit(refused ? 1 : 0);
   if (!cli.yes) {
-    log.info(S.uninstallNeedsYes);
-    process.exit(0);
+    if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+      log.info(S.uninstallNeedsYes);
+      process.exit(0);
+    }
+    const proceed = await confirm({ message: S.askConfirmUninstall, initialValue: false });
+    if (isCancel(proceed) || !proceed) {
+      log.info(S.uninstallNeedsYes);
+      process.exit(0);
+    }
   }
   for (const { repo, plan } of ready) {
     if (plan.kind !== 'ready') continue;
@@ -421,6 +429,27 @@ async function main(): Promise<void> {
   if (cli.help) {
     console.log(usage());
     process.exit(0);
+  }
+  if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
+    const action = await askMenu();
+    if (action === 'exit') {
+      outro(S.menuExit);
+      process.exit(0);
+    }
+    if (action !== 'install') {
+      const dir = cli.dir ? resolveTargetDir(cli.dir) : await askWorkspace();
+      let names: string[] = [];
+      if (actionNeedsRepos(action)) {
+        const chosen = await askRepos(catalogFor(dir), { initialAll: false });
+        names = chosen.map((r) => r.name);
+      }
+      cli = {
+        ...cli,
+        dir,
+        positionals: actionToPositionals(action, names),
+        fix: action === 'repair',
+      };
+    }
   }
   const resolved = resolveCommand(cli);
   if (resolved.command === 'unknown') {

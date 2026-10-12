@@ -7,6 +7,11 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- TUI (Cycle 2): menu principal ao rodar `forge-cli` em terminal
+  interativo (instalar, atualizar, reinstalar, reparar, versões, estado,
+  desinstalar, diagnosticar, sair). Sem TTY ou com comando/flags de
+  seleção, o comportamento anterior é mantido. `uninstall` pede
+  confirmação interativa quando não há `--yes`.
 - Ciclo de vida (Cycle 4/5/7): `pin`/`unpin` (install/update respeitam a
   fixação), `rollback` (só o checkout Git, ao HEAD anterior registrado),
   `reinstall` (mantém a revisão atual; `--clean` remove e reclona com
