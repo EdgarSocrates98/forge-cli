@@ -5,12 +5,14 @@ import { checkRepoPrereqs } from './prereqs.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 import { S } from './ui/strings.js';
 import {
+  currentHead,
   errorDetail,
   findSetupScript,
   npmInstallArgs,
   runStreamed,
   syncRepo,
 } from './utils/system.js';
+import type { CliState } from './artifacts.js';
 
 export interface RepoReporter {
   phase?: (phase: string) => void;
@@ -23,6 +25,9 @@ export interface RunOptions {
   skipScripts?: boolean;
   skipVerify?: boolean;
   timeoutMs?: number;
+  shallow?: boolean;
+  onlyChanged?: boolean;
+  state?: CliState['repos'];
 }
 
 export async function processRepo(
@@ -35,6 +40,7 @@ export async function processRepo(
   const elapsedMs = () => Date.now() - start;
   const repoDir = path.join(targetDir, repo.name);
   const notes: string[] = [];
+  let head: string | null = null;
   const finish = (status: RepoStatus, detail: string, envNote?: string): RepoResult => ({
     repo,
     status,
@@ -42,16 +48,23 @@ export async function processRepo(
     envNote,
     notes: notes.length ? notes : undefined,
     elapsedMs: elapsedMs(),
+    ...(head ? { head } : {}),
   });
 
   reporter.phase?.(S.phaseClone);
   let sync;
   try {
-    sync = await syncRepo(repo, targetDir);
+    sync = await syncRepo(repo, targetDir, { shallow: opts.shallow });
   } catch (error) {
     return finish('error', `${S.cloneFailed}: ${errorDetail(error)}`);
   }
   if (sync.kind === 'non-git') return finish('warning', S.nonGitDir);
+  head = await currentHead(repoDir);
+  const prior = opts.onlyChanged ? opts.state?.[repo.name] : undefined;
+  if (prior?.status === 'ok' && prior.head && prior.head === head) {
+    notes.push(S.unchanged);
+    return finish('ok', S.unchanged);
+  }
   if (sync.dirty) notes.push(S.warnDirtyTree);
   const pullFailed = sync.kind === 'pull-failed';
   if (pullFailed) notes.push(S.warnPullFailed);
@@ -131,4 +144,27 @@ export async function processRepo(
   }
 
   return finish(status, `${S.installedVia} ${ran.join(' + ')}`, envNote);
+}
+
+export async function processPool(
+  repos: readonly ForgeRepo[],
+  targetDir: string,
+  opts: RunOptions,
+  jobs: number,
+  reporterFor: (repo: ForgeRepo, index: number) => RepoReporter,
+  onResult?: (result: RepoResult) => void,
+): Promise<RepoResult[]> {
+  const results = new Array<RepoResult>(repos.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < repos.length) {
+      const index = next++;
+      const repo = repos[index];
+      const result = await processRepo(repo, targetDir, reporterFor(repo, index), opts);
+      results[index] = result;
+      onResult?.(result);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(jobs, repos.length) }, worker));
+  return results;
 }

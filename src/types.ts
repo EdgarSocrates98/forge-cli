@@ -21,6 +21,7 @@ export interface RepoResult {
   envNote?: string;
   notes?: string[];
   elapsedMs: number;
+  head?: string;
 }
 
 export interface SetupScript {

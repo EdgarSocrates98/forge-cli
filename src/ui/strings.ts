@@ -75,6 +75,9 @@ export const S = {
   doctorNeedsInstall: 'Sem checkout — instale com o modo normal',
   doctorFixing: 'Reparando',
   configInvalid: 'forge-cli.config.json inválido — ignorando',
+  errJobsInvalid: '--jobs deve ser um inteiro entre 1 e 8',
+  jobsIgnored: '--jobs ignorado no modo interativo',
+  unchanged: 'Sem mudanças — HEAD inalterado',
   listTitle: 'Catálogo e último estado',
   listNever: 'nunca executado',
   usage: `forge-cli — instalador do ecossistema Forge
@@ -99,6 +102,9 @@ Opções:
   --json             Grava relatório JSON em .forge-cli/reports/
   --report <path>    Grava relatório JSON em caminho próprio
   --retry-failed     Reexecuta só os repositórios que falharam antes
+  --jobs <n>         Processa até n repositórios em paralelo (1-8; só não-interativo)
+  --only-changed     Pula repositórios cujo HEAD não mudou desde o último ok
+  --shallow          Clona com git clone --depth 1 (só clones novos)
   -h, --help         Mostra esta ajuda
 
 Extras:

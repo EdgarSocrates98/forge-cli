@@ -63,6 +63,26 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['--dry-run']).plan).toBe(true);
   });
 
+  it('parses --jobs/--only-changed/--shallow with defaults', () => {
+    const cli = parseCliArgs(['--jobs', '4', '--only-changed', '--shallow']);
+    expect(cli.jobs).toBe(4);
+    expect(cli.jobsSet).toBe(true);
+    expect(cli.onlyChanged).toBe(true);
+    expect(cli.shallow).toBe(true);
+    const bare = parseCliArgs([]);
+    expect(bare.jobs).toBe(1);
+    expect(bare.jobsSet).toBe(false);
+    expect(bare.onlyChanged).toBe(false);
+    expect(bare.shallow).toBe(false);
+  });
+
+  it('throws CliError on out-of-range or non-numeric --jobs', () => {
+    for (const value of ['0', '9', 'abc', '2.5x']) {
+      expect(() => parseCliArgs(['--jobs', value])).toThrow(CliError);
+    }
+    expect(parseCliArgs(['--jobs', '8']).jobs).toBe(8);
+  });
+
   it('throws CliError on unknown flag and bad timeout', () => {
     expect(() => parseCliArgs(['--nope'])).toThrow(CliError);
     expect(() => parseCliArgs(['--timeout', 'abc'])).toThrow(CliError);
@@ -96,7 +116,17 @@ describe('resolveSelection', () => {
 describe('usage', () => {
   it('documents the main flags', () => {
     const text = usage();
-    for (const flag of ['--dir', '--all', '--only', '--plan', '--timeout', '--help']) {
+    for (const flag of [
+      '--dir',
+      '--all',
+      '--only',
+      '--plan',
+      '--timeout',
+      '--help',
+      '--jobs',
+      '--only-changed',
+      '--shallow',
+    ]) {
       expect(text).toContain(flag);
     }
   });

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('execa', () => ({ execa: vi.fn() }));
 
 import { execa } from 'execa';
-import { processRepo } from '../src/runner.js';
+import { processPool, processRepo } from '../src/runner.js';
 import type { ForgeRepo } from '../src/types.js';
 import { S } from '../src/ui/strings.js';
 
@@ -32,14 +32,18 @@ function proc(outcome: { stdout?: string; exitCode?: number } | Error) {
 interface GitState {
   dirty?: boolean;
   pullFails?: boolean;
+  head?: string;
 }
 
 function mockExeca(state: GitState = {}) {
   mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
     const joined = args.join(' ');
     if (cmd === 'git' && joined.startsWith('clone')) {
-      mkdirSync(args[2], { recursive: true });
+      mkdirSync(args[args.length - 1], { recursive: true });
       return proc({ stdout: '' });
+    }
+    if (cmd === 'git' && args[0] === '-C' && joined.includes('rev-parse')) {
+      return proc({ stdout: state.head ?? 'sha-1' });
     }
     if (cmd === 'git' && joined.startsWith('status')) {
       return proc({ stdout: state.dirty ? ' M dirty.ts' : '' });
@@ -270,5 +274,144 @@ describe('processRepo', () => {
       ([cmd, args]) => /^npm/.test(String(cmd)) && (args as string[])[0] !== '--version',
     );
     expect(npmRuns).toHaveLength(0);
+  });
+});
+
+describe('--shallow clones', () => {
+  it('passes --depth 1 to fresh clones only', async () => {
+    mockExeca();
+    const target = tmpDir();
+    await processRepo(baseRepo, target, {}, { shallow: true });
+    const clone = mockedExeca.mock.calls.find(
+      ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
+    );
+    expect(clone?.[1]).toEqual(['clone', '--depth', '1', baseRepo.url, expect.any(String)]);
+  });
+
+  it('clones without --depth when shallow is off', async () => {
+    mockExeca();
+    const target = tmpDir();
+    await processRepo(baseRepo, target);
+    const clone = mockedExeca.mock.calls.find(
+      ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
+    );
+    expect(clone?.[1]).toEqual(['clone', baseRepo.url, expect.any(String)]);
+  });
+});
+
+describe('--only-changed', () => {
+  const stateWith = (name: string, head: string) => ({
+    [name]: { status: 'ok' as const, detail: 'x', at: '2026-01-01T00:00:00.000Z', head },
+  });
+
+  it('skips repos whose HEAD matches the last ok run', async () => {
+    mockExeca({ head: 'sha-abc' });
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(
+      baseRepo,
+      target,
+      {},
+      {
+        onlyChanged: true,
+        state: stateWith(baseRepo.name, 'sha-abc'),
+      },
+    );
+    expect(result.status).toBe('ok');
+    expect(result.detail).toBe(S.unchanged);
+    const npmRuns = mockedExeca.mock.calls.filter(([cmd]) => /^npm/.test(String(cmd)));
+    expect(npmRuns).toHaveLength(0);
+  });
+
+  it('reruns when HEAD moved since the last ok run', async () => {
+    mockExeca({ head: 'sha-new' });
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(
+      baseRepo,
+      target,
+      {},
+      {
+        onlyChanged: true,
+        state: stateWith(baseRepo.name, 'sha-old'),
+      },
+    );
+    expect(result.detail).toBe(`${S.installedVia} npm install`);
+  });
+
+  it('reruns when prior state is missing or not ok', async () => {
+    mockExeca({ head: 'sha-abc' });
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const noPrior = await processRepo(
+      baseRepo,
+      target,
+      {},
+      {
+        onlyChanged: true,
+        state: {},
+      },
+    );
+    expect(noPrior.detail).toBe(`${S.installedVia} npm install`);
+    const failed = await processRepo(
+      baseRepo,
+      target,
+      {},
+      {
+        onlyChanged: true,
+        state: {
+          [baseRepo.name]: { status: 'error' as const, detail: 'x', at: 'a', head: 'sha-abc' },
+        },
+      },
+    );
+    expect(failed.detail).toBe(`${S.installedVia} npm install`);
+  });
+
+  it('records head on the result for state persistence', async () => {
+    mockExeca({ head: 'sha-xyz' });
+    const target = tmpDir();
+    const repoDir = existingGitRepo(target);
+    writeFileSync(path.join(repoDir, 'package.json'), '{}');
+    const result = await processRepo(baseRepo, target);
+    expect(result.head).toBe('sha-xyz');
+  });
+});
+
+describe('processPool', () => {
+  const named = (name: string): ForgeRepo => ({ ...baseRepo, name, url: `https://x/${name}` });
+
+  it('keeps results in catalog order and isolates failures', async () => {
+    mockExeca();
+    const target = tmpDir();
+    for (const name of ['a', 'b', 'c']) {
+      const dir = path.join(target, name);
+      mkdirSync(path.join(dir, '.git'), { recursive: true });
+      writeFileSync(path.join(dir, 'package.json'), '{}');
+    }
+    // b becomes non-git → warning; others install fine.
+    rmSync(path.join(target, 'b', '.git'), { recursive: true, force: true });
+    const finished: string[] = [];
+    const results = await processPool(
+      [named('a'), named('b'), named('c')],
+      target,
+      {},
+      2,
+      () => ({}),
+      (r) => finished.push(r.repo.name),
+    );
+    expect(results.map((r) => r.repo.name)).toEqual(['a', 'b', 'c']);
+    expect(results.map((r) => r.status)).toEqual(['ok', 'warning', 'ok']);
+    expect(finished.sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles more jobs than repos and empty input', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const results = await processPool([named('solo')], target, {}, 8, () => ({}));
+    expect(results).toHaveLength(1);
+    expect(await processPool([], target, {}, 4, () => ({}))).toEqual([]);
   });
 });

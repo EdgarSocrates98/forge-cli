@@ -84,6 +84,15 @@ describe('state', () => {
     expect(state?.repos.b.status).toBe('error');
   });
 
+  it('persists head SHA when the result carries one', () => {
+    const dir = tmpDir();
+    recordResult(dir, { ...result('a', 'ok'), head: 'sha-abc' });
+    recordResult(dir, result('b', 'ok'));
+    const state = loadState(dir);
+    expect(state?.repos.a.head).toBe('sha-abc');
+    expect(state?.repos.b.head).toBeUndefined();
+  });
+
   it('failedRepoNames returns only error repos', () => {
     const dir = tmpDir();
     recordResult(dir, result('a', 'ok'));

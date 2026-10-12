@@ -5,7 +5,7 @@ import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 
 export interface CliState {
   version: 1;
-  repos: Record<string, { status: RepoStatus; detail: string; at: string }>;
+  repos: Record<string, { status: RepoStatus; detail: string; at: string; head?: string }>;
 }
 
 export function artifactsRoot(targetDir: string): string {
@@ -67,6 +67,7 @@ export function recordResult(targetDir: string, result: RepoResult): void {
     status: result.status,
     detail: result.detail,
     at: new Date().toISOString(),
+    ...(result.head ? { head: result.head } : {}),
   };
   const file = stateFileFor(targetDir);
   mkdirSync(path.dirname(file), { recursive: true });

@@ -36,7 +36,7 @@ import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
 import { listLine, mergeResults, renderReport, resultLine } from './report.js';
-import { processRepo, type RepoReporter, type RunOptions } from './runner.js';
+import { processPool, processRepo, type RepoReporter, type RunOptions } from './runner.js';
 import type { ForgeRepo, RepoResult } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, kindIcon, theme } from './ui/theme.js';
@@ -227,6 +227,8 @@ async function main(): Promise<void> {
     only: cli.only ?? cfg.only,
     timeoutSecs: cli.timeoutSet ? cli.timeoutSecs : (cfg.timeout ?? cli.timeoutSecs),
     jsonReport: cli.jsonSet ? cli.jsonReport : cli.jsonReport || cfg.json === true,
+    jobs: cli.jobsSet ? cli.jobs : (cfg.jobs ?? cli.jobs),
+    shallow: cli.shallow || cfg.shallow === true,
   };
   const nonInteractive = !interactive || (effectiveCli.only?.length ?? 0) > 0;
 
@@ -275,10 +277,40 @@ async function main(): Promise<void> {
     skipScripts: cli.skipScripts,
     skipVerify: cli.skipVerify,
     timeoutMs: effectiveCli.timeoutSecs * 1000,
+    shallow: effectiveCli.shallow,
+    onlyChanged: effectiveCli.onlyChanged,
+    state: effectiveCli.onlyChanged ? loadState(targetDir)?.repos : undefined,
   };
+  const jobs = interactive ? 1 : effectiveCli.jobs;
+  if (interactive && effectiveCli.jobs > 1) log.warn(S.jobsIgnored);
   const runLog = openRunLog(targetDir);
-  runLog.write(`# forge-cli ${new Date().toISOString()} dir=${targetDir}`);
-  let results = await processBatch(repos, targetDir, opts, runLog.write, 0, repos.length);
+  runLog.write(
+    `# forge-cli ${new Date().toISOString()} dir=${targetDir} jobs=${jobs} onlyChanged=${effectiveCli.onlyChanged}`,
+  );
+  let results: RepoResult[];
+  if (jobs > 1) {
+    results = await processPool(
+      repos,
+      targetDir,
+      opts,
+      jobs,
+      (repo, index) =>
+        withLog(
+          {
+            phase: (p) =>
+              log.info(`${theme.dim(`[${index + 1}/${repos.length}]`)} ${repo.name} — ${p}`),
+          },
+          (line) => runLog.write(`[${repo.name}] ${line}`),
+        ),
+      (result) => {
+        runLog.write(`[result] ${result.repo.name} ${result.status}: ${result.detail}`);
+        log.info(resultLine(result));
+      },
+    );
+    for (const result of results) recordResult(targetDir, result);
+  } else {
+    results = await processBatch(repos, targetDir, opts, runLog.write, 0, repos.length);
+  }
 
   renderReport(results);
 

@@ -83,7 +83,19 @@ export async function isGitDirty(repoDir: string): Promise<boolean> {
   }
 }
 
-export async function syncRepo(repo: ForgeRepo, targetDir: string): Promise<SyncResult> {
+export async function currentHead(repoDir: string): Promise<string | null> {
+  return commandOutput('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
+}
+
+export interface SyncOptions {
+  shallow?: boolean;
+}
+
+export async function syncRepo(
+  repo: ForgeRepo,
+  targetDir: string,
+  opts: SyncOptions = {},
+): Promise<SyncResult> {
   const repoDir = path.join(targetDir, repo.name);
   if (existsSync(repoDir)) {
     if (!hasGitRepo(repoDir)) return { kind: 'non-git', dirty: false };
@@ -95,7 +107,8 @@ export async function syncRepo(repo: ForgeRepo, targetDir: string): Promise<Sync
       return { kind: 'pull-failed', dirty };
     }
   }
-  await execa('git', ['clone', repo.url, repoDir]);
+  const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];
+  await execa('git', [...cloneArgs, repo.url, repoDir]);
   return { kind: 'cloned', dirty: false };
 }
 

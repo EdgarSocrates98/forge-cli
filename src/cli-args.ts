@@ -4,6 +4,7 @@ import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 
 export const DEFAULT_TIMEOUT_SECS = 900;
+export const MAX_JOBS = 8;
 
 export interface CliOptions {
   dir?: string;
@@ -21,6 +22,10 @@ export interface CliOptions {
   fix: boolean;
   timeoutSet: boolean;
   jsonSet: boolean;
+  jobs: number;
+  jobsSet: boolean;
+  onlyChanged: boolean;
+  shallow: boolean;
   positionals: string[];
 }
 
@@ -46,6 +51,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         report: { type: 'string' },
         'retry-failed': { type: 'boolean' },
         fix: { type: 'boolean' },
+        jobs: { type: 'string' },
+        'only-changed': { type: 'boolean' },
+        shallow: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -58,6 +66,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const timeoutSecs = Number.parseInt(values.timeout ?? '', 10);
   if (values.timeout !== undefined && (!Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
     throw new CliError(S.errTimeoutInvalid);
+  }
+  const jobs = Number(values.jobs ?? '');
+  if (values.jobs !== undefined && (!Number.isInteger(jobs) || jobs < 1 || jobs > MAX_JOBS)) {
+    throw new CliError(S.errJobsInvalid);
   }
 
   return {
@@ -79,6 +91,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
     fix: values.fix ?? false,
     timeoutSet: values.timeout !== undefined,
     jsonSet: values.json !== undefined || values.report !== undefined,
+    jobs: values.jobs === undefined ? 1 : jobs,
+    jobsSet: values.jobs !== undefined,
+    onlyChanged: values['only-changed'] ?? false,
+    shallow: values.shallow ?? false,
     positionals,
   };
 }
