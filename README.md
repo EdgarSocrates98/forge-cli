@@ -59,6 +59,20 @@ npm link        # registra o binário `forge-cli`
 forge-cli       # em qualquer diretório
 ```
 
+Alternativa sem npm global — o próprio CLI se registra no PATH do usuário
+(sem admin), copiando o bundle para `~/.forge-cli/bin`:
+
+```bash
+npm run build
+node dist/index.js install     # Windows: forge-cli.cmd + PATH do usuário
+                               # Linux/macOS: shim sh + bloco nos profiles
+forge-cli uninstall            # desfaz tudo (PATH, shims e bundle)
+```
+
+Após `install`, abra um terminal novo — o PATH do usuário só é lido por
+processos novos. `forge-cli doctor` avisa quando o binário não está
+acessível no PATH.
+
 ## Uso
 
 Execute `npm run dev` (ou `forge-cli`, se instalado globalmente) e siga

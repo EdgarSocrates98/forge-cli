@@ -11,6 +11,7 @@ import {
   taskLog,
 } from '@clack/prompts';
 import figlet from 'figlet';
+import standardFont from 'figlet/importable-fonts/Standard.js';
 import {
   failedRepoNames,
   loadCustomRepos,
@@ -32,6 +33,7 @@ import {
 import { FORGE_REPOS } from './constants/repos.js';
 import { loadConfig } from './config.js';
 import { reposNeedingFix, runDoctor } from './doctor.js';
+import { install, pathStatus, uninstall } from './install.js';
 import { planLines } from './plan.js';
 import { runPreflight } from './preflight.js';
 import { askConfirm, askRepos, askWorkspace } from './prompts.js';
@@ -45,6 +47,7 @@ import { resolveTargetDir } from './utils/system.js';
 const BANNER_LINE_DELAY_MS = 30;
 
 async function printBanner(): Promise<void> {
+  figlet.parseFont('Standard', standardFont);
   const art = figlet.textSync(S.bannerWord, { font: 'Standard' });
   for (const line of art.split('\n')) {
     console.log(theme.brand(line));
@@ -131,6 +134,7 @@ async function processBatch(
 async function runDoctorCommand(cli: CliOptions): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
   const results = await runDoctor(catalogFor(targetDir), targetDir);
+  if ((await pathStatus()) === 'missing') log.warn(S.doctorPathMissing);
   const body = results
     .map((r) => {
       const badge =
@@ -184,6 +188,26 @@ async function runListCommand(cli: CliOptions): Promise<void> {
   process.exit(0);
 }
 
+async function runInstallCommand(): Promise<void> {
+  const report = await install();
+  log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
+  if (report.pathAlready) {
+    log.info(S.installPathAlready);
+  } else {
+    log.info(S.installNewTerminal);
+  }
+  process.exit(0);
+}
+
+async function runUninstallCommand(): Promise<void> {
+  const report = await uninstall();
+  log.success(`${icons.ok} ${S.uninstallDone}`);
+  if (report.profilesTouched.length) {
+    log.info(`${S.uninstallProfiles}: ${report.profilesTouched.join(', ')}`);
+  }
+  process.exit(0);
+}
+
 async function main(): Promise<void> {
   await printBanner();
   intro(theme.accent(S.intro));
@@ -206,6 +230,14 @@ async function main(): Promise<void> {
   }
   if (cli.positionals[0] === 'list') {
     await runListCommand(cli);
+    return;
+  }
+  if (cli.positionals[0] === 'install') {
+    await runInstallCommand();
+    return;
+  }
+  if (cli.positionals[0] === 'uninstall') {
+    await runUninstallCommand();
     return;
   }
 

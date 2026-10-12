@@ -80,6 +80,13 @@ export const S = {
   unchanged: 'Sem mudanças — HEAD inalterado',
   listTitle: 'Catálogo e último estado',
   listNever: 'nunca executado',
+  installDone: 'forge-cli instalado em',
+  installPathAlready: 'O PATH do usuário já aponta para a instalação.',
+  installNewTerminal: 'Abra um terminal novo para usar forge-cli de qualquer lugar.',
+  uninstallDone: 'forge-cli removido do PATH do usuário.',
+  uninstallProfiles: 'Blocos removidos dos profiles',
+  doctorPathMissing:
+    'forge-cli não está no PATH — rode forge-cli install ou npm i -g para usá-lo de qualquer terminal',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:
@@ -89,6 +96,8 @@ Uso:
   forge-cli --plan              Mostra o plano por repositório e sai
   forge-cli doctor [--fix]      Diagnostica; --fix repara os que falharem
   forge-cli list                Lista o catálogo e o último estado conhecido
+  forge-cli install             Registra forge-cli no PATH do usuário
+  forge-cli uninstall           Remove o registro do PATH
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
