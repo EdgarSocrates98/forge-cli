@@ -110,8 +110,17 @@ forge-cli install api-forge --version 1.2.0  # fixa em tag/sha (checkout destaca
 forge-cli pin|unpin|rollback api-forge       # fixação e retorno ao HEAD anterior
 forge-cli reinstall api-forge [--clean]      # mantém a revisão; --clean reclona com backup
 forge-cli uninstall api-forge [--yes]        # plano + backup de .env/configs
+forge-cli components [forjas]                # flags do instalador nativo por Forja
+forge-cli doctor [forjas] [--fix]            # diagnostica (ou repara) Forjas
+forge-cli install api-forge --offline        # só usa clone existente, sem rede
 forge-cli self install | self uninstall | self update
+forge-cli help
 ```
+
+Segurança: scripts não rodam após falha de sync (`--run-after-sync-failure`
+libera) e repositórios de `forge-cli.repos.json` só executam scripts com
+`--trust-custom`. `--yes` não autoriza o instalador nativo a escrever sem
+que seja passado explicitamente.
 
 > `forge-cli install` agora instala Forjas; o registro no PATH passou a
 > ser `forge-cli self install`.
@@ -192,6 +201,14 @@ repositório é marcado como `[ERRO]` e o script de instalação **não**
 src/
   index.ts           # orquestrador do fluxo interativo
   prompts.ts         # prompts: diretório, seleção, confirmação
+  menu.ts            # menu principal (TUI)
+  commands.ts        # resolução de subcomandos
+  safety.ts          # nomes/URLs seguros, symlinks, redação de segredos
+  git-revs.ts        # tags, checkout por ref, update --check
+  lifecycle.ts       # uninstall seguro, rollback
+  native-install.ts  # adaptador do instalador nativo (profile/scope/components)
+  status.ts          # estado local por Forja
+  self.ts            # self update por método de instalação
   runner.ts          # pipeline por repositório (clone → .env → script)
   env.ts             # provisionamento do .env
   preflight.ts       # verificações de ambiente
@@ -211,6 +228,7 @@ factory/             # fluxo spec-driven (Loop Factory)
 ## Documentação
 
 - [Arquitetura e decisões de design](docs/arquitetura.md)
+- [Matriz de capacidades das Forjas](docs/capabilities.md)
 - [Solução de problemas](docs/solucao-de-problemas.md)
 - [Como contribuir](CONTRIBUTING.md)
 - [Registro de mudanças](CHANGELOG.md)

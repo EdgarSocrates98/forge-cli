@@ -43,6 +43,16 @@ quando algo falta:
   `[ERRO]` — isso é esperado quando o repo não publica script para a
   sua plataforma.
 
+## Os scripts não rodaram (aviso de sync ou de repositório customizado)
+
+- `Scripts não executados após falha de sincronização`: o pull falhou, o
+  branch divergiu ou o remote difere do catálogo. Resolva o repositório ou
+  reexecute com `--run-after-sync-failure`.
+- `Repositório customizado: scripts não executados`: repositórios vindos de
+  `forge-cli.repos.json` exigem `--trust-custom`.
+- `Working tree com alterações locais` ao usar `--ref`/`--version`: faça
+  commit ou stash antes de trocar de revisão.
+
 ## O spinner trava ou a saída quebra
 
 - Use um terminal moderno (Windows Terminal, VS Code, ou similar). O

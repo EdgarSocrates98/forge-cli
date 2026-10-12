@@ -19,6 +19,14 @@ vive em módulos especializados.**
 | `src/ui/strings.ts`      | Todas as strings visíveis ao usuário, em PT-BR.                                                        |
 | `src/constants/repos.ts` | Catálogo fixo dos oito repositórios Forge.                                                             |
 | `src/utils/system.ts`    | Primitivas: resolução de caminho, `.git`, seleção de script por SO, `execa`, detalhe de erro.          |
+| `src/commands.ts`        | Resolve o subcomando (`install`, `clone`, `update`, `pin`, `self ...`) a partir dos posicionais.       |
+| `src/menu.ts`            | Menu principal; só aparece com TTY e sem comando/flags de seleção.                                     |
+| `src/safety.ts`          | Nomes/URLs de repositório válidos, bloqueio de symlink/junction, redação de segredos, escrita atômica. |
+| `src/git-revs.ts`        | Tags, checkout destacado por ref/versão, verificação de atualização via fetch.                         |
+| `src/lifecycle.ts`       | Plano e execução de uninstall (com backup) e rollback de checkout.                                     |
+| `src/native-install.ts`  | Monta o `<cli> install` nativo da Forja com as flags que ela documenta.                                |
+| `src/status.ts`          | Fase local (não clonado, clonado, instalado, falha), versão e alterações.                              |
+| `src/self.ts`            | Detecta o método de instalação do CLI e planeja o `self update`.                                       |
 | `src/types.ts`           | Tipos compartilhados (`ForgeRepo`, `RepoResult`, `InstallScript`, `PreflightCheck`).                   |
 
 ## Fluxo de execução
@@ -47,6 +55,18 @@ flowchart TD
     L & N & P & Q --> R[Próximo repositório]
     R -->|fim da lista| S[Relatório + outro]
 ```
+
+## Camadas adicionadas no roadmap 2.0
+
+- **Segurança antes de execução:** todo nome/URL passa por `safety.ts`; o
+  destino nunca é symlink; segredos são mascarados em logs, relatórios e erros.
+- **Sync com política:** falha de pull, divergência ou remote diferente do
+  catálogo impedem a execução de scripts, salvo aprovação por flag.
+- **Instalação em duas fases:** bootstrap (`setup.sh/ps1`) e, sob opt-in
+  (`--profile/--scope/--components`), o `<cli> install` da própria Forja —
+  sempre `--dry-run` sem `--yes`. Veja [capabilities.md](capabilities.md).
+- **Independência:** nenhuma Forja depende do forge-cli; o estado em
+  `.forge-cli/` é auxiliar e pode ser descartado.
 
 ## Decisões de design
 
