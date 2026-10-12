@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0002.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T02:41:05+00:00",
+  "id": "lf-0002",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0002.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0002.md",
+  "spec_sha256": "c8e077ae678e9910e8a2075034b4f0579a885657f3b07b896f44f36608236f9f",
+  "status": "planned",
+  "title": "Evolve forge-cli \u2014 env bootstrap, UI polish, preflight, refactor"
+}
