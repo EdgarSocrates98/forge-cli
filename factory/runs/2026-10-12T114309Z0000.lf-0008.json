@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0008.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T11:43:09+00:00",
+  "id": "lf-0008",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0008.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0008.md",
+  "spec_sha256": "18edfb20cba0b651474c94e244c85292d70fbdee6e0b0c5baf8559b120038ced",
+  "status": "planned",
+  "title": "Engineering quality \u2014 GitHub Actions CI, prettier, eslint, coverage gate"
+}
