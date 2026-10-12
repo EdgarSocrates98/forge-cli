@@ -76,6 +76,9 @@ async function checkEnvironment(): Promise<void> {
 function catalogFor(targetDir: string): ForgeRepo[] {
   const custom = loadCustomRepos(targetDir);
   if (custom && 'repos' in custom) {
+    if (custom.rejected.length) {
+      log.warn(`${S.customReposRejected}: ${custom.rejected.join(', ')}`);
+    }
     const hasNew = custom.repos.some((r) => !FORGE_REPOS.some((c) => c.name === r.name));
     if (hasNew) log.info(`${S.customReposLoaded} ${theme.dim(`(${custom.repos.length})`)}`);
     return mergeCatalog(FORGE_REPOS, custom.repos);

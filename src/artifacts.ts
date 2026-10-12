@@ -1,6 +1,7 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { RepoReporter } from './runner.js';
+import { isSafeRepoName, isSafeRepoUrl, redactSecrets, writeFileAtomic } from './safety.js';
 import type { ForgeRepo, RepoResult, RepoStatus } from './types.js';
 
 export interface CliState {
@@ -71,7 +72,7 @@ export function recordResult(targetDir: string, result: RepoResult): void {
   };
   const file = stateFileFor(targetDir);
   mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(state, null, 2), 'utf8');
+  writeFileAtomic(file, JSON.stringify(state, null, 2));
 }
 
 export function failedRepoNames(state: CliState | null): string[] {
@@ -89,15 +90,17 @@ export function writeJsonReport(
   const file =
     reportPath ?? path.join(artifactsRoot(targetDir), 'reports', `forge-cli-${timestamp()}.json`);
   mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(
+  writeFileAtomic(
     file,
-    JSON.stringify({ generatedAt: new Date().toISOString(), targetDir, results }, null, 2),
-    'utf8',
+    redactSecrets(
+      JSON.stringify({ generatedAt: new Date().toISOString(), targetDir, results }, null, 2),
+    ),
   );
   return file;
 }
 
-export type CustomReposResult = { repos: ForgeRepo[] } | { error: string } | null;
+export type CustomReposResult =
+  { repos: ForgeRepo[]; rejected: string[] } | { error: string } | null;
 
 export function loadCustomRepos(targetDir: string): CustomReposResult {
   const file = path.join(targetDir, 'forge-cli.repos.json');
@@ -106,7 +109,16 @@ export function loadCustomRepos(targetDir: string): CustomReposResult {
     const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
     if (!Array.isArray(parsed)) return { error: 'not-an-array' };
     const repos: ForgeRepo[] = [];
+    const rejected: string[] = [];
     for (const item of parsed) {
+      if (item && typeof item.name === 'string' && !isSafeRepoName(item.name)) {
+        rejected.push(item.name);
+        continue;
+      }
+      if (item && typeof item.url === 'string' && !isSafeRepoUrl(item.url)) {
+        rejected.push(String(item.name));
+        continue;
+      }
       if (
         item &&
         typeof item.name === 'string' &&
@@ -124,7 +136,7 @@ export function loadCustomRepos(targetDir: string): CustomReposResult {
         });
       }
     }
-    return repos.length ? { repos } : { error: 'empty' };
+    return repos.length ? { repos, rejected } : { error: 'empty' };
   } catch {
     return { error: 'invalid-json' };
   }

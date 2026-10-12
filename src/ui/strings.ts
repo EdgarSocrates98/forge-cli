@@ -64,6 +64,7 @@ export const S = {
   errNoState: 'Nenhum estado anterior encontrado neste diretório',
   noFailedRepos: 'Nenhum repositório com erro registrado',
   customReposInvalid: 'forge-cli.repos.json inválido — usando catálogo padrão',
+  customReposRejected: 'Repositórios customizados rejeitados (nome ou URL inválidos)',
   customReposLoaded: 'Repositórios extras carregados de forge-cli.repos.json',
   logSaved: 'Log salvo em',
   reportSaved: 'Relatório JSON salvo em',

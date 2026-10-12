@@ -285,7 +285,7 @@ describe('--shallow clones', () => {
     const clone = mockedExeca.mock.calls.find(
       ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
     );
-    expect(clone?.[1]).toEqual(['clone', '--depth', '1', baseRepo.url, expect.any(String)]);
+    expect(clone?.[1]).toEqual(['clone', '--depth', '1', '--', baseRepo.url, expect.any(String)]);
   });
 
   it('clones without --depth when shallow is off', async () => {
@@ -295,7 +295,7 @@ describe('--shallow clones', () => {
     const clone = mockedExeca.mock.calls.find(
       ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
     );
-    expect(clone?.[1]).toEqual(['clone', baseRepo.url, expect.any(String)]);
+    expect(clone?.[1]).toEqual(['clone', '--', baseRepo.url, expect.any(String)]);
   });
 });
 

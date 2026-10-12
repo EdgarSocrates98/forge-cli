@@ -7,6 +7,10 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 
+- Segurança (Cycle 1): validação de nomes/URLs de repositórios (bloqueia
+  path traversal, `--opção`, `ext::`, `file://` e credenciais embutidas),
+  recusa de destino symlink/junction, `git clone --`, redação de
+  segredos em logs/relatórios/erros e escrita atômica de estado.
 - Provisionamento de `.env` por repositório antes do script de
   instalação: copia `.env.example`, cria modelo comentado ou preserva
   `.env` existente (lf-0002).

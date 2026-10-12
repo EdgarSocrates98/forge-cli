@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { execa } from 'execa';
+import { isLinkOrJunction, isSafeRepoUrl, redactSecrets, resolveInside } from '../safety.js';
 import type { ForgeRepo, SetupScript, SyncResult } from '../types.js';
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
@@ -96,7 +97,12 @@ export async function syncRepo(
   targetDir: string,
   opts: SyncOptions = {},
 ): Promise<SyncResult> {
-  const repoDir = path.join(targetDir, repo.name);
+  const repoDir = resolveInside(targetDir, repo.name);
+  if (!repoDir) throw new Error(`nome de repositório inválido: ${repo.name}`);
+  if (!isSafeRepoUrl(repo.url)) throw new Error(`URL de repositório não permitida: ${repo.name}`);
+  if (isLinkOrJunction(repoDir)) {
+    throw new Error(`destino é link simbólico/junction: ${repo.name}`);
+  }
   if (existsSync(repoDir)) {
     if (!hasGitRepo(repoDir)) return { kind: 'non-git', dirty: false };
     const dirty = await isGitDirty(repoDir);
@@ -108,7 +114,7 @@ export async function syncRepo(
     }
   }
   const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];
-  await execa('git', [...cloneArgs, repo.url, repoDir]);
+  await execa('git', [...cloneArgs, '--', repo.url, repoDir]);
   return { kind: 'cloned', dirty: false };
 }
 
@@ -126,7 +132,7 @@ export async function runStreamed(
     timeout: timeoutMs,
   });
   for await (const line of sub.iterable({ from: 'all' })) {
-    onLine?.(line);
+    onLine?.(redactSecrets(line));
   }
   await sub;
 }
@@ -134,7 +140,7 @@ export async function runStreamed(
 export function errorDetail(error: unknown): string {
   if (error && typeof error === 'object') {
     const err = error as { shortMessage?: string; stderr?: string; message?: string };
-    return err.stderr?.trim() || err.shortMessage || err.message || String(error);
+    return redactSecrets(err.stderr?.trim() || err.shortMessage || err.message || String(error));
   }
-  return String(error);
+  return redactSecrets(String(error));
 }
