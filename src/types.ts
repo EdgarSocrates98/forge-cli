@@ -3,6 +3,8 @@ export interface ForgeRepo {
   url: string;
   description: string;
   verify?: readonly string[];
+  nextSteps?: readonly string[];
+  envKeys?: readonly string[];
 }
 
 export type RepoStatus = 'ok' | 'warning' | 'error';
@@ -31,8 +33,11 @@ export interface SyncResult {
   dirty: boolean;
 }
 
+export type CheckSeverity = 'fatal' | 'warn';
+
 export interface PreflightCheck {
   name: string;
   ok: boolean;
   detail: string;
+  severity: CheckSeverity;
 }

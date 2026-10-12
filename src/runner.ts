@@ -51,7 +51,7 @@ export async function processRepo(
   let envNote: string | undefined;
   try {
     reporter.phase?.(S.phaseEnv);
-    envNote = envNoteFor(await ensureEnvFile(repoDir));
+    envNote = envNoteFor(await ensureEnvFile(repoDir, repo.envKeys));
   } catch (error) {
     return finish('error', `${S.envFailed}: ${errorDetail(error)}`, envNote);
   }

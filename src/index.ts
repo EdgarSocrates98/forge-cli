@@ -25,11 +25,13 @@ async function checkEnvironment(): Promise<void> {
   for (const check of checks) {
     if (check.ok) {
       log.success(`${icons.ok} ${check.name} ${theme.dim(`(${check.detail})`)}`);
+    } else if (check.severity === 'warn') {
+      log.warn(`${icons.warn} ${check.name} ${theme.dim(`(${check.detail})`)}`);
     } else {
       log.error(`${icons.err} ${check.name} ${theme.dim(`(${check.detail})`)}`);
     }
   }
-  if (checks.some((check) => !check.ok)) {
+  if (checks.some((check) => !check.ok && check.severity === 'fatal')) {
     log.error(S.preflightFailed);
     process.exit(1);
   }

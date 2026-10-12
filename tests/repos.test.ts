@@ -40,4 +40,18 @@ describe('FORGE_REPOS catalog', () => {
     const portal = FORGE_REPOS.find((r) => r.name === 'forge-portal');
     expect(portal?.verify).toEqual(['npx', '--no-install', 'ng', 'version']);
   });
+
+  it('defines nextSteps for every repo', () => {
+    for (const repo of FORGE_REPOS) {
+      expect(repo.nextSteps?.length, repo.name).toBeGreaterThan(0);
+    }
+  });
+
+  it('defines documented envKeys only for api-forge', () => {
+    const api = FORGE_REPOS.find((r) => r.name === 'api-forge');
+    expect(api?.envKeys).toEqual(['APIFORGE_HOME', 'APIFORGE_CONFIG', 'APIFORGE_CACHE']);
+    for (const repo of FORGE_REPOS.filter((r) => r.name !== 'api-forge')) {
+      expect(repo.envKeys, repo.name).toBeUndefined();
+    }
+  });
 });

@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0004.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T11:32:39+00:00",
+  "id": "lf-0004",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0004.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0004.md",
+  "spec_sha256": "681f75627b0b6f2d0e056771c11114fe3ff0cbb2f6a37bed7d0a190f561733ba",
+  "status": "planned",
+  "title": "Gap closing \u2014 Python preflight, next-steps hints, env templates"
+}
