@@ -1,0 +1,307 @@
+import path from 'node:path';
+import { copyConfigExamples } from './configs.js';
+import { checkoutRef } from './git-revs.js';
+import { readForgeManifest } from './manifest.js';
+import {
+  buildNativeInstall,
+  buildNativeOp,
+  hasNativeRequest,
+  type NativeInstallOptions,
+} from './native-install.js';
+import { ensureEnvFile, envNoteFor } from './env.js';
+import { checkRepoPrereqs } from './prereqs.js';
+import type { ForgeRepo, LifecyclePhase, RepoResult, RepoStatus } from './types.js';
+import { S } from './ui/strings.js';
+import {
+  currentHead,
+  errorDetail,
+  findSetupScript,
+  npmInstallArgs,
+  resolvePython,
+  runStreamed,
+  syncRepo,
+} from './utils/system.js';
+import type { CliState } from './artifacts.js';
+
+export interface RepoReporter {
+  phase?: (phase: string) => void;
+  commandStart?: (title: string) => void;
+  commandLine?: (line: string) => void;
+  commandEnd?: (ok: boolean, title: string) => void;
+}
+
+export interface RunOptions {
+  skipScripts?: boolean;
+  skipVerify?: boolean;
+  timeoutMs?: number;
+  shallow?: boolean;
+  onlyChanged?: boolean;
+  ref?: string;
+  refs?: Record<string, string>;
+  cloneOnly?: boolean;
+  offline?: boolean;
+  native?: NativeInstallOptions;
+  nativeUpdate?: boolean;
+  trustCustom?: boolean;
+  trustedRepos?: ReadonlySet<string>;
+  deniedScripts?: ReadonlySet<string>;
+  runAfterSyncFailure?: boolean;
+  state?: CliState['repos'];
+}
+
+export async function processRepo(
+  repo: ForgeRepo,
+  targetDir: string,
+  reporter: RepoReporter = {},
+  opts: RunOptions = {},
+): Promise<RepoResult> {
+  const start = Date.now();
+  const elapsedMs = () => Date.now() - start;
+  const repoDir = path.join(targetDir, repo.name);
+  const notes: string[] = [];
+  let head: string | null = null;
+  let phase: LifecyclePhase | undefined;
+  const finish = (status: RepoStatus, detail: string, envNote?: string): RepoResult => ({
+    repo,
+    status,
+    detail,
+    envNote,
+    notes: notes.length ? notes : undefined,
+    elapsedMs: elapsedMs(),
+    ...(head ? { head } : {}),
+    ...((phase ?? (status === 'error' ? ('failed' as const) : undefined))
+      ? { phase: phase ?? 'failed' }
+      : {}),
+  });
+
+  const wantedRef = opts.ref ?? opts.refs?.[repo.name];
+  reporter.phase?.(S.phaseClone);
+  let sync;
+  try {
+    sync = await syncRepo(repo, targetDir, {
+      shallow: opts.shallow && !wantedRef,
+      noPull: Boolean(wantedRef),
+      offline: opts.offline,
+    });
+    if (wantedRef && sync.kind !== 'non-git' && sync.kind !== 'remote-mismatch') {
+      if (sync.dirty) throw new Error(S.errRefDirty);
+      const resolved = await checkoutRef(repoDir, wantedRef);
+      notes.push(`${S.refCheckedOut}: ${resolved}`);
+    }
+  } catch (error) {
+    return finish('error', `${S.cloneFailed}: ${errorDetail(error)}`);
+  }
+  if (sync.kind === 'non-git') return finish('warning', S.nonGitDir);
+  const remoteMismatch = sync.kind === 'remote-mismatch';
+  if (remoteMismatch) notes.push(S.warnRemoteMismatch);
+  head = await currentHead(repoDir);
+  if (opts.cloneOnly) {
+    phase = 'cloned';
+    return finish(
+      sync.kind === 'pull-failed' || remoteMismatch ? 'warning' : 'ok',
+      sync.kind === 'cloned' ? S.clonedOnly : S.syncedOnly,
+    );
+  }
+  const prior = opts.onlyChanged ? opts.state?.[repo.name] : undefined;
+  if (prior?.status === 'ok' && prior.head && prior.head === head) {
+    notes.push(S.unchanged);
+    return finish('ok', S.unchanged);
+  }
+  if (sync.dirty) notes.push(S.warnDirtyTree);
+  const pullFailed = sync.kind === 'pull-failed';
+  if (pullFailed) {
+    notes.push(
+      sync.failure === 'diverged'
+        ? S.warnPullDiverged
+        : sync.failure === 'network'
+          ? S.warnPullNetwork
+          : sync.failure === 'auth'
+            ? S.warnPullAuth
+            : S.warnPullFailed,
+    );
+  }
+  const syncFailed = pullFailed || remoteMismatch;
+  const syncBlocksScripts = syncFailed && !opts.runAfterSyncFailure;
+  const untrusted =
+    repo.origin === 'custom' && !opts.trustCustom && !opts.trustedRepos?.has(repo.name);
+  const denied = opts.deniedScripts?.has(repo.name) === true;
+  const skipScripts = opts.skipScripts || syncBlocksScripts || untrusted || denied;
+  if (!opts.skipScripts && syncBlocksScripts) notes.push(S.warnScriptsSkippedSync);
+  if (!opts.skipScripts && untrusted) notes.push(S.warnScriptsSkippedUntrusted);
+  if (!opts.skipScripts && denied) notes.push(S.warnScriptsDenied);
+
+  let envNote: string | undefined;
+  try {
+    reporter.phase?.(S.phaseEnv);
+    envNote = envNoteFor(await ensureEnvFile(repoDir, repo.envKeys));
+  } catch (error) {
+    return finish('error', `${S.envFailed}: ${errorDetail(error)}`, envNote);
+  }
+
+  reporter.phase?.(S.phaseConfigs);
+  try {
+    for (const target of await copyConfigExamples(repoDir)) {
+      notes.push(`${S.configCopied}: ${target}`);
+    }
+  } catch (error) {
+    return finish('error', `${S.configFailed}: ${errorDetail(error)}`, envNote);
+  }
+
+  reporter.phase?.(S.phasePrereqs);
+  const prereqs = await checkRepoPrereqs(repoDir);
+  const unmet = prereqs.filter((check) => !check.ok);
+  if (unmet.length) {
+    for (const check of unmet) notes.push(`${check.name} (${check.detail})`);
+    return finish('error', `${S.prereqsFailed}: ${unmet.map((c) => c.name).join(', ')}`, envNote);
+  }
+
+  const ran: string[] = [];
+  const script = skipScripts ? null : findSetupScript(repoDir);
+  if (script) {
+    reporter.phase?.(`${S.phaseInstall} ${script.file}`);
+    reporter.commandStart?.(script.file);
+    try {
+      await runStreamed(
+        [script.command, ...script.args],
+        repoDir,
+        reporter.commandLine,
+        opts.timeoutMs,
+      );
+      reporter.commandEnd?.(true, script.file);
+      ran.push(script.file);
+    } catch (error) {
+      reporter.commandEnd?.(false, script.file);
+      phase = ran.length ? 'partial' : 'failed';
+      return finish('error', `${S.installFailed} ${script.file}: ${errorDetail(error)}`, envNote);
+    }
+  }
+
+  const npmArgs = skipScripts ? null : npmInstallArgs(repoDir);
+  if (npmArgs) {
+    const title = `npm ${npmArgs[0]}`;
+    reporter.phase?.(title);
+    reporter.commandStart?.(title);
+    try {
+      await runStreamed(['npm', ...npmArgs], repoDir, reporter.commandLine, opts.timeoutMs);
+      reporter.commandEnd?.(true, title);
+      ran.push(title);
+    } catch (error) {
+      reporter.commandEnd?.(false, title);
+      phase = ran.length ? 'partial' : 'failed';
+      return finish('error', `${S.npmFailed}: ${errorDetail(error)}`, envNote);
+    }
+  }
+
+  const nativeRequested = hasNativeRequest(opts.native);
+  if (!ran.length && !nativeRequested) {
+    phase = 'prepared';
+    return finish('warning', S.noSetupSteps, envNote);
+  }
+
+  let status: RepoStatus = syncFailed ? 'warning' : 'ok';
+  let validated = false;
+  // forge.json é conteúdo do repositório (não confiável): só vira comando para Forja do
+  // catálogo ou repositório customizado aprovado, e roda fora do diretório da Forja para
+  // que um executável local não seja resolvido antes do PATH.
+  const repoTrusted =
+    repo.origin !== 'custom' || opts.trustCustom === true || opts.trustedRepos?.has(repo.name);
+  const manifest = repo.verify?.length || !repoTrusted ? null : readForgeManifest(repoDir);
+  const fromManifest = !repo.verify?.length && Boolean(manifest?.cli);
+  const verifyCmd: readonly string[] | undefined = repo.verify?.length
+    ? repo.verify
+    : manifest?.cli
+      ? [manifest.cli, '--help']
+      : undefined;
+  if (verifyCmd?.length && !opts.skipVerify) {
+    reporter.phase?.(S.phaseVerify);
+    try {
+      await runStreamed(
+        [...verifyCmd],
+        fromManifest ? targetDir : repoDir,
+        undefined,
+        opts.timeoutMs,
+      );
+      notes.push(`${S.verifyOk}: ${verifyCmd.join(' ')}`);
+      validated = true;
+    } catch {
+      status = 'warning';
+      notes.push(`${S.verifyFailed}: ${verifyCmd.join(' ')}`);
+    }
+  }
+
+  const runNative = async (argv: string[], dryRun: boolean): Promise<void> => {
+    if (argv[0] === '{python}') {
+      const py = await resolvePython();
+      if (!py) {
+        status = 'warning';
+        notes.push(S.nativeNoPython);
+        return;
+      }
+      argv.splice(0, 1, ...py);
+    }
+    const title = argv.join(' ');
+    reporter.phase?.(S.phaseNative);
+    reporter.commandStart?.(title);
+    try {
+      await runStreamed(argv, repoDir, reporter.commandLine, opts.timeoutMs);
+      reporter.commandEnd?.(true, title);
+      ran.push(dryRun ? S.nativeDryRun : S.nativeApplied);
+      if (dryRun) notes.push(S.nativeNeedsYes);
+    } catch (error) {
+      reporter.commandEnd?.(false, title);
+      status = 'warning';
+      notes.push(`${S.nativeFailed}: ${errorDetail(error)}`);
+    }
+  };
+
+  if (nativeRequested && opts.native) {
+    const built = buildNativeInstall(repo, opts.native);
+    if (!built) {
+      status = 'warning';
+      notes.push(S.nativeUnsupported);
+    } else {
+      for (const flag of built.ignored) notes.push(`${S.nativeFlagIgnored}: --${flag}`);
+      await runNative(built.argv, built.dryRun);
+    }
+  }
+
+  if (opts.nativeUpdate) {
+    const op = buildNativeOp(repo, 'update', opts.native?.approve === true);
+    if (!op) {
+      status = 'warning';
+      notes.push(S.nativeUnsupported);
+    } else {
+      await runNative(op.argv, op.dryRun);
+    }
+  }
+
+  if (!ran.length) {
+    phase = 'prepared';
+    return finish(status, S.noSetupSteps, envNote);
+  }
+  phase = validated ? 'validated' : 'installed';
+  return finish(status, `${S.installedVia} ${ran.join(' + ')}`, envNote);
+}
+
+export async function processPool(
+  repos: readonly ForgeRepo[],
+  targetDir: string,
+  opts: RunOptions,
+  jobs: number,
+  reporterFor: (repo: ForgeRepo, index: number) => RepoReporter,
+  onResult?: (result: RepoResult) => void,
+): Promise<RepoResult[]> {
+  const results = new Array<RepoResult>(repos.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < repos.length) {
+      const index = next++;
+      const repo = repos[index];
+      const result = await processRepo(repo, targetDir, reporterFor(repo, index), opts);
+      results[index] = result;
+      onResult?.(result);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(jobs, repos.length) }, worker));
+  return results;
+}

@@ -1,0 +1,73 @@
+{
+  "name": "forge-cli",
+  "version": "0.1.0",
+  "description": "CLI interativa para clonar e configurar o ecossistema Forge",
+  "type": "module",
+  "bin": {
+    "forge-cli": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "docs/*.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "pack": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "execa": "^9.0.0",
+    "figlet": "^1.9.0",
+    "picocolors": "^1.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EdgarSocrates98/forge-cli.git"
+  },
+  "homepage": "https://github.com/EdgarSocrates98/forge-cli#readme",
+  "bugs": {
+    "url": "https://github.com/EdgarSocrates98/forge-cli/issues"
+  },
+  "keywords": [
+    "forge",
+    "cli",
+    "installer",
+    "git",
+    "agents",
+    "skills",
+    "mcp"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "license": "MIT",
+  "author": "Edgar Sócrates Caria"
+}

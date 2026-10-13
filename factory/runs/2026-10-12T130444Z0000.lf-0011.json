@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0011.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T13:04:44+00:00",
+  "id": "lf-0011",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0011.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0011.md",
+  "spec_sha256": "6cad7768efc4a2b5eb1472e1ce97895d039e165745b9a1c69297373d8a841361",
+  "status": "planned",
+  "title": "forge-cli list + workspace config file defaults"
+}

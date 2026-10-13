@@ -1,0 +1,15 @@
+{
+  "agent": "codex",
+  "command": [
+    "codex",
+    "exec",
+    "$(cat E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0007.implement.codex.md)"
+  ],
+  "created_at": "2026-10-12T11:39:28+00:00",
+  "id": "lf-0007",
+  "prompt_path": "E:\\projetos\\node\\forge-cli\\factory\\prompts\\lf-0007.implement.codex.md",
+  "spec_path": "E:\\projetos\\node\\forge-cli\\factory\\specs\\active\\lf-0007.md",
+  "spec_sha256": "5f4f222732ab9572b4f4e92318a992ebae68d306a088029f2bacd26bd239eedb",
+  "status": "planned",
+  "title": "Artifacts \u2014 run logs, state/resume, JSON report, doctor, custom repos"
+}
