@@ -13,6 +13,7 @@ export type Command =
   | 'rollback'
   | 'reinstall'
   | 'doctor'
+  | 'heal'
   | 'help'
   | 'components'
   | 'discover'
@@ -60,6 +61,7 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
   if (head === 'help') return { command: 'help', names: [] };
   if (head === 'components') return { command: 'components', names: rest };
   if (head === 'doctor') return { command: 'doctor', names: rest };
+  if (head === 'heal') return { command: 'heal', names: rest };
   if (head === 'discover') return { command: 'discover', names: rest };
   if (head === 'recommend') return { command: 'recommend', names: rest };
   if (head === 'env') return { command: 'env', names: rest };

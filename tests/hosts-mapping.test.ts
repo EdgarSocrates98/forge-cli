@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { HostState } from '../src/hosts/types';
+import type { HostState } from '../src/hosts/types.js';
 
 /**
  * Guard — spec C4/§4.2 ADR (forge-portal docs/roadmap/C4_BRIDGE_ADR.md):
