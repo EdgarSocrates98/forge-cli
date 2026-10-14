@@ -24,6 +24,12 @@ export type Command =
   | 'lock'
   | 'profile'
   | 'recover'
+  | 'ask'
+  | 'predict'
+  | 'context'
+  | 'ai'
+  | 'bundle'
+  | 'learning'
   | 'self-install'
   | 'self-update'
   | 'self-uninstall'
@@ -70,6 +76,12 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
   if (head === 'lock') return { command: 'lock', names: rest };
   if (head === 'profile') return { command: 'profile', names: rest };
   if (head === 'recover') return { command: 'recover', names: rest };
+  if (head === 'ask') return { command: 'ask', names: rest };
+  if (head === 'predict') return { command: 'predict', names: rest };
+  if (head === 'context') return { command: 'context', names: rest };
+  if (head === 'ai') return { command: 'ai', names: rest };
+  if (head === 'bundle') return { command: 'bundle', names: rest };
+  if (head === 'learning') return { command: 'learning', names: rest };
   if (head === 'uninstall') return { command: 'uninstall', names: rest };
   if (REPO_COMMANDS.has(head)) return { command: head as Command, names: rest };
   return { command: 'unknown', names: [], unknown: head };

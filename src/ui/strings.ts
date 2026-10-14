@@ -316,6 +316,12 @@ Uso:
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
   forge-cli self update         Atualiza o próprio CLI conforme o método de instalação
+  forge-cli ask <domínio>       Inteligência determinística: discovery|recommendation|repair
+  forge-cli predict             Compatibilidade preditiva (evidência + versão + certeza)
+  forge-cli context             Contexto estruturado limitado (base do modo IA)
+  forge-cli ai <tarefa>         Modo IA opcional (opt-in via forge-cli.config.json)
+  forge-cli bundle <verbo>      Portabilidade: export [chaves-não-secretas...]|import|verify
+  forge-cli learning <verbo>    Observações locais opt-in: status|enable|disable|report
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
 
 Opções:
@@ -352,7 +358,34 @@ Opções:
 Extras:
   forge-cli.repos.json no diretório alvo adiciona repositórios ao catálogo.
   forge-cli.config.json no diretório alvo define padrões (only, timeout,
-  json, shallow, jobs) — flags explícitas sempre vencem o arquivo.
+  json, shallow, jobs, ai) — flags explícitas sempre vencem o arquivo.
   Artefatos (logs, estado, relatórios) ficam em <dir>/.forge-cli/
 `,
+  askTitle: 'Inteligência Forge',
+  intelBadDomain: 'Domínio desconhecido — use discovery|recommendation|repair',
+  intelNoEvidence: 'sem evidência registrada',
+  intelLimits: 'limites:',
+  predictTitle: 'Compatibilidade preditiva',
+  predictNone: 'Nenhuma incompatibilidade prevista — sem evidência de risco',
+  contextTitle: 'Contexto Forge (limitado, sem segredos)',
+  aiTitle: 'Modo IA (opcional)',
+  aiBadTask: 'Tarefa de IA desconhecida',
+  aiDisabled: 'Modo IA desativado — comportamento determinístico em vigor',
+  aiFailed: 'Modo IA falhou',
+  aiCached: 'resposta do cache local',
+  bundleNeedsPath: 'Informe o caminho do bundle',
+  bundleExported: 'Bundle exportado (sem segredos)',
+  bundleImported: 'Bundle importado e verificado',
+  bundlePins: 'pins',
+  bundleInvalid: 'Bundle inválido',
+  bundleTampered: 'Integridade violada — arquivos divergentes',
+  bundleIntact: 'Integridade verificada — bundle íntegro',
+  bundleSecretRefused: 'Exportação recusada — chaves parecem secretas',
+  bundleBadVerb: 'Verbo desconhecido — use export|import|verify',
+  learningTitle: 'Observações locais (opt-in)',
+  learningEnabled: 'Aprendizado local ativado — só observações, nunca altera política',
+  learningDisabled: 'Aprendizado local desativado',
+  learningOn: 'ativado',
+  learningOff: 'desativado',
+  learningEmpty: 'Nenhuma observação registrada',
 };

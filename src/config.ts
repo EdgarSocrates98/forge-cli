@@ -8,6 +8,14 @@ export interface ForgeConfig {
   json?: boolean;
   shallow?: boolean;
   jobs?: number;
+  /** §6.3 AI-assisted mode — opt-in, local bridge command, never a hardwired provider. */
+  ai?: {
+    enabled?: boolean;
+    command?: string[];
+    maxContextBytes?: number;
+    timeoutMs?: number;
+    cacheTtlMs?: number;
+  };
 }
 
 export type ConfigResult = { config: ForgeConfig } | { error: string } | null;
@@ -42,6 +50,43 @@ export function loadConfig(targetDir: string): ConfigResult {
     raw.jobs <= 8
   ) {
     config.jobs = raw.jobs;
+  }
+  if (raw.ai && typeof raw.ai === 'object' && !Array.isArray(raw.ai)) {
+    const ai = raw.ai as Record<string, unknown>;
+    const parsed: NonNullable<ForgeConfig['ai']> = {};
+    if (typeof ai.enabled === 'boolean') parsed.enabled = ai.enabled;
+    if (
+      Array.isArray(ai.command) &&
+      ai.command.length > 0 &&
+      ai.command.every((c) => typeof c === 'string' && c.trim().length > 0)
+    ) {
+      parsed.command = ai.command as string[];
+    }
+    if (
+      typeof ai.maxContextBytes === 'number' &&
+      Number.isInteger(ai.maxContextBytes) &&
+      ai.maxContextBytes >= 512 &&
+      ai.maxContextBytes <= 262144
+    ) {
+      parsed.maxContextBytes = ai.maxContextBytes;
+    }
+    if (
+      typeof ai.timeoutMs === 'number' &&
+      Number.isInteger(ai.timeoutMs) &&
+      ai.timeoutMs >= 1000 &&
+      ai.timeoutMs <= 300000
+    ) {
+      parsed.timeoutMs = ai.timeoutMs;
+    }
+    if (
+      typeof ai.cacheTtlMs === 'number' &&
+      Number.isInteger(ai.cacheTtlMs) &&
+      ai.cacheTtlMs >= 0 &&
+      ai.cacheTtlMs <= 86400000
+    ) {
+      parsed.cacheTtlMs = ai.cacheTtlMs;
+    }
+    if (Object.keys(parsed).length > 0) config.ai = parsed;
   }
   return { config };
 }
