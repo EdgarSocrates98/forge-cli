@@ -26,12 +26,12 @@ observe/versions/federated-graph/security-matrix no seu próprio report.
 
 ## Verificação (spec frontmatter)
 
-| Comando | Resultado |
-|---|---|
-| `npm run typecheck` | ✅ clean |
-| `npx eslint src/ tests/` | ✅ clean |
-| `npx prettier --check` | ✅ clean |
-| `npm test` | ✅ 36 files / **483 tests** |
+| Comando                  | Resultado                   |
+| ------------------------ | --------------------------- |
+| `npm run typecheck`      | ✅ clean                    |
+| `npx eslint src/ tests/` | ✅ clean                    |
+| `npx prettier --check`   | ✅ clean                    |
+| `npm test`               | ✅ 36 files / **483 tests** |
 
 ## Gate C5 — evidência real (workspace `E:\tmp\forge-c5-gate`)
 
