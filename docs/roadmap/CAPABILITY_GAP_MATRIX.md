@@ -1,0 +1,143 @@
+# F0 Capability Gap Matrix — forge-cli × forge-portal
+
+Program: `prompt_evo_cli_portal.md`. Levels per §1.4. Every row cites
+file+symbol; "evidence" means actually executed during this audit.
+Rows claim nothing stronger than what was run or read.
+
+Legend: **V**=EXISTS_AND_VERIFIED · **P**=EXISTS_BUT_PARTIAL ·
+**D**=DOCUMENTED_ONLY · **M**=MISSING · **B**=BROKEN ·
+**NA**=NOT_APPLICABLE · **U**=UNVERIFIED
+
+## 1. Forge CLI — §0.4 baseline claims vs reality
+
+| Capability | Level | File+symbol | Tests | Evidence | Gaps / risk | Action → cycle |
+|---|---|---|---|---|---|---|
+| Interactive TUI (menu/prompts) | V | `src/menu.ts`, `src/prompts.ts`, index.ts:63-83 | `tests/menu.test.ts` (+295) | vitest 296 pass | — | keep |
+| Clone/install/update orchestrator | V | `runner.ts:processRepo` | runner tests | vitest pass | pull-failure classes exist; no cross-repo DAG ordering | C2: planner layer |
+| `list/status/doctor/versions/update --check` | V | `cmd/query.ts`, `doctor.ts`, `status.ts`, `git-revs.ts` | query tests | vitest pass | doctor = verify+prereqs only; no host/env/ops checks | C5: Doctor 2.0 |
+| `pin/unpin/rollback` | V | `cmd/manage.ts`, `lifecycle.ts:rollbackRepo`, `artifacts.ts` | lifecycle tests | vitest pass | rollback = git-head only, documented limit | keep + document |
+| Plan mode `--plan` | V | `plan.ts:planLines/executionSummary`, run.ts:166-177 | plan tests | vitest pass | per-repo plan; no signed/serialized plan artifact | C1+C2: `ForgeOperationPlan` |
+| `.env` handling | P | `env.ts:ensureEnvFile`, `configs.ts` | env tests | vitest pass | preserve/copy/stub only — no discovery, validation, migration, redacted diff | C2: `.env` intelligence |
+| Prereq engine | V | `prereqs.ts`, `preflight.ts` | prereq tests | vitest pass | checks per-repo at run time; no environment discovery/recommendation output | C2 |
+| Native install (dry-run default) | V | `native-install.ts`, runner.ts:232-266, repos.ts `nativeInstall` | native tests | vitest pass | per-Forja argv table; no capability negotiation at runtime | C1: `ForgeInstallContract` |
+| Trust model for custom repos | V | runner.ts:125-131, `artifacts.ts:loadCustomRepos`, run.ts:57-61 | trust tests | vitest pass | — | keep |
+| `forge.json` manifest | V | `manifest.ts` (≤64KiB, strict) | manifest tests | vitest pass | 3 fields only; not a descriptor contract | C1: extend to `ForgeDescriptor` |
+| Safety layer | V | `safety.ts` | safety tests | vitest pass | redaction on logs+reports; `.env` values never printed — matches §8 | keep |
+| Lifecycle/uninstall/refusals | V | `lifecycle.ts:planUninstall`, manage.ts:53 | lifecycle tests | vitest pass | refusal taxonomy exists; risk classes `SAFE_AUTOMATIC/REVIEW_REQUIRED/MANUAL_ONLY` absent | C5 |
+| JSON reports + redacted logs | V | `artifacts.ts:writeJsonReport/openRunLog` | artifacts tests | vitest pass | report schema is ad-hoc (`RepoResult[]`), not `ForgeOperationReceipt` | C1: receipt contract |
+| Self install/update/uninstall | V | `install.ts`, `self.ts`, manage.ts:134+ | install tests | vitest pass | Windows registry PATH covered; macOS not executable here (U on macOS) | C2 re-verify |
+| Offline mode | P | `--offline` in cli-args + syncRepo | — | flag exists | no cache/bundle install path — offline only skips network in git ops | C2: offline bundle |
+| Idempotent reinstall | V | `reinstall` + `only-changed` + pin/ref handling, runner.ts:105-109 | runner tests | vitest pass | — | keep |
+| Concurrency control | P | `--jobs`/`processPool` | — | vitest pass | no operation lock across CLI instances (`forge-cli.repos` lock absent) | C5 + homologation |
+| Recommendation engine | M | — | — | not present | §3 wants deterministic recommend+explain | C2 |
+| Environment discovery (hosts/tools/OS) | M | — | — | host detection lives in Forja adapters only | §3 smart discovery | C2 |
+| Smart wizard (beyond pick-list) | P | `applyMenu` flow | menu tests | vitest pass | menu exists; no guided recommendation-driven flow | C2+C3 |
+| `.env` discovery/validation/migration | M | — | — | only bootstrap creation | §3 .env intelligence | C2 |
+| Host intelligence adapters (in CLI) | M | — | — | `--host` is a flag passthrough to nativeInstall argv | §3 host intelligence | C2/C4 |
+| Advanced install planner (cross-repo) | M | — | — | planLines per repo only; no ecosystem plan, no ordering | §3 planner | C2 |
+| Version manager (ecosystem) | P | `versions/pin/rollback` | query tests | vitest pass | per-repo git refs; no manifest-version registry, no compat matrix | C5 |
+| Receipts (`ForgeOperationReceipt`) | D | — | — | reports exist but schema undefined | §2 contract set | C1 |
+| Offline bundle/cache install | M | — | — | — | §3+§14 offline scenario | C2 + homologation |
+
+## 2. Forge Portal — §0.4 baseline claims vs reality
+
+| Capability | Level | File+symbol | Tests | Evidence | Gaps / risk | Action → cycle |
+|---|---|---|---|---|---|---|
+| `forge/PortalApi/1` contract | V | `portal_core/forge_portal.py` SCHEMA; `api.models.ts` | 45 pytest | pytest pass | — | keep (C1 alignment) |
+| Loopback server + session + CSRF + host guard | V | `forge_portal.py:397-556` | 45 pytest | pytest pass | — | keep |
+| Plan-token binding (plan→apply) | V | `forge_portal.py:350-370` | pytest | pytest pass | 15-min TTL; no nonce reuse protection beyond HMAC — acceptable per threat model | C5 security review |
+| Rate limit + body cap + timeouts | V | `RateLimiter`, `MAX_BODY`, `run_with_timeout` | pytest | pytest pass | — | keep |
+| Secret redaction scrub | V | `redact()` + `_REDACT_EXEMPT` | pytest | pytest pass | — | keep |
+| `PortalAdapter` contract + `Operation` registry | V | `forge_portal.py:133-208` | pytest | pytest pass | — | keep |
+| `default_operations` (bootstrap/health/env/caps/status) | V | `forge_portal.py:819-853` | pytest | pytest pass | — | keep |
+| Vendored distribution + drift gate | V | `scripts/vendor.py` | — | **ran sha256 parity check: all 7 Forjas byte-identical** | no CI drift check wired | homologation |
+| Real adapters per Forja | V | `*/portal_adapter.py` (17-20 ops each ×7) | per-Forja tests | counted+grep | fidelity per Forja unverified in THIS audit | C4 |
+| Angular shell (12 lazy routes) | V | `app.routes.ts`, pages/* | 11 ng + 12 e2e | ng build+test+e2e pass | unit coverage thin (3 spec files) | C3: coverage |
+| Dashboard 360° | P | `dashboard.page.ts` (482 LOC) | e2e | e2e pass | one-Forja-per-portal: "360° across ecosystem" exists only via the-forge adapter's federation op — no multi-portal aggregation | C3: federation-first dashboard |
+| Install center (plan→apply UI) | V | `install.page.ts` (731) + api ops | 12 e2e | e2e pass | — | keep |
+| Federation page | V | `federation.page.ts` (686) | e2e | e2e pass | depth vs the-forge adapter unverified end-to-end across all 7 | C4 |
+| Profiles page | V | `profiles.page.ts` | e2e | e2e pass | — | keep |
+| Hosts page | V | `hosts.page.ts` | e2e | e2e pass | HostIntegrationCenter = observe + launch-hint; launch real requires TTY — honest by design | C4 |
+| MCP page | V | `mcp.page.ts` | e2e | e2e pass | MCP ops center = verify only; no tool allowlist mgmt surface | C4 |
+| Skills page | V | `skills.page.ts` | e2e | e2e pass | catalog read; no install/mirror ops UI | C4 |
+| Agents page | V | `agents.page.ts` | e2e | e2e pass | catalog read; no Agent Studio depth | C4 |
+| Tasks page | V | `tasks.page.ts` (319) | e2e | e2e pass | plan/execute ops exist; evidence-center depth partial | C5 |
+| Graph page | V | `graph.page.ts` | e2e | e2e pass | reuses `_graphstudio` — correct, no second engine | C5 |
+| Knowledge page | V | `knowledge.page.ts` | e2e | e2e pass | local doc search only | C3 |
+| Settings page | V | `settings.page.ts` | e2e | e2e pass | — | keep |
+| Configuration Center (cross-cutting) | P | pages + env surface via `/environment` | pytest | pytest pass | `.env` management UI absent; account-environment read-only | C3 |
+| Global search | P | `shared/command-palette.ts` | e2e | e2e pass | palette exists; depth unverified beyond routing | C3 |
+| i18n (en + pt-br) | V | `core/i18n/`, `check_i18n.py` | e2e | build chunks emit en+pt-br | — | keep |
+| Session store + interceptor | V | `core/session`, `core/api/interceptor` | pytest+e2e | e2e pass | — | keep |
+| Browser E2E harness | V | `e2e/test_browser_e2e.py` (549) | 12 tests | **12 pass in Chromium** | requires playwright+dist; not in `npm test` | homologation |
+| Frontend unit coverage | P | 3 spec files | 11 tests | ng test pass | far below backend depth | C3 |
+| Observability/logs surface | M | — | — | no `/logs` op or log viewer in UI | §7 local observability | C5 |
+| Doctor/ops checks in portal | P | `health` op only | pytest | pytest pass | single state + checks[]; no Forge-Doctor-2.0 categories | C5 |
+| Self-healing risk classes | M | — | — | no SAFE_AUTOMATIC/REVIEW_REQUIRED/MANUAL_ONLY model | §7 | C5 |
+| Execution Center (full plan→evidence→receipt) | P | tasks plan/execute ops + SSE | e2e | e2e pass | steps exist; no unified execution-center surface w/ evidence+receipt artifacts | C5 |
+| Version manager UI | M | — | — | — | §7 | C5 |
+| Explainable recommendations UI | M | — | — | — | §8 (AI optional) | C6 |
+| AI-assisted mode | M | — | — | — | §8 optional | C6 |
+| Offline-first local operation | V | stdlib server, no remote calls | all | all local | — | keep |
+
+## 3. Cross-repo contract inventory (existing vs §2 canonical set)
+
+| §2 contract | Closest existing | Level | Note |
+|---|---|---|---|
+| `ForgeDescriptor` | adapter `descriptor()` + `forge.json` (3 fields) | P | exists per-Forja, not versioned as canonical schema |
+| `ForgeCapability` | `PortalCapability` (`supported\|unverified\|unsupported\|not_applicable`) | P | exists inside PortalApi/1, not standalone |
+| `ForgeInstallContract` | `repos.ts:nativeInstall` argv table + `_installkit.py` | P | behavior contract exists implicitly in catalog+kit |
+| `ForgeEnvironmentSchema` | `forge/InstallEnvironment/v1` (`detect_account_environment`) | P | scoped to installer vars only |
+| `ForgeHostDescriptor` | `HostDetection` + `HostLifecycleState` | P | inside PortalApi/1 |
+| `ForgeOperationPlan` | CLI `planLines`/`executionSummary` + portal plan tokens | P | rendered/signed, not serialized canonically |
+| `ForgeOperationReceipt` | `RepoResult` JSON reports + `InstallationReceipt` | P | two ad-hoc shapes, no unified receipt |
+| `ForgeHealthReport` | `PortalHealth` + CLI doctor results | P | exists, no canonical schema |
+| Version negotiation | `forge/PortalApi/1` `portal_version()`="1.0.0" + additive-only rule in contracts.md | P | rule documented, not negotiated at runtime |
+| `forge/PortalApi/1` | — | V | already canonical & vendored |
+| `forge/InstallEnvironment/v1` | — | V | already canonical & vendored |
+| `forge/PortalAssets/1` | — | V | vendored manifest w/ sha256 |
+| `forge/InstallationManifest/v1` | — | V | `~/.forge/installations/*.json` live |
+| `theforge/<Name>/v1` (core contracts) | — | V | the-forge invariant, regen via `schema` cmd |
+
+## 4. §8 security gates — current posture
+
+| Gate | CLI | Portal | Level |
+|---|---|---|---|
+| Least privilege | trust model + dry-run native | op registry + confirm literals | V |
+| Local-first | yes | loopback-only, enforced | V |
+| Explicit consent | `--yes`, interactive confirm | confirm + plan_token | V |
+| No arbitrary execution | fixed argv + setup-script detection only | no shell, typed ops only | V |
+| Input validation | repo name/URL/path checks | JSON object + op schema | V |
+| Structured errors | CliError + per-repo results | PortalError codes | V |
+| Secret redaction | `redactSecrets` on logs+reports | `redact()` on all responses+SSE | V |
+| Immutable plans | planLines render + plan mode | HMAC plan token | P (CLI plan not signed) |
+| Approval before mutation | interactive gate + `--yes` | confirm literal | V |
+| Integrity verification | git head tracking | asset manifest sha256 | V |
+| Timeouts | `--timeout` per op | per-op timeout | V |
+| Rate limits | n/a | 10 mut/min | V |
+| Audit receipts | state.json+reports+logs | receipts via adapter ops | P |
+| Secure temp files | `writeFileAtomic` | n/a | V |
+| Sensitive-file permissions | `.env` never overwritten | no .env write path | P (no perms hardening check) |
+| Rollback documented limits | git-head only | adapter-declared | V |
+| Session expiry | n/a | token per process; no idle expiry | P (§7 wants expiry) |
+| SSRF/traversal/RCE | path containment + URL allowlist | traversal-proof static + no remote fetch | V |
+
+## 5. Prioritized gaps for cycle planning
+
+**Critical (block later gates)**
+1. C1: canonical contract set — most exist *inside* PortalApi/1 or implicitly; need standalone versioned schemas without breaking the vendored surface.
+2. C2: `.env` intelligence (discovery/validation/migration) — bootstrap-only today.
+3. C2: cross-repo install planner + offline bundle — plan is per-repo today.
+4. C4: adapter fidelity verification per Forja (each claims ops; evidence is per-Forja tests, not run here).
+
+**High**
+5. C5: self-healing risk classes + execution center + local observability surface.
+6. C3: 360° multi-forge dashboard — portal currently serves one Forja; aggregation model undecided (ADR needed: the-forge as federator vs multi-portal discovery).
+7. C3: frontend unit coverage (3 spec files today).
+8. Homologation: performance baselines never measured; security test matrix partially covered (server-level pytest covers most; penetration items like symlink-escape/SSRF need explicit cases).
+
+**Medium**
+9. C2: recommendation engine (deterministic core absent).
+10. C5: version manager beyond git pins.
+11. C4: host integration beyond observe+launch-hint (documented limitation, honest today).
+12. Homologation: concurrency/locking between CLI processes unimplemented; e2e not wired into `npm test`; macOS unverifiable here.
