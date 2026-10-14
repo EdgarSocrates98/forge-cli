@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import type { ForgeRepo } from './types.js';
 
 // ForgeOperationPlan/v1 emitter (contracts/CONTRACTS.md).
 // A plan is a deterministic document: hash = sha256 of canonical JSON
@@ -120,8 +119,7 @@ export function buildPlan(input: {
 }
 
 export type PlanVerification =
-  | { ok: true }
-  | { ok: false; reason: 'expired' | 'hash-mismatch' | 'malformed' };
+  { ok: true } | { ok: false; reason: 'expired' | 'hash-mismatch' | 'malformed' };
 
 /** Verifica integridade + validade de um plano aprovado antes de executar. */
 export function verifyPlan(plan: OperationPlan, now = new Date()): PlanVerification {
@@ -147,7 +145,10 @@ export function filterSteps(
   const sel = new Set<PlanActionKind>(selected);
   // passos não-selecionáveis (env, prereq, verify…) sempre permanecem;
   // só os seis selecionáveis podem ser desligados.
-  return actions.filter((a) => !SELECTABLE_STEPS.includes(a.kind as SelectableStep) || sel.has(a.kind as SelectableStep));
+  return actions.filter(
+    (a) =>
+      !SELECTABLE_STEPS.includes(a.kind as SelectableStep) || sel.has(a.kind as SelectableStep),
+  );
 }
 
 /** Resumo de mudanças previstas por Forja (para review antes de aprovar). */

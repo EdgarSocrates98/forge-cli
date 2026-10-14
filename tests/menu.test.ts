@@ -151,11 +151,20 @@ describe('askMenu renderiza e navega com teclas reais (streams simulados)', () =
     }
   });
 
-  it('seta para baixo + Enter escolhe a próxima opção (atualizar)', async () => {
+  it('seta para baixo + Enter escolhe a próxima opção (wizard)', async () => {
     const io = makeIo();
     const pending = askMenu({ input: io.input, output: io.output });
     setTimeout(() => io.input.write(DOWN), 50);
     setTimeout(() => io.input.write('\r'), 120);
+    expect(await pending).toBe('wizard');
+  });
+
+  it('duas setas para baixo + Enter escolhe atualizar', async () => {
+    const io = makeIo();
+    const pending = askMenu({ input: io.input, output: io.output });
+    setTimeout(() => io.input.write(DOWN), 50);
+    setTimeout(() => io.input.write(DOWN), 90);
+    setTimeout(() => io.input.write('\r'), 140);
     expect(await pending).toBe('update');
   });
 });

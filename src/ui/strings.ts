@@ -98,6 +98,8 @@ export const S = {
   menuTitle: 'Como podemos ajudar?',
   menuInstall: 'Instalar Forjas',
   menuInstallHint: 'clona e executa os instaladores',
+  menuWizard: 'Assistente inteligente',
+  menuWizardHint: 'descobrir → recomendar → instalar',
   menuUpdate: 'Atualizar Forjas',
   menuReinstall: 'Reinstalar Forjas',
   menuReinstallHint: 'mantém a revisão atual',
@@ -236,8 +238,7 @@ export const S = {
   envValidateFail: '.env inválido',
   envMigrateDryRun: 'Simulação — nada foi escrito (remova --dry-run para aplicar)',
   envMigrateDone: '.env migrado',
-  envMigrateNeedsYes:
-    'Remoção de variáveis exige autorização explícita — reexecute com --yes',
+  envMigrateNeedsYes: 'Remoção de variáveis exige autorização explícita — reexecute com --yes',
   envBackupAt: 'Backup em',
   envRollbackDone: '.env restaurado a partir do backup',
   envRollbackNone: 'Nenhum backup de .env encontrado',

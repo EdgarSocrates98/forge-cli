@@ -6,6 +6,7 @@ import { S } from './ui/strings.js';
 
 export type MenuAction =
   | 'install'
+  | 'wizard'
   | 'update'
   | 'reinstall'
   | 'repair'
@@ -17,6 +18,7 @@ export type MenuAction =
 
 export const MENU_ITEMS: { value: MenuAction; label: string; hint?: string }[] = [
   { value: 'install', label: S.menuInstall, hint: S.menuInstallHint },
+  { value: 'wizard', label: S.menuWizard, hint: S.menuWizardHint },
   { value: 'update', label: S.menuUpdate },
   { value: 'reinstall', label: S.menuReinstall, hint: S.menuReinstallHint },
   { value: 'repair', label: S.menuRepair, hint: S.menuRepairHint },
@@ -53,6 +55,8 @@ export function actionToPositionals(action: MenuAction, names: string[]): string
     case 'install':
     case 'exit':
       return [];
+    case 'wizard':
+      return ['wizard'];
     case 'repair':
     case 'doctor':
       return ['doctor'];

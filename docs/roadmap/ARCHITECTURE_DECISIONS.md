@@ -172,9 +172,10 @@ existing 3-field manifests (`forge_id`, `cli`, `mcp_command`) already
 satisfy `ForgeDescriptor/v1` unchanged; new fields (`schema`, `name`,
 `version`, `kind`, `capabilities`, `install`, `environment`) are optional
 and tolerated by older readers (unknown-field tolerance is a hard rule of
-the family). `forge.agentic.json` `provides` entries map into
-`ForgeDescriptor.capabilities` — derivation is one-way
-(`forge.agentic.json` → descriptor view), the file is not rewritten.
+the family). `forge.agentic.json` (`forge/SpecialistAgenticManifest/v1`,
+present in 6 of 7 Forjas) contributes `mcp_command`, `host_adapters` and
+`workflows` into the derived descriptor view — derivation is one-way
+(agentic manifest → descriptor view), the file is not rewritten.
 
 `manifest.ts` is fail-closed on version: a manifest that _declares_ a
 `schema` it doesn't satisfy is discarded entirely rather than partially
