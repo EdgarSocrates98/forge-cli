@@ -30,6 +30,7 @@ export interface CliOptions {
   shallow: boolean;
   check: boolean;
   native: boolean;
+  rollback: boolean;
   host?: string;
   gatewayProfile?: string;
   verbose: boolean;
@@ -83,6 +84,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         version: { type: 'string' },
         'trust-custom': { type: 'boolean' },
         'run-after-sync-failure': { type: 'boolean' },
+        rollback: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -142,6 +144,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     shallow: values.shallow ?? false,
     check: values.check ?? false,
     native: values.native ?? false,
+    rollback: values.rollback ?? false,
     host: values.host,
     gatewayProfile: values['gateway-profile'],
     verbose: values.verbose ?? false,

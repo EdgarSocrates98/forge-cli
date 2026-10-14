@@ -30,6 +30,16 @@ import {
   runUninstallCommand,
 } from './cmd/manage.js';
 import { runInstallFlow } from './cmd/run.js';
+import { runEnvCommand } from './cmd/env.js';
+import { runHostsCommand } from './cmd/hosts.js';
+import {
+  runDiscoverCommand,
+  runLockCommand,
+  runProfileCommand,
+  runRecommendCommand,
+  runRecoverCommand,
+} from './cmd/intel.js';
+import { runWizard } from './wizard.js';
 
 const JSON_QUERY_COMMANDS = new Set([
   'status',
@@ -38,6 +48,13 @@ const JSON_QUERY_COMMANDS = new Set([
   'components',
   'update',
   'doctor',
+  'discover',
+  'recommend',
+  'env',
+  'hosts',
+  'lock',
+  'profile',
+  'recover',
 ]);
 
 async function main(): Promise<void> {
@@ -90,6 +107,42 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'doctor') {
     await runDoctorCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'discover') {
+    process.exitCode = await runDiscoverCommand(cli);
+    return;
+  }
+  if (resolved.command === 'recommend') {
+    process.exitCode = await runRecommendCommand(cli);
+    return;
+  }
+  if (resolved.command === 'env') {
+    process.exitCode = await runEnvCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'hosts') {
+    process.exitCode = await runHostsCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'wizard') {
+    if (isNonInteractive(cli)) {
+      log.error(S.errCloneNeedsNames);
+      process.exit(2);
+    }
+    await runWizard(cli);
+    return;
+  }
+  if (resolved.command === 'lock') {
+    process.exitCode = await runLockCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'profile') {
+    process.exitCode = await runProfileCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'recover') {
+    process.exitCode = await runRecoverCommand(cli);
     return;
   }
   if (resolved.command === 'list') {
