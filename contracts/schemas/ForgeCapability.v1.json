@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeCapability/v1",
+  "title": "ForgeCapability",
+  "type": "object",
+  "required": ["id", "state"],
+  "properties": {
+    "schema": { "const": "forge/ForgeCapability/v1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$" },
+    "state": { "enum": ["supported", "unverified", "unsupported", "not_applicable"] },
+    "label_key": { "type": "string" },
+    "detail": { "type": ["string", "null"] },
+    "evidence": { "type": ["string", "null"] },
+    "since": { "type": ["string", "null"] },
+    "requires": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeInstallContract/v1",
+  "title": "ForgeInstallContract",
+  "type": "object",
+  "required": ["forge_id", "commands"],
+  "properties": {
+    "schema": { "const": "forge/ForgeInstallContract/v1" },
+    "forge_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}[a-z0-9]$" },
+    "commands": {
+      "type": "object",
+      "required": ["install"],
+      "properties": {
+        "install": { "type": "array", "items": { "type": "string" } },
+        "update": { "type": ["array", "null"], "items": { "type": "string" } },
+        "uninstall": { "type": ["array", "null"], "items": { "type": "string" } },
+        "verify": { "type": ["array", "null"], "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "flags": {
+      "type": "object",
+      "properties": {
+        "scope": { "type": "array", "items": { "type": "string" } },
+        "profile": { "type": "array", "items": { "type": "string" } },
+        "components": { "type": "array", "items": { "type": "string" } },
+        "host": { "type": "array", "items": { "type": "string" } },
+        "gateway_profile": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "dry_run_flag": { "type": ["string", "null"] },
+    "approve_flag": { "type": ["string", "null"] },
+    "scopes": { "type": "array", "items": { "enum": ["project", "workspace", "user"] } },
+    "hosts": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

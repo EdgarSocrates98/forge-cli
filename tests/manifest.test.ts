@@ -45,4 +45,30 @@ describe('readForgeManifest', () => {
     write(JSON.stringify({ cli: 'x', pad: 'a'.repeat(70_000) }));
     expect(readForgeManifest(dir)).toBeNull();
   });
+
+  it('aceita manifest com schema ForgeDescriptor/v1 declarado e válido', () => {
+    write(
+      JSON.stringify({
+        schema: 'forge/ForgeDescriptor/v1',
+        forge_id: 'api-forge',
+        cli: 'apiforge',
+        capabilities: [{ id: 'install', state: 'supported' }],
+      }),
+    );
+    expect(readForgeManifest(dir)).toEqual({ forgeId: 'api-forge', cli: 'apiforge' });
+  });
+
+  it('descarta manifest que declara schema errado (fail-closed)', () => {
+    write(JSON.stringify({ schema: 'forge/ForgeDescriptor/v2', forge_id: 'x', cli: 'x' }));
+    expect(readForgeManifest(dir)).toBeNull();
+    write(
+      JSON.stringify({
+        schema: 'forge/ForgeDescriptor/v1',
+        forge_id: 'x',
+        cli: 'x',
+        capabilities: [{ id: 'y' }],
+      }),
+    );
+    expect(readForgeManifest(dir)).toBeNull();
+  });
 });

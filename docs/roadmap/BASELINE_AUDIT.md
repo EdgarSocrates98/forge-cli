@@ -5,16 +5,16 @@ the real `main` checkout — not against the roadmap's assumptions.
 
 ## §1.1 — Repository identity
 
-| Item | Value | Evidence |
-|---|---|---|
-| Branch | `main` | `git branch --show-current` |
-| HEAD SHA | `f893bb0308f2c4016e024d7e21a2e9e79f09c64a` | `git rev-parse HEAD` |
-| Remote | `https://github.com/EdgarSocrates98/forge-cli.git` | `git remote -v` |
-| Package | `forge-cli@0.1.0` (private, bin `forge`) | `package.json` |
-| History | single squashed commit `f893bb0 Tornando repositório` | `git log --oneline` — the repo has exactly one commit; no granular history exists on `main` |
-| Open PRs | none | `gh pr list` (authenticated) |
-| Working tree | clean except untracked `nul` file (Windows NUL-redirection artifact, pre-existing) | `git status` |
-| Runtime | Node ≥20, TS strict, ESM bundle via tsup | `package.json`, `tsup.config.ts` |
+| Item         | Value                                                                              | Evidence                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Branch       | `main`                                                                             | `git branch --show-current`                                                                 |
+| HEAD SHA     | `f893bb0308f2c4016e024d7e21a2e9e79f09c64a`                                         | `git rev-parse HEAD`                                                                        |
+| Remote       | `https://github.com/EdgarSocrates98/forge-cli.git`                                 | `git remote -v`                                                                             |
+| Package      | `forge-cli@0.1.0` (private, bin `forge`)                                           | `package.json`                                                                              |
+| History      | single squashed commit `f893bb0 Tornando repositório`                              | `git log --oneline` — the repo has exactly one commit; no granular history exists on `main` |
+| Open PRs     | none                                                                               | `gh pr list` (authenticated)                                                                |
+| Working tree | clean except untracked `nul` file (Windows NUL-redirection artifact, pre-existing) | `git status`                                                                                |
+| Runtime      | Node ≥20, TS strict, ESM bundle via tsup                                           | `package.json`, `tsup.config.ts`                                                            |
 
 In-flight work: none on `main`. Prior Loop Factory specs `lf-0002`…`lf-0013`
 exist under `factory/specs/` (several in `active/`); they are unrelated to this
@@ -23,15 +23,15 @@ exist remotely but are not on `main`.
 
 ## §1.2 — Quality gate results (run verbatim)
 
-| Command | Result | Evidence |
-|---|---|---|
-| `npm ci` | OK | node_modules populated, lockfile-honoring install |
-| `npm run typecheck` (tsc --noEmit) | OK | clean, no output |
-| `npm run lint` (eslint .) | OK | clean, no output |
-| `npm run format:check` (prettier --check .) | OK | "All matched files use Prettier code style!" |
-| `npm test` (vitest run) | OK | **26 test files, 296 tests, all passing**, ~24.5s |
-| `npm run build` (tsup) | OK | `dist/index.js` 472 KB ESM in ~187ms |
-| `npm run pack` (npm pack --dry-run) | OK | tarball 127.5 kB, 8 files, unpacked 523.2 kB |
+| Command                                     | Result | Evidence                                          |
+| ------------------------------------------- | ------ | ------------------------------------------------- |
+| `npm ci`                                    | OK     | node_modules populated, lockfile-honoring install |
+| `npm run typecheck` (tsc --noEmit)          | OK     | clean, no output                                  |
+| `npm run lint` (eslint .)                   | OK     | clean, no output                                  |
+| `npm run format:check` (prettier --check .) | OK     | "All matched files use Prettier code style!"      |
+| `npm test` (vitest run)                     | OK     | **26 test files, 296 tests, all passing**, ~24.5s |
+| `npm run build` (tsup)                      | OK     | `dist/index.js` 472 KB ESM in ~187ms              |
+| `npm run pack` (npm pack --dry-run)         | OK     | tarball 127.5 kB, 8 files, unpacked 523.2 kB      |
 
 Environment limits recorded (§14.3): Windows host, Git Bash; no sandboxed
 second machine for real-install E2E; no macOS host available — macOS paths
@@ -168,16 +168,16 @@ dry-run unless `--yes`.** This matches `docs/capabilities.md` exactly.
 
 ## Integration points evaluated
 
-| Surface | Finding |
-|---|---|
+| Surface                     | Finding                                                                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | the-forge `install` surface | `src/theforge/cli/commands.py` exposes `cmd_install_plan`, `cmd_install_lifecycle`, `cmd_install_wizard`, `cmd_portal`, `cmd_doctor` — matches `nativeInstall` argv in repos.ts:11-18 |
-| api-forge | `apiforge install`, `apiforge doctor`, `apiforge portal` (cli_portal.py) — matches repos.ts:68-77 |
-| spark-forge-aws/azure | `install/cli.py` + adapters/cli.py exist; `install`, `update`, `uninstall` declared — matches repos.ts:26-47 |
-| platform-forge | `platformforge install/upgrade/uninstall` — matches repos.ts:54-60 |
-| forge-doctor-data | `forge-doctor-data install …` — matches repos.ts:100-109 |
-| forge-doctor-api | no in-package install engine by design (RC, no-network core); CLI uses `{python} scripts/forge_install.py install|update|uninstall` — matches repos.ts:84-92 and real `scripts/forge_install.py` |
-| forge-portal | `kind: node`, verify `npx --no-install ng version`, no nativeInstall — correct: portal is not a product-installed Forja here, it is cloned + `npm install` |
-| `forge.json` manifest | read strictly-bounded, only honored for trusted repos lacking `verify` — trust boundary respected |
+| api-forge                   | `apiforge install`, `apiforge doctor`, `apiforge portal` (cli_portal.py) — matches repos.ts:68-77                                                                                     |
+| spark-forge-aws/azure       | `install/cli.py` + adapters/cli.py exist; `install`, `update`, `uninstall` declared — matches repos.ts:26-47                                                                          |
+| platform-forge              | `platformforge install/upgrade/uninstall` — matches repos.ts:54-60                                                                                                                    |
+| forge-doctor-data           | `forge-doctor-data install …` — matches repos.ts:100-109                                                                                                                              |
+| forge-doctor-api            | no in-package install engine by design (RC, no-network core); CLI uses `{python} scripts/forge_install.py install                                                                     | update | uninstall`— matches repos.ts:84-92 and real`scripts/forge_install.py` |
+| forge-portal                | `kind: node`, verify `npx --no-install ng version`, no nativeInstall — correct: portal is not a product-installed Forja here, it is cloned + `npm install`                            |
+| `forge.json` manifest       | read strictly-bounded, only honored for trusted repos lacking `verify` — trust boundary respected                                                                                     |
 
 ## What the audit did NOT execute (recorded honestly)
 

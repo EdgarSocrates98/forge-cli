@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeHostDescriptor/v1",
+  "title": "ForgeHostDescriptor",
+  "type": "object",
+  "required": ["host", "detected", "launchable"],
+  "properties": {
+    "schema": { "const": "forge/ForgeHostDescriptor/v1" },
+    "host": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "detected": { "type": "boolean" },
+    "version": { "type": ["string", "null"] },
+    "supported": { "type": ["boolean", "null"] },
+    "logged_in": { "type": ["boolean", "null"] },
+    "integration": {
+      "enum": [
+        "NOT_DETECTED",
+        "DETECTED",
+        "INSTALLED",
+        "CONFIGURED",
+        "MCP_REGISTERED",
+        "HANDSHAKE_VERIFIED",
+        "TOOLS_DISCOVERED",
+        "EXECUTION_VERIFIED",
+        "FAILED",
+        "BLOCKED"
+      ]
+    },
+    "launchable": { "type": "boolean" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "command_hint": { "type": ["string", "null"] },
+    "detail": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}
