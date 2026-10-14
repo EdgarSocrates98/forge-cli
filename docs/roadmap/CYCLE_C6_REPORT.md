@@ -77,3 +77,27 @@ determinístico em vigor (disabled)` — sem bridge configurada, sem key.
   spec — estrutura independente dos textos.
 - Aprendizado é observacional apenas — evolução para política exigiria
   novo fluxo de consentimento (documentado em LEARNING_EVAL.md).
+
+---
+
+## §13 Addendum (homologation 008)
+
+- **Baseline**: forge-cli `cycle/c6-intelligence` sobre `cycle/c5-operations`;
+  capacidades: doctor2/heal, observability, versions, contracts v1.
+- **Segurança**: AI mode opt-in+BYOK, propostas display-only
+  (sanitize→redact→model→schema→deterministic recheck→aprovação humana),
+  zero execução; contexto 8 KiB bounded, 3-layer secret hygiene; bundle
+  recusa whitelist secreta (`SecretKeysRefusedError` fail-closed antes de
+  escrever); `env-values.json` ausente por default; learning local opt-in
+  redacted, nunca altera política. Tests: keyless-gate, ai-sanitize,
+  intel-contracts.
+- **Interoperabilidade**: `forge/ForgeContext/v1`, `forge/AiProposal/v1`,
+  `forge-cli/Bundle/v1`, `forge/IntegrityManifest/v1`. Zero deps novas.
+  Keyless path verificado com env stripado (`ask`/`predict`/`context` OK,
+  `ai` → `disabled` tipado).
+- **Performance**: predict 10.7 s / context 6.5 s medianas reais
+  (PERFORMANCE_BASELINE.md) — primeiras medianas, sem baseline anterior.
+- **Release readiness**: PASS_WITH_LIMITATIONS.
+- **Pendências**: P2 — cross-process lock; P3 — preview `--offline` (ver
+  E2E_HOMOLOGATION.md scenario E); manifest de Forjas ainda não emitido
+  pelos repos consumidores (silêncio correto).

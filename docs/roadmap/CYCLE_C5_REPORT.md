@@ -51,3 +51,21 @@ Falhas injetadas: `.forge-cli/` ausente + `API_TOKEN` declarada no schema mas au
 - Health score depende de checks `unverified` honestos — documentado em HEALTH_MODEL.md.
 - `MANUAL_ONLY`/`UNSUPPORTED` são diagnosticados mas nunca aplicados (by design).
 - Telemetria remota: nenhuma — métricas são locais-only por padrão (off switch trivial).
+
+---
+
+## §13 Addendum (homologation 008)
+
+- **Baseline**: forge-cli `cycle/c5-operations` sobre `cycle/c4-hosts` (C4);
+  capacidades: discovery, recommend, env intel, hosts, planner, lifecycle.
+- **Segurança**: heal gateado por classificação — `--yes` só aplica
+  `SAFE_AUTOMATIC`; `REVIEW_REQUIRED` (`.env` append) fica pendente mesmo
+  com `--yes` (provado no Gate C5). Receipts imutáveis com correlation ID.
+  `test_security_c5.py` 24/24 no lado Portal.
+- **Interoperabilidade**: `forge/DoctorReport/v1` + `forge/RepairReceipt/v1`
+  consumidos pelo Portal observe/tasks; contracts versionados. Sem deps
+  novas. Forjas consumidoras intocadas.
+- **Performance**: doctor 1897 ms real (PERFORMANCE_BASELINE.md); sem
+  afirmação não medida.
+- **Release readiness**: PASS_WITH_LIMITATIONS (ver GLOBAL_ACCEPTANCE_MATRIX).
+- **Pendências**: P2 — lock cross-process (cenário G); P3 — nenhuma nova.

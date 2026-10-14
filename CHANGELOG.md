@@ -5,6 +5,108 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Não lançado]
 
+### Programa evo-cli-portal (F0→C6, ciclos `audit/f0-baseline`→`cycle/c6-intelligence`)
+
+#### Added
+
+- **Contratos canônicos (C1)**: família `forge/<Name>/v1` como JSON Schemas
+  em `contracts/schemas/` (Descriptor, Capability, EnvironmentSchema,
+  HostDescriptor, InstallContract, OperationPlan, OperationReceipt,
+  HealthReport), validator Python vendorizável (`contracts/forge_contracts.py`,
+  stdlib-only), política de descoberta com os sete estados
+  (`declared/detected/configured/integrated/validated/degraded/unknown`) e
+  precedência explícita (`src/discovery/negotiate.ts`).
+- **Descoberta e recomendação (C2)**: `forge-cli discover` (walk bounded por
+  budget, sinais de stack, probes de host, `truncated` honesto) e
+  `forge-cli recommend` (recomendações explicáveis com confidence).
+- **Wizard de instalação (C2)**: fluxo interativo de 7 passos + planner que
+  emite `forge/ForgeOperationPlan/v1` com hash sha256 canônico verificável.
+- **Env Intelligence (C2)**: `forge-cli env inspect|plan|init|validate|
+migrate|doctor` — valores nunca exibidos, migração com rollback.
+- **Host Intelligence (C2/C4)**: adapters por host (`forge-cli hosts
+list|plan|register|validate|rollback`) — detecção ≠ validação
+  (`verified|absent|unknown`), comando copiável em vez de escrita opaca.
+- **Ciclo de vida (C2)**: `lock`, `profile`, `recover`, análise de
+  breaking-changes, estado persistido.
+- **Doctor 2.0 + self-healing (C5)**: `forge-cli doctor` cobre 5 domínios
+  (`forge/DoctorReport/v1`, health score gated — `HEALTH_MODEL.md`);
+  `forge-cli heal` com classificação `SAFE_AUTOMATIC`/`REVIEW_REQUIRED`/
+  `MANUAL_ONLY`/`UNSUPPORTED`, fluxo de reparo em 8 passos, receipts
+  imutáveis (`forge/RepairReceipt/v1`) com correlation IDs.
+- **Observabilidade e versões (C5)**: métricas locais, `versions`,
+  overhead medido (PERFORMANCE_BASELINE.md).
+- **Forge Intelligence Engine (C6)**: `forge-cli ask <domínio>`
+  (discovery/recommendation/repair — respostas com evidência, confidence,
+  ordenação estável), `forge-cli predict` (compatibilidade preditiva com
+  evidência/versão/certainty — silêncio honesto sem evidência),
+  `forge-cli context` (`forge/ForgeContext/v1`, 8 KiB bounded).
+- **Modo IA opcional (C6)**: `forge-cli ai <task>` — opt-in, BYOK via
+  bridge configurável (`ai.command`), sanitize tripla de segredos,
+  propostas schema-validadas (`forge/AiProposal/v1`) com refs
+  re-validados e rechecagem determinística; **zero execução** de conteúdo
+  do modelo; fallback tipado para determinístico (`AI_MODE_POLICY.md`).
+- **Portabilidade (C6)**: `forge-cli bundle export|import|verify`
+  (`forge-cli/Bundle/v1`) — profile, env lock + check, pins, manifesto de
+  integridade sha256 (`forge/IntegrityManifest/v1`); valores de segredo
+  excluídos por default (`env-values.json` só com whitelist explícita e
+  recusa fail-closed de chaves secretas); `planReinstall` gera plano
+  verificável (`PORTABILITY.md`).
+- **Aprendizado local (C6)**: `forge-cli learning status|enable|disable|
+report` — opt-in, `.forge-cli/learning.json` bounded a 1000
+  observações, redacted, FIFO, nunca altera política (`LEARNING_EVAL.md`).
+
+#### Changed
+
+- `forge.json` passa a ser validado contra `ForgeDescriptor/v1` quando o
+  campo `schema` é declarado — fail-closed, aditivo.
+- Ordenações em intel/predict usam comparação por code-unit (estável,
+  independente de locale).
+- `bundle export` aceita chaves não-secretas posicionais para inclusão
+  explícita de valores.
+
+#### Fixed
+
+- `doctor`/`env`/`hosts`/`discover`/`recommend`/`context`/`predict`
+  respeitam `--json` sem banner (via `JSON_QUERY_COMMANDS`).
+- `bundle export` captura `SecretKeysRefusedError` e exibe recusa clara.
+- Heal: `REVIEW_REQUIRED` nunca é aplicado por `--yes` — aguarda revisão
+  por chave (Gate C5).
+
+#### Security
+
+- Logs, receipts e erros mascaram segredos (`redactSecrets`); contexto de
+  IA usa denylist de chave + redact + detecção de valor-secret-shaped
+  (`sk-live-`, `ghp_`, JWT, `AKIA`, `xox*`).
+- `assertNoSecrets` devolve paths ofensores ordenados; cache de IA bounded
+  (32 entradas, TTL, anti clock-skew, chave sha256 de JSON canônico).
+- Bridge de IA tem boundary injetável único, timeout, cap de contexto e
+  nenhum payload de comando na saída do modelo.
+- `npm ci` auditado, zero vulnerabilidades; runtime deps congeladas.
+
+#### Compatibility
+
+- Sem novas dependências de runtime desde F0; Node >= 20, npm >= 10.
+- Contratos são aditivos: `forge/PortalApi/1` intocado; Forjas
+  consumidoras não requerem mudança.
+- `--offline` usa apenas clones locais; clone ausente → recusa explícita
+  (sem tentativa de rede).
+
+#### Migration
+
+- Nenhuma migração obrigatória. `forge.json` legado continua válido
+  (campos desconhecidos ignorados); `env migrate` oferece plano+rollback.
+
+#### Known limitations
+
+- Preview de plano exibe `git pull` mesmo com `--offline` (cosmético —
+  execução honra a flag; P3).
+- Sem lock cross-process entre dois CLIs no mesmo target (P2).
+- Manifests de Forja (`forge/SpecialistAgenticManifest/v1`) ainda não
+  emitidos pelos repos consumidores — engine reporta silêncio correto.
+- Defect pré-existente em `forge-doctor-api`
+  (`test_malformed_stdio_input_resilient`) descoberto na homologação —
+  escopo do especialista, P2.
+
 ### Adicionado
 
 - Licença MIT (`LICENSE`, campo `license`), alinhada às demais Forjas.
