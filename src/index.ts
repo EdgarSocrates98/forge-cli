@@ -39,6 +39,14 @@ import {
   runRecommendCommand,
   runRecoverCommand,
 } from './cmd/intel.js';
+import {
+  runAiCommand,
+  runAskCommand,
+  runBundleCommand,
+  runContextCommand,
+  runLearningCommand,
+  runPredictCommand,
+} from './cmd/intel2.js';
 import { runWizard } from './wizard.js';
 
 const JSON_QUERY_COMMANDS = new Set([
@@ -56,6 +64,12 @@ const JSON_QUERY_COMMANDS = new Set([
   'lock',
   'profile',
   'recover',
+  'ask',
+  'predict',
+  'context',
+  'ai',
+  'bundle',
+  'learning',
 ]);
 
 async function main(): Promise<void> {
@@ -148,6 +162,30 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'recover') {
     process.exitCode = await runRecoverCommand(cli);
+    return;
+  }
+  if (resolved.command === 'ask') {
+    process.exitCode = await runAskCommand(cli);
+    return;
+  }
+  if (resolved.command === 'predict') {
+    process.exitCode = await runPredictCommand(cli);
+    return;
+  }
+  if (resolved.command === 'context') {
+    process.exitCode = await runContextCommand(cli);
+    return;
+  }
+  if (resolved.command === 'ai') {
+    process.exitCode = await runAiCommand(cli);
+    return;
+  }
+  if (resolved.command === 'bundle') {
+    process.exitCode = await runBundleCommand(cli);
+    return;
+  }
+  if (resolved.command === 'learning') {
+    process.exitCode = await runLearningCommand(cli);
     return;
   }
   if (resolved.command === 'list') {
