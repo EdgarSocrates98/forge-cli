@@ -14,12 +14,12 @@ import { resolveInside } from './safety.js';
 import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
 import {
-  runDoctorCommand,
   runListCommand,
   runStatusCommand,
   runUpdateCheckCommand,
   runVersionsCommand,
 } from './cmd/query.js';
+import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
 import {
   runPinCommand,
   runUnpinCommand,
@@ -48,6 +48,7 @@ const JSON_QUERY_COMMANDS = new Set([
   'components',
   'update',
   'doctor',
+  'heal',
   'discover',
   'recommend',
   'env',
@@ -106,7 +107,11 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   if (resolved.command === 'doctor') {
-    await runDoctorCommand(cli, resolved.names);
+    process.exitCode = await runDoctor2Command(cli);
+    return;
+  }
+  if (resolved.command === 'heal') {
+    process.exitCode = await runHealCommand(cli);
     return;
   }
   if (resolved.command === 'discover') {
