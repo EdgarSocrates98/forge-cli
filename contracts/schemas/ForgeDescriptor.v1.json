@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeDescriptor/v1",
+  "title": "ForgeDescriptor",
+  "type": "object",
+  "required": ["forge_id"],
+  "properties": {
+    "schema": { "const": "forge/ForgeDescriptor/v1" },
+    "forge_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}[a-z0-9]$" },
+    "name": { "type": "string" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+([-.][0-9A-Za-z.-]+)?$" },
+    "kind": { "enum": ["python", "node", "other"] },
+    "cli": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]+$" },
+    "mcp_command": { "type": "array", "items": { "type": "string" } },
+    "install": { "$ref": "forge/ForgeInstallContract/v1" },
+    "env_schema": { "$ref": "forge/ForgeEnvironmentSchema/v1" },
+    "capabilities": { "type": "array", "items": { "$ref": "forge/ForgeCapability/v1" } },
+    "workspace": { "type": "string" }
+  },
+  "additionalProperties": true
+}

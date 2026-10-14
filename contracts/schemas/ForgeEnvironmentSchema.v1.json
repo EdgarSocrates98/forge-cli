@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeEnvironmentSchema/v1",
+  "title": "ForgeEnvironmentSchema",
+  "type": "object",
+  "required": ["forge_id", "prefix", "state", "variables"],
+  "properties": {
+    "schema": { "const": "forge/ForgeEnvironmentSchema/v1" },
+    "forge_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}[a-z0-9]$" },
+    "prefix": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+    "scope": { "enum": ["project", "workspace", "user"] },
+    "state": { "enum": ["READY", "PARTIAL", "MISSING", "INVALID"] },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "required", "kind"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+          "required": { "type": "boolean" },
+          "kind": { "enum": ["directory", "file", "string"] },
+          "present": { "type": "boolean" },
+          "valid": { "type": ["boolean", "null"] },
+          "path": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "windows_aliases": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

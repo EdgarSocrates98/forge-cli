@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeOperationPlan/v1",
+  "title": "ForgeOperationPlan",
+  "type": "object",
+  "required": ["plan_id", "created_at", "forges", "hash"],
+  "properties": {
+    "schema": { "const": "forge/ForgeOperationPlan/v1" },
+    "plan_id": { "type": "string", "minLength": 8 },
+    "created_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}" },
+    "expires_at": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+    },
+    "source": { "enum": ["cli", "portal", "other"] },
+    "forges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["forge_id", "actions"],
+        "properties": {
+          "forge_id": { "type": "string" },
+          "repo": { "type": "string" },
+          "target_dir": { "type": ["string", "null"] },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "label"],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "clone",
+                    "env",
+                    "config",
+                    "prereq",
+                    "script",
+                    "npm",
+                    "verify",
+                    "native",
+                    "binary",
+                    "skills",
+                    "agents",
+                    "mcp",
+                    "host_integration"
+                  ]
+                },
+                "label": { "type": "string" },
+                "argv": { "type": "array", "items": { "type": "string" } },
+                "paths": { "type": "array", "items": { "type": "string" } },
+                "reversible": { "type": "boolean" },
+                "precondition": { "type": ["string", "null"] }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "native": {
+      "type": ["object", "null"],
+      "properties": {
+        "scope": { "type": "string" },
+        "profile": { "type": "string" },
+        "components": { "type": "array", "items": { "type": "string" } },
+        "host": { "type": "string" },
+        "gateway_profile": { "type": "string" },
+        "approve": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": true
+}

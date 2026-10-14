@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/ForgeHealthReport/v1",
+  "title": "ForgeHealthReport",
+  "type": "object",
+  "required": ["forge_id", "checked_at", "state", "checks"],
+  "properties": {
+    "schema": { "const": "forge/ForgeHealthReport/v1" },
+    "forge_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}[a-z0-9]$" },
+    "checked_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}" },
+    "state": {
+      "enum": [
+        "NOT_INSTALLED",
+        "INSTALLED",
+        "CONFIGURED",
+        "ACTIVE",
+        "VERIFIED",
+        "DEGRADED",
+        "BLOCKED",
+        "FAILED"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "domain", "result", "severity"],
+        "properties": {
+          "id": { "type": "string" },
+          "domain": { "enum": ["system", "install", "environment", "hosts", "operations"] },
+          "result": { "enum": ["pass", "warn", "fail", "skipped", "unverified"] },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "diagnosis": { "type": ["string", "null"] },
+          "evidence": { "type": ["string", "null"] },
+          "corrective_action": { "type": ["string", "null"] },
+          "reversibility": { "enum": ["reversible", "partial", "manual_only", "unsupported", null] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "score": {
+      "type": ["object", "null"],
+      "required": ["value", "basis"],
+      "properties": {
+        "value": { "type": "number" },
+        "basis": { "type": "string" },
+        "partial": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "workspace": { "type": ["string", "null"] },
+    "profile": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

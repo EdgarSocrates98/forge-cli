@@ -1,0 +1,5 @@
+{
+  "forge_id": "the-forge",
+  "cli": "theforge",
+  "mcp_command": ["theforge", "mcp"]
+}

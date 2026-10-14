@@ -1,0 +1,5 @@
+{
+  "schema": "forge/ForgeDescriptor/v9",
+  "forge_id": "the-forge",
+  "cli": "theforge"
+}

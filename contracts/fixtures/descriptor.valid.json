@@ -1,0 +1,14 @@
+{
+  "schema": "forge/ForgeDescriptor/v1",
+  "forge_id": "the-forge",
+  "name": "The Forge",
+  "version": "1.4.0",
+  "kind": "python",
+  "cli": "theforge",
+  "mcp_command": ["theforge", "mcp"],
+  "capabilities": [
+    { "id": "install", "state": "supported" },
+    { "id": "graph", "state": "unverified", "detail": "engine vendored, not probed" },
+    { "id": "remote", "state": "unsupported", "detail": "no remote transport" }
+  ]
+}
