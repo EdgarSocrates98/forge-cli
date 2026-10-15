@@ -1,7 +1,7 @@
 ---
 id: cyc8-05
 title: cli-release-management
-status: active
+status: done
 created: 2026-10-15
 owner: forge-cli
 scope: repo
