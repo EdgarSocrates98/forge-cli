@@ -21,7 +21,12 @@ const DOC = {
     { component: 'api-forge', version: '0.1.0', scheme: 'semver', source: 'pyproject.toml' },
   ],
   contracts: [
-    { family: 'specialist_manifest', contract: 'theforge/ForgeManifest', min_major: 1, max_major: 1 },
+    {
+      family: 'specialist_manifest',
+      contract: 'theforge/ForgeManifest',
+      min_major: 1,
+      max_major: 1,
+    },
     { family: 'portal_api', contract: 'forge/PortalApi', min_major: 1, max_major: 1 },
     { family: 'unversioned_thing', contract: null },
   ],
@@ -103,12 +108,8 @@ describe('manifestProblems — strict parity with Python load_manifest', () => {
   });
   it('rejects bad release ids and non-ISO created_at', () => {
     expect(manifestProblems(ok({ release: 'latest' }))).toContain('release must be YYYY.MM');
-    expect(manifestProblems(ok({ release: '2026.13' }))).toContain(
-      'release must be YYYY.MM',
-    );
-    expect(manifestProblems(ok({ created_at: 'Oct 15' }))).toContain(
-      'created_at must be ISO date',
-    );
+    expect(manifestProblems(ok({ release: '2026.13' }))).toContain('release must be YYYY.MM');
+    expect(manifestProblems(ok({ created_at: 'Oct 15' }))).toContain('created_at must be ISO date');
   });
   it('rejects "latest"/empty component versions and missing source', () => {
     const bad = ok({
@@ -154,10 +155,7 @@ describe('manifestProblems — strict parity with Python load_manifest', () => {
   it('rejects a manifest Python would reject (wrong schema)', () => {
     expect(loadCompatManifest(defaultManifestPath(ws()))).not.toBeNull();
     const dir = ws();
-    writeFileSync(
-      defaultManifestPath(dir),
-      JSON.stringify(ok({ release: 'rolling' })),
-    );
+    writeFileSync(defaultManifestPath(dir), JSON.stringify(ok({ release: 'rolling' })));
     expect(loadCompatManifest(defaultManifestPath(dir))).toBeNull();
   });
 });

@@ -99,8 +99,9 @@ export function manifestProblems(doc: unknown): string[] {
     const version = String(c.version ?? '');
     if (version === '' || version === 'latest') {
       problems.push(`${id}: requires a pinned version`);
-    } else if (scheme === 'pep440' ? !PEP440_VERSION_RE.test(version)
-                                  : !SEMVER_VERSION_RE.test(version)) {
+    } else if (
+      scheme === 'pep440' ? !PEP440_VERSION_RE.test(version) : !SEMVER_VERSION_RE.test(version)
+    ) {
       problems.push(`${id}: version ${version} not ${String(scheme)}-shaped`);
     }
     if (typeof c.source !== 'string' || c.source === '') {
@@ -118,8 +119,10 @@ export function manifestProblems(doc: unknown): string[] {
     if (families.has(family)) problems.push(`duplicate family ${family}`);
     families.add(family);
     if (r.contract === null || r.contract === undefined) {
-      if ((r.min_major !== undefined && r.min_major !== null) ||
-          (r.max_major !== undefined && r.max_major !== null)) {
+      if (
+        (r.min_major !== undefined && r.min_major !== null) ||
+        (r.max_major !== undefined && r.max_major !== null)
+      ) {
         problems.push(`${family}: unversioned family must not carry ranges`);
       }
       continue;
@@ -128,7 +131,8 @@ export function manifestProblems(doc: unknown): string[] {
       problems.push(`${family}: bad contract id`);
       continue;
     }
-    const min = r.min_major, max = r.max_major;
+    const min = r.min_major,
+      max = r.max_major;
     if (typeof min !== 'number' || typeof max !== 'number' || min < 1 || max < min) {
       problems.push(`${family}: invalid major window`);
     }

@@ -25,7 +25,7 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 - **`update --check --json`**: o payload passa de array puro de
   repositórios para envelope `{manifest: {release, sha256, path} | null,
-  repos: [...]}` — a identidade do manifesto avaliado agora é evidência no
+repos: [...]}` — a identidade do manifesto avaliado agora é evidência no
   JSON. Consumidores do array anterior devem ler `payload.repos`.
 - **`compat:` → `installed_compat:`** no texto e no JSON: o veredito se
   refere à versão **instalada**, não ao update pendente (repos `behind`
