@@ -3,3 +3,8 @@ node_modules/
 dist/
 coverage/
 forge-workspace/
+
+# Environment stubs/secrets — never commit filled .env files
+.env
+.env.*
+*.tgz

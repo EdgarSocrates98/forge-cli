@@ -174,9 +174,9 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
   it('update --check --json lista estado por Forja', async () => {
     const res = await cli('update', '--check', '--json', '--dir', ws);
     expect(res.code).toBe(0);
-    expect(JSON.parse(res.out).every((r: { state: string }) => r.state === 'not-installed')).toBe(
-      true,
-    );
+    const doc = JSON.parse(res.out);
+    expect(doc.repos.every((r: { state: string }) => r.state === 'not-installed')).toBe(true);
+    expect(doc.manifest === null || typeof doc.manifest.sha256 === 'string').toBe(true);
   });
 
   it('uninstall --native sem a operação nativa preserva o clone', async () => {

@@ -5,6 +5,32 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Não lançado]
 
+### Programa ecosystem-2026 (cyc8-05)
+
+#### Added
+
+- **Compatibilidade com o manifesto do ecossistema**: `src/compat.ts`
+  consome `forge/EcosystemCompatibility/v1` (the-forge
+  `ecosystem-compatibility.json`) — `update --check` reporta
+  `installed_compat: certified|incompatible|unknown` por repositório e o
+  banner do manifesto (release + sha256) na saída texto.
+- **Validação estrita do manifesto**: `manifestProblems()` espelha
+  `load_manifest(strict=True)` do Python — release `YYYY.MM`, `created_at`
+  ISO, ids de componente/família/contrato, versão pinada (rejeita
+  `latest`/`""`) no scheme declarado, `source` obrigatório, janelas
+  `min_major`/`max_major`, famílias únicas. Manifesto inválido → `null`
+  (nunca certifica silenciosamente).
+
+#### Changed
+
+- **`update --check --json`**: o payload passa de array puro de
+  repositórios para envelope `{manifest: {release, sha256, path} | null,
+  repos: [...]}` — a identidade do manifesto avaliado agora é evidência no
+  JSON. Consumidores do array anterior devem ler `payload.repos`.
+- **`compat:` → `installed_compat:`** no texto e no JSON: o veredito se
+  refere à versão **instalada**, não ao update pendente (repos `behind`
+  não sugerem mais que a atualização é certificada).
+
 ### Programa evo-cli-portal (F0→C6, ciclos `audit/f0-baseline`→`cycle/c6-intelligence`)
 
 #### Added

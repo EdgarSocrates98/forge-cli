@@ -13,6 +13,12 @@ import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
 import { processBatch } from './batch.js';
+import {
+  compatVerdict,
+  defaultManifestPath,
+  loadCompatManifest,
+  readDeclaredVersion,
+} from '../compat.js';
 
 export async function runDoctorCommand(cli: CliOptions, names: string[] = []): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
@@ -132,8 +138,25 @@ export async function runUpdateCheckCommand(cli: CliOptions, names: string[]): P
     process.exit(2);
   }
   const lines: string[] = [];
-  const rows: { name: string; state: string; behind: number; ahead: number; failure?: string }[] =
-    [];
+  const rows: {
+    name: string;
+    state: string;
+    behind: number;
+    ahead: number;
+    failure?: string;
+    installed_compat?: string;
+  }[] = [];
+  const manifest = loadCompatManifest(defaultManifestPath(targetDir));
+  const compatOf = (repoName: string, repoDir: string): string | undefined => {
+    if (!manifest) return undefined;
+    const version = readDeclaredVersion(repoDir);
+    return version === null ? 'unknown' : compatVerdict(manifest, repoName, version);
+  };
+  lines.push(
+    manifest
+      ? `compat manifest: ${manifest.release} (sha256:${manifest.fileSha256.slice(0, 12)})`
+      : `compat manifest: unavailable — ${defaultManifestPath(targetDir)} not found`,
+  );
   let pending = 0;
   for (const repo of picked) {
     const dir = resolveInside(targetDir, repo.name);
@@ -142,20 +165,47 @@ export async function runUpdateCheckCommand(cli: CliOptions, names: string[]): P
       rows.push({ name: repo.name, state: 'not-installed', behind: 0, ahead: 0 });
       continue;
     }
+    const compat = compatOf(repo.name, dir);
     const check = await updateCheck(dir);
     if (check.failure) {
       lines.push(`${repo.name} — ${theme.warn(`${S.updateCheckFailed} (${check.failure})`)}`);
       rows.push({ name: repo.name, state: 'unknown', behind: 0, ahead: 0, failure: check.failure });
     } else if (check.behind > 0) {
       pending++;
-      lines.push(`${repo.name} — ${theme.accent(`${check.behind} ${S.updateCommitsBehind}`)}`);
-      rows.push({ name: repo.name, state: 'behind', behind: check.behind, ahead: check.ahead });
+      lines.push(
+        `${repo.name} — ${theme.accent(`${check.behind} ${S.updateCommitsBehind}`)}${compat ? ` · installed-compat:${compat}` : ''}`,
+      );
+      rows.push({
+        name: repo.name,
+        state: 'behind',
+        behind: check.behind,
+        ahead: check.ahead,
+        ...(compat ? { installed_compat: compat } : {}),
+      });
     } else {
-      lines.push(`${repo.name} — ${theme.ok(S.updateUpToDate)}`);
-      rows.push({ name: repo.name, state: 'up-to-date', behind: 0, ahead: check.ahead });
+      lines.push(
+        `${repo.name} — ${theme.ok(S.updateUpToDate)}${compat ? ` · installed-compat:${compat}` : ''}`,
+      );
+      rows.push({
+        name: repo.name,
+        state: 'up-to-date',
+        behind: 0,
+        ahead: check.ahead,
+        ...(compat ? { installed_compat: compat } : {}),
+      });
     }
   }
-  if (cli.jsonReport) emitJson(rows, pending > 0 ? 1 : 0);
+  if (cli.jsonReport) {
+    emitJson(
+      {
+        manifest: manifest
+          ? { release: manifest.release, sha256: manifest.fileSha256, path: manifest.path }
+          : null,
+        repos: rows,
+      },
+      pending > 0 ? 1 : 0,
+    );
+  }
   note(lines.join('\n'), S.updateCheckTitle);
   process.exit(pending > 0 ? 1 : 0);
 }
