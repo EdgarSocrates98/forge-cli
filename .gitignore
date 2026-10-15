@@ -8,3 +8,4 @@ forge-workspace/
 .env
 .env.*
 *.tgz
+graphify-out/
