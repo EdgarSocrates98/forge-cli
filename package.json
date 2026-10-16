@@ -1,5 +1,5 @@
 {
-  "name": "forge-cli",
+  "name": "theforge-cli",
   "version": "0.1.0",
   "description": "CLI interativa para clonar e configurar o ecossistema Forge",
   "type": "module",

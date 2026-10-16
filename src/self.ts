@@ -22,7 +22,7 @@ export function detectInstallMethod(scriptPath: string, home: string): InstallMe
   return 'source';
 }
 
-export function planSelfUpdate(method: InstallMethod, pkgName = 'forge-cli'): SelfUpdatePlan {
+export function planSelfUpdate(method: InstallMethod, pkgName = 'theforge-cli'): SelfUpdatePlan {
   switch (method) {
     case 'npm-global':
       return {

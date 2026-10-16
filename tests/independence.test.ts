@@ -148,7 +148,7 @@ describe('self update respeita o método de instalação', () => {
     expect(planSelfUpdate('npm-global').command?.args).toEqual([
       'install',
       '-g',
-      'forge-cli@latest',
+      'theforge-cli@latest',
     ]);
     expect(planSelfUpdate('shim').command).toBeUndefined();
     expect(planSelfUpdate('source').manual).toMatch(/git pull/);
