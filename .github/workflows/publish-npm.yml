@@ -1,0 +1,30 @@
+name: publish-npm
+
+# npm Trusted Publishing (OIDC) — sem token armazenado, com provenance.
+# Requer: trusted publisher registrado em npmjs.com apontando para
+#   owner/repo: EdgarSocrates98/forge-cli  workflow: publish-npm.yml
+# Disparo manual: gh workflow run publish-npm
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    # Disabled until the npm trusted publisher is configured — flip `if: false`.
+    if: false
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write   # OIDC token for npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      # npm>=11.5.1 auto-detects OIDC; --provenance requires it anyway.
+      - run: npm publish --provenance
