@@ -268,6 +268,7 @@ describe(
         '--yes',
         '--skip-scripts',
         '--skip-verify',
+        '--offline',
         '--dir',
         ws,
       );
