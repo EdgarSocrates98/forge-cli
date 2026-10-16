@@ -79,12 +79,12 @@ acessível no PATH.
 
 ## Quickstart
 
-1. Instale o forge-cli (`npm run build && node dist/index.js self install` a partir do clone, ou `npm i -g` quando publicado).
+1. Instale o forge-cli (`npm run build && node dist/index.js self install` a partir do clone, ou `npm i -g theforge-cli` quando publicado).
 2. Abra um terminal novo e rode `forge-cli`.
 3. Escolha **Instalar Forjas**, selecione as Forjas desejadas e confirme.
 4. Use os comandos oficiais de cada Forja (a seção "próximos passos" do relatório lista os principais).
 
-Para atualizar o próprio CLI: `forge-cli self update` (npm global executa `npm i -g` com `--yes`; demais métodos mostram o passo manual).
+Para atualizar o próprio CLI: `forge-cli self update` (npm global executa `npm i -g theforge-cli` com `--yes`; demais métodos mostram o passo manual).
 
 ## Instalador nativo (perfil, escopo, componentes)
 
