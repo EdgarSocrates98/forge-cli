@@ -379,6 +379,7 @@ describe('runEnvCommand', () => {
     offline: false,
     clean: false,
     rollback: false,
+    verify: false,
     trustCustom: false,
     runAfterSyncFailure: false,
     positionals: [],

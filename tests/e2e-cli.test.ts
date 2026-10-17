@@ -232,26 +232,33 @@ describe('dispatch --method registry', () => {
     expect(res.out).toContain('exigem exatamente uma Forja');
   });
 
-  it.each([
-    'update',
-    'clone',
-    'reinstall',
-    'rollback',
-    'pin',
-    'unpin',
-    'versions',
-    'status',
-    'list',
-  ])('%s --method registry é recusado antes de qualquer dispatch', async (verb) => {
-    const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
-    expect(res.code).toBe(2);
-    expect(res.out).toContain('só é suportado em install|uninstall');
-  });
+  it.each(['clone', 'versions', 'status', 'list'])(
+    '%s --method registry é recusado antes de qualquer dispatch',
+    async (verb) => {
+      const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
+      expect(res.code).toBe(2);
+      expect(res.out).toContain(
+        'só é suportado em install|uninstall|update|reinstall|rollback|pin|unpin',
+      );
+    },
+  );
+
+  it.each(['update', 'reinstall', 'rollback', 'pin', 'unpin'])(
+    '%s --method registry sem state → recusa honesta (não crasha)',
+    async (verb) => {
+      const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
+      // sem state.json → "não instalado via registry" — exit 1, nunca 2-crash
+      expect(res.code).toBe(1);
+      expect(res.out).not.toContain('só é suportado');
+    },
+  );
 
   it('self update --method registry é recusado (não roda npm)', async () => {
     const res = await cli('self', 'update', '--method', 'registry');
     expect(res.code).toBe(2);
-    expect(res.out).toContain('só é suportado em install|uninstall');
+    expect(res.out).toContain(
+      'só é suportado em install|uninstall|update|reinstall|rollback|pin|unpin',
+    );
   });
 
   it('uninstall --method registry --json misto → stdout é JSON puro', async () => {

@@ -28,8 +28,41 @@ Revisões inspecionadas (HEAD de `main` em 2026-10-12):
   digest publicado e instala pelo caminho do artefato verificado.
   `uninstall --method registry` remove venv + wheel cache + receipt com
   confirmação; `--plan`, `--offline`, `--clean`, `--version` pinado,
-  `--json` e `--report` são honrados. Não executa o instalador nativo
-  (fase 2) — skills/agents/hosts ficam para o `<cli> install` da Forja.
+  `--json` e `--report` são honrados. `--native` delega ao instalador
+  nativo **da venv** (dry-run sem `--yes`; `--profile`/`--scope`/
+  `--components`/`--host`/`--gateway-profile` passam adiante);
+  Forjas cujo instalador é script de repositório (forge-doctor-api)
+  recebem skip honesto — a wheel não carrega o script.
+- **lifecycle registry** — `update` (mais nova no PyPI; `--check` só
+  planeja; respeita pin), `reinstall` (mesma versão do receipt — reparo
+  de drift), `rollback` (desempilha `history` do receipt; rollback de
+  rollback funciona), `pin`/`unpin` (trava a versão instalada no state).
+  Tudo com o mesmo contrato: receipts atômicos, `--json`/`--report`,
+  flags git ignoradas avisadas, nomes desconhecidos → exit 2, falhas → 1.
+- **hosts/MCP sem clone** — `forge-cli mcp <forja>` resolve o argv MCP
+  (forge.json do clone ou template `mcp` do catálogo + receipt:
+  `{bin}` = bin da venv, `{binDir}/x` = script irmão); `--verify` roda
+  `--version` como handshake. `hosts plan|register|validate|rollback`
+  usam o mesmo descritor — `hosts register` grava `mcpServers` apontando
+  para o binário da venv registry.
+- **portal** — `GET /api/v1/registry/state` no forge-portal projeta
+  `~/.forge-cli/forges/state.json` (contrato
+  `docs/registry-state-contract.md`).
+
+## Matriz registry (PyPI)
+
+| Forja             | Dist PyPI           | Piso Python | MCP (venv)                   | Nativo `--native`           |
+| ----------------- | ------------------- | ----------- | ---------------------------- | --------------------------- |
+| the-forge         | `theforge-core`     | >=3.11      | — (sem mcp_command)          | `theforge install apply`    |
+| api-forge         | `apiforge-af`       | >=3.12      | `apiforge-mcp`               | `apiforge install`          |
+| platform-forge    | `platformforge`     | >=3.10      | `platformforge-mcp`          | `platformforge install`     |
+| spark-forge-aws   | `sparkforge-aws`    | >=3.10      | `sparkforge-aws mcp serve`   | `sparkforge-aws install`    |
+| spark-forge-azure | `sparkforge-azure`  | >=3.10      | `sparkforge-azure mcp serve` | `sparkforge-azure install`  |
+| forge-doctor-data | `forge-doctor-data` | >=3.11      | `forge-doctor-data mcp`      | `forge-doctor-data install` |
+| forge-doctor-api  | `forge-doctor-api`  | >=3.11      | `forge-doctor-api mcp`       | **não** (script de repo)    |
+
+`requires_python` publicado no PyPI é autoritativo por release; o piso da
+tabela compõe com ele (o mais restritivo vence).
 
 ## Modelo de instalação em duas fases
 

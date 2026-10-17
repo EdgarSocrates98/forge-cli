@@ -15,6 +15,11 @@ export interface RegistryEntry {
   minPython: string;
   /** Classe de origem para a política de confiança. */
   origin: 'official';
+  /**
+   * Template do comando MCP da Forja (espelho do `mcp_command` do forge.json).
+   * `{bin}` = bin principal da venv; `{binDir}/x` = script irmão na venv.
+   */
+  mcp?: string[];
 }
 
 export const REGISTRY_PACKAGES: RegistryEntry[] = [
@@ -30,6 +35,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'apiforge-af',
     bin: 'apiforge',
     minPython: '3.12',
+    mcp: ['{binDir}/apiforge-mcp'],
     origin: 'official',
   },
   {
@@ -37,6 +43,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'platformforge',
     bin: 'platformforge',
     minPython: '3.10',
+    mcp: ['{binDir}/platformforge-mcp'],
     origin: 'official',
   },
   {
@@ -44,6 +51,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'sparkforge-aws',
     bin: 'sparkforge-aws',
     minPython: '3.10',
+    mcp: ['{bin}', 'mcp', 'serve'],
     origin: 'official',
   },
   {
@@ -51,6 +59,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'sparkforge-azure',
     bin: 'sparkforge-azure',
     minPython: '3.10',
+    mcp: ['{bin}', 'mcp', 'serve'],
     origin: 'official',
   },
   {
@@ -58,6 +67,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'forge-doctor-data',
     bin: 'forge-doctor-data',
     minPython: '3.11',
+    mcp: ['{bin}', 'mcp'],
     origin: 'official',
   },
   {
@@ -65,6 +75,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     dist: 'forge-doctor-api',
     bin: 'forge-doctor-api',
     minPython: '3.11',
+    mcp: ['{bin}', 'mcp'],
     origin: 'official',
   },
 ];

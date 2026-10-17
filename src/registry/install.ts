@@ -6,6 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -44,6 +45,26 @@ export interface RegistryInstallReceipt {
   verifiedHash?: string;
   yanked?: boolean;
   staleCache?: boolean;
+  /** Proveniência do artefato instalado — URL publicada no índice + via de resolução. */
+  provenance?: {
+    registry: 'pypi.org';
+    file?: string;
+    url?: string;
+    resolvedVia: 'pypi' | 'offline-cache';
+  };
+  /** Versão travada por `pin --method registry` — update a respeita. */
+  pinned?: string;
+  /** Versões anteriores (mais antiga → mais recente) — alimenta `rollback`. */
+  history?: { version: string; installedAt: string }[];
+  /** Delegação ao instalador nativo da Forja (fase 2) — evidência honesta. */
+  native?: {
+    argv: string[];
+    ran: boolean;
+    dryRun?: boolean;
+    exitCode?: number;
+    skipped?: string;
+    ignored?: string[];
+  };
 }
 
 export interface ForgeState {
@@ -92,8 +113,33 @@ export function loadForgeState(home: string): ForgeState {
   }
 }
 
-function saveForgeState(home: string, state: ForgeState): void {
+/**
+ * Entrada sintética para Forja presente no state mas fora do catálogo:
+ * o receipt é a única fonte confiável — dist/bin por ele, piso derivado
+ * do interpretador que instalou (único com prova de compatibilidade).
+ */
+export function ghostEntry(name: string, receipt: RegistryInstallReceipt): RegistryEntry {
+  return {
+    name,
+    dist: receipt.dist,
+    bin: path.basename(receipt.bin).replace(/\.exe$/i, ''),
+    minPython: receipt.python.split('.').slice(0, 2).join('.'),
+    origin: 'official',
+  };
+}
+
+export function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
+  // Receipts carregam paths internos + hashes — o dir de estado é privado
+  // ao usuário (POSIX; Windows usa ACL do perfil — chmod é no-op honesto).
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(forgesRoot(home), 0o700);
+      chmodSync(path.dirname(forgesRoot(home)), 0o700);
+    } catch {
+      // fs sem chmod (ex.: alguns mounts) — não bloqueia o write
+    }
+  }
   // Escrita atômica (convenção do codebase) — kill no meio não corrompe.
   writeFileAtomic(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`);
 }
@@ -126,7 +172,11 @@ export interface RunOpts {
 }
 export type RunLike = (cmd: string, args: string[], opts?: RunOpts) => Promise<RunResult>;
 
-async function execaRun(cmd: string, args: string[], opts: RunOpts = {}): Promise<RunResult> {
+export async function execaRun(
+  cmd: string,
+  args: string[],
+  opts: RunOpts = {},
+): Promise<RunResult> {
   const res = await execa(cmd, args, {
     reject: false,
     timeout: opts.timeoutMs ?? 300_000,
@@ -455,6 +505,12 @@ export async function registryInstall(
       packagetype: f.packagetype,
     })),
     verifiedHash,
+    provenance: {
+      registry: 'pypi.org',
+      file: verifiedFile,
+      url: resolved.files.find((f) => f.filename === verifiedFile)?.url,
+      resolvedVia: deps.offline ? 'offline-cache' : 'pypi',
+    },
     yanked: resolved.yanked,
     staleCache: resolved.staleCache,
   };

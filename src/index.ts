@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import { cancel, intro, log, note, outro } from '@clack/prompts';
 import { loadState } from './artifacts.js';
-import { CliError, isNonInteractive, parseCliArgs, usage } from './cli-args.js';
+import { CliError, isNonInteractive, parseCliArgs, usage, type CliOptions } from './cli-args.js';
 import { resolveCommand } from './commands.js';
 import { collectStatus } from './status.js';
 import { askRepos, askWorkspace } from './prompts.js';
 import { S } from './ui/strings.js';
 import { theme } from './ui/theme.js';
-import { hasGitRepo, resolveTargetDir } from './utils/system.js';
+import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
-import { applyMenu, askMenu, shouldShowMenu } from './menu.js';
+import { applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
@@ -20,8 +20,19 @@ import {
   runVersionsCommand,
 } from './cmd/query.js';
 import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
-import { runRegistryInstall, runRegistryList, runRegistryUninstall } from './cmd/registry.js';
-import { registryEntry, registryNames } from './registry/catalog.js';
+import {
+  runRegistryInstall,
+  runRegistryList,
+  runRegistryPin,
+  runRegistryReinstall,
+  runRegistryRollback,
+  runRegistryUninstall,
+  runRegistryUpdate,
+} from './cmd/registry.js';
+import { registryEntry, registryNames, REGISTRY_PACKAGES } from './registry/catalog.js';
+import { loadForgeState } from './registry/install.js';
+import { isCancel, multiselect } from '@clack/prompts';
+import { exitCancelled } from './prompts.js';
 import {
   runPinCommand,
   runUnpinCommand,
@@ -33,7 +44,7 @@ import {
 } from './cmd/manage.js';
 import { runInstallFlow } from './cmd/run.js';
 import { runEnvCommand } from './cmd/env.js';
-import { runHostsCommand } from './cmd/hosts.js';
+import { runHostsCommand, runMcpCommand } from './cmd/hosts.js';
 import {
   runDiscoverCommand,
   runLockCommand,
@@ -63,6 +74,7 @@ const JSON_QUERY_COMMANDS = new Set([
   'recommend',
   'env',
   'hosts',
+  'mcp',
   'lock',
   'profile',
   'recover',
@@ -78,7 +90,7 @@ const JSON_QUERY_COMMANDS = new Set([
 ]);
 
 async function main(): Promise<void> {
-  let cli;
+  let cli: CliOptions;
   try {
     cli = parseCliArgs(process.argv.slice(2));
   } catch (error) {
@@ -99,7 +111,7 @@ async function main(): Promise<void> {
   }
   if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
     const next = await applyMenu(cli, {
-      ask: () => askMenu(),
+      ask: () => askMenu({}, menuItemsFor(cli)),
       workspace: askWorkspace,
       resolveDir: resolveTargetDir,
       pickRepos: async (dir) => {
@@ -110,6 +122,33 @@ async function main(): Promise<void> {
           status: new Map(infos.map((i) => [i.name, i])),
         });
         return chosen.map((r) => r.name);
+      },
+      pickRegistryCatalog: async () => {
+        const picked = await multiselect({
+          message: 'Forjas para instalar do PyPI (registry-first)',
+          options: REGISTRY_PACKAGES.map((e) => ({
+            value: e.name,
+            label: e.name,
+            hint: `${e.dist} · python >=${e.minPython}`,
+          })),
+          required: true,
+        });
+        if (isCancel(picked)) exitCancelled();
+        return picked as string[];
+      },
+      pickRegistryInstalled: async () => {
+        const installed = Object.keys(loadForgeState(cliHome()).forges);
+        if (!installed.length) {
+          log.warn('Nenhuma Forja instalada via registry ainda — instale primeiro.');
+          return [];
+        }
+        const picked = await multiselect({
+          message: 'Forjas instaladas (registry)',
+          options: installed.map((n) => ({ value: n, label: n })),
+          required: true,
+        });
+        if (isCancel(picked)) exitCancelled();
+        return picked as string[];
       },
     });
     if (!next) {
@@ -125,13 +164,40 @@ async function main(): Promise<void> {
     console.log(usage());
     process.exit(2);
   }
-  if (
-    cli.method === 'registry' &&
-    resolved.command !== 'install' &&
-    resolved.command !== 'uninstall'
-  ) {
+  const REGISTRY_COMMANDS = new Set([
+    'install',
+    'uninstall',
+    'update',
+    'reinstall',
+    'rollback',
+    'pin',
+    'unpin',
+  ]);
+  if (cli.method === 'registry' && !REGISTRY_COMMANDS.has(resolved.command)) {
     log.error(S.errMethodUnsupported);
     process.exit(2);
+  }
+  // Lifecycle registry intercepta antes dos handlers git — update/reinstall/
+  // rollback/pin/unpin com --method registry operam sobre receipts, não clones.
+  if (cli.method === 'registry' && resolved.command === 'update') {
+    await runRegistryUpdate(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'reinstall') {
+    await runRegistryReinstall(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'rollback') {
+    await runRegistryRollback(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'pin') {
+    await runRegistryPin(cli, resolved.names, true);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'unpin') {
+    await runRegistryPin(cli, resolved.names, false);
+    return;
   }
   // `--method` só significa algo nos fluxos de instalação/lifecycle —
   // em comandos de consulta/hosts/self é avisado, nunca engolido.
@@ -172,6 +238,10 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'hosts') {
     process.exitCode = await runHostsCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'mcp') {
+    process.exitCode = await runMcpCommand(cli, resolved.names);
     return;
   }
   if (resolved.command === 'wizard') {

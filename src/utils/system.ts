@@ -1,11 +1,18 @@
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
 import { isLinkOrJunction, isSafeRepoUrl, redactSecrets, resolveInside } from '../safety.js';
 import type { ForgeRepo, SetupScript, SyncFailure, SyncResult } from '../types.js';
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
+
+/** Home do estado forge-cli — `FORGE_CLI_HOME` permite home hermético
+ * (bench, testes, containers). Hosts continuam no home real do usuário. */
+export function cliHome(): string {
+  return process.env.FORGE_CLI_HOME || os.homedir();
+}
 
 const WIN_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
 const POSIX_SETUP_CANDIDATES = ['setup.sh', 'install.sh'];

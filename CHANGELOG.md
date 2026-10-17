@@ -7,6 +7,97 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Wave 7 — performance (números medidos, não inventados)
+
+- `scripts/bench.mjs`: mede startup (`--help`), `status`, `registry`,
+  resolve `--plan` (rede), install frio, reinstall e `update --check`
+  (cache). Mediana de N runs (`--runs`), JSON
+  `forge-cli/BenchReport/v1` em stdout, `FORGE_CLI_HOME` hermético.
+- Medido local (Node 24, Linux, 3 runs): `--help` ~259ms,
+  `status` ~72ms, `registry` ~67ms, `resolve --plan` ~290ms (PyPI
+  online), install frio ~3.2s e reinstall ~3.5s (venv+pip dominam —
+  fora do nosso controle), `update --check` com cache ~217ms.
+- **`FORGE_CLI_HOME`**: novo env override para o home de estado
+  (`~/.forge-cli`) — bench/testes/containers rodam isolados sem tocar
+  o estado real. Não afeta detecção de hosts (esses ficam no home real).
+
+#### Wave 8 — supply chain / hardening
+
+- **Retry com backoff no PyPI**: `fetchWithRetry` — 429/5xx e erros de
+  rede retentam 2x (250ms→500ms); 404 e respostas definitivas retornam
+  imediato. Retry nunca mascara "não existe".
+- **`receipt.provenance`**: `{registry:'pypi.org', file, url,
+resolvedVia:'pypi'|'offline-cache'}` — proveniência auditável do
+  artefato instalado junto ao `verifiedHash`.
+- **Permissões do state dir**: `~/.forge-cli` e `forges/` recebem
+  `chmod 0700` no POSIX (Windows: ACL do perfil, chmod é no-op).
+
+#### Wave 4 — hosts/MCP registry-aware
+
+- **`forge-cli mcp [forja…]`**: resolve o argv MCP por Forja e reporta
+  presença do binário. Fonte: `forge.json` do clone, ou — sem clone —
+  receipt registry + template `mcp` do catálogo (`{bin}` → bin da venv,
+  `{binDir}/x` → script irmão; `.exe` no Windows). `--verify` roda
+  `<argv[0]> --version` como handshake mínimo. `--json` emit
+  `{forge, mcp_command, binPresent, handshake?}` por item. Forja sem
+  `mcp_command` honesto (ex.: the-forge) sai `ok:false`, nunca inventa.
+- **`hosts plan|register|validate|rollback` sem clone**: `forgeDescriptor`
+  cai para o receipt + catálogo quando o manifest não está no
+  workspace — `hosts register claude api-forge` numa instalação
+  registry grava `mcpServers['api-forge'].command` apontando para o
+  `apiforge-mcp` da venv. Backup/rollback/`--yes` inalterados.
+- Catálogo: campo `mcp` por Forja espelhando o `mcp_command` de cada
+  `forge.json` (api-forge `apiforge-mcp`, platform-forge
+  `platformforge-mcp`, doctors `[bin] mcp`, spark-forge `[bin] mcp serve`).
+- `CliOptions.verify` + flag `--verify` registrada (parser é strict).
+
+#### Wave 3 — lifecycle registry
+
+- **`update --method registry`**: resolve a mais nova no PyPI, compara
+  com o receipt e reinstala limpo quando há versão nova. `--check`/
+  `--plan` mostram o plano sem mutar; `--ref <ver>` é override pontual
+  (não cria nem remove pin). Versões anteriores são empilhadas em
+  `receipt.history` — insumo do rollback.
+- **`reinstall --method registry`**: reinstala a mesma versão do
+  receipt (reparo de drift — venv apagada mas state presente recria).
+  Preserva `pinned` e `history` — reinstall não é lifecycle de versão.
+- **`rollback --method registry`**: desempilha `history.at(-1)` e
+  empilha a versão abandonada — rollback de rollback retorna à versão
+  original. Sem histórico → recusa honesta (`rollbackNoPrevious`), exit 1.
+- **`pin`/`unpin --method registry`**: trava/remove a versão instalada
+  no state; `update` respeita (`skipped: fixada em <ver>`).
+- **Ghost-forge no lifecycle**: Forja removida do catálogo mas com
+  receipt continua atualizável/reinstalável — `ghostEntry()` deriva
+  dist/bin do receipt e o piso Python do interpretador que a instalou.
+- **Contrato uniforme**: `isSafeRepoName`/`resolveInside` nos mesmos
+  pontos do uninstall; flags git ignoradas avisam também no lifecycle;
+  `update` com todos os alvos não-instalados sai 1 (nada aconteceu);
+  confirmação interativa só em TTY duplo (automação segue com `--yes`).
+
+#### Wave 2 — TUI registry + delegação nativa (fase 2)
+
+- **Menu guiado `--method registry`**: `shouldShowMenu` não exclui mais
+  o método — `menuItemsFor` filtra o menu para os verbos suportados
+  (install/update/reinstall/uninstall/status/exit). `status` mapeia
+  para `forge-cli registry` (receipts). Install escolhe no catálogo
+  PyPI com hint de dist+piso Python; lifecycle escolhe nas instaladas.
+- **Delegação ao instalador nativo** (`delegateNative`): `--native` ou
+  qualquer flag de fase 2 (`--profile/--scope/--components/--host/
+--gateway-profile`) roda `<bin> install` **pelo bin da venv
+  verificada** — nunca um shim global. Sem `--yes` roda `--dry-run`
+  (default-deny). `{python} scripts/...` (forge-doctor-api) é skip
+  honesto — o script vive no repositório, não na wheel.
+- **Native em lifecycle**: update/reinstall rodam a op `update`
+  documentada; `uninstall --native` roda `ops.uninstall` **antes** de
+  remover a venv. Tudo gravado em `receipt.native` (argv, ran, dryRun,
+  exitCode, skipped, ignored).
+- **Validação fail-fast**: `--profile/--scope/--components/--host/
+--gateway-profile` inválidos recusam antes de gastar rede (exit 1),
+  mesmo contrato do fluxo git. Flags saem de REGISTRY_IGNORED_FLAGS —
+  agora são honradas.
+- **`.env` preservado**: instalações registry vivem em venvs isoladas
+  sob `~/.forge-cli/` — nunca tocam `.env` de projetos do usuário.
+
 #### Corrigido após revisão (7ª rodada)
 
 - **Uninstall não-TTY sem `--yes` (crítico)**: `uninstall --method

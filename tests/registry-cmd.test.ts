@@ -75,13 +75,11 @@ describe('ignoredRegistryFlags', () => {
     );
     for (const f of [
       '--dir',
-      '--profile',
       '--skip-verify',
       '--skip-scripts',
       '--shallow',
       '--fix',
       '--rollback',
-      '--gateway-profile',
       '--trust-custom',
       '--run-after-sync-failure',
       '--only-changed',
@@ -91,11 +89,21 @@ describe('ignoredRegistryFlags', () => {
       expect(flags).toContain(f);
     }
     expect(flags).not.toContain('--scope');
-    // honradas, não ignoradas
-    expect(flags).not.toContain('--plan');
-    expect(flags).not.toContain('--check');
-    expect(flags).not.toContain('--clean');
-    expect(flags).not.toContain('--report');
+    // honradas (delegação nativa / plan mode / relatório), não ignoradas
+    for (const f of [
+      '--profile',
+      '--scope',
+      '--components',
+      '--host',
+      '--gateway-profile',
+      '--native',
+      '--plan',
+      '--check',
+      '--clean',
+      '--report',
+    ]) {
+      expect(flags).not.toContain(f);
+    }
   });
   it('sem flags → vazio', () => {
     expect(ignoredRegistryFlags(cli())).toEqual([]);

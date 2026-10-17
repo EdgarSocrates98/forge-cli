@@ -368,3 +368,46 @@ describe('cache expirado', () => {
     expect(res.staleCache).toBeUndefined();
   });
 });
+
+describe('fetchWithRetry — backoff em falhas transitórias', () => {
+  it('500 → 500 → 200 resolve retentando', async () => {
+    let calls = 0;
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        calls += 1;
+        return calls < 3
+          ? { status: 500, body: '' }
+          : { status: 200, body: JSON.stringify(PAYLOAD) };
+      },
+    });
+    expect(calls).toBe(3);
+    expect('kind' in res).toBe(false);
+  });
+
+  it('404 não retenta — resposta definitiva', async () => {
+    let calls = 0;
+    const res = await resolveRelease('nope', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        calls += 1;
+        return { status: 404, body: '' };
+      },
+    });
+    expect(calls).toBe(1);
+    expect(res).toEqual({ kind: 'not-found', dist: 'nope' });
+  });
+
+  it('throw de rede retenta; 3 falhas + sem cache → network', async () => {
+    let calls = 0;
+    const res = await resolveRelease('x', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        calls += 1;
+        throw new Error('conn reset');
+      },
+    });
+    expect(calls).toBe(3);
+    expect(res).toMatchObject({ kind: 'network' });
+  });
+});
