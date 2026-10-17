@@ -5,6 +5,50 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Não lançado]
 
+### Cycle 11.1 — hardening de produção, MCP real e Trusted Publishing
+
+#### P0-001 — npm Trusted Publishing (OIDC)
+
+- `publish-npm.yml` reescrito: `workflow_dispatch(version, tag?)` →
+  job `validate` (gates completos + `npm pack --dry-run` + release
+  gate) → job `publish` (`environment: npm`, `id-token: write`,
+  checkout pinado no SHA validado — sem TOCTOU), provenance e
+  smoke pós-publish (registry check + install limpo + `--help`).
+- `scripts/release/verify-version.mjs`: recusas nomeadas —
+  `version-invalid`, `version-mismatch`, `version-exists`,
+  `tag-missing`, `tag-mismatch`, `repo-url`, `license-missing`.
+- `docs/releasing/npm-trusted-publishing.md`: setup do publisher,
+  environment, gates, troubleshooting e recovery.
+- Setup externo (publisher no npmjs.com + environment `npm` com
+  aprovação) é ação do mantenedor — `BLOCKED_EXTERNAL` até então.
+
+#### P0-002 — pureza de `--plan`/`--check`/`--dry-run`
+
+- `resolveRelease` ganha `ephemeral`: em plano, o fetch PyPI pode
+  acontecer mas **nada persiste** — nem o cache TTL de metadados
+  (`resolveRelease` não chama mais `writeCache` sob ephemeral).
+- `tests/plan-purity.test.ts`: snapshot sha256 da árvore do home
+  antes/depois — `install --plan`, `update --check` e uninstall
+  não-TTY sem `--yes` (needsYes) produzem zero mutação observável.
+
+#### P1-002 — verificação MCP de protocolo real
+
+- `src/mcp/handshake.ts`: probe stdio JSON-RPC — spawn (argv array,
+  sem shell) → `initialize` → `notifications/initialized` →
+  `tools/list` → kill. Níveis `MCP_INITIALIZED`/`TOOLS_DISCOVERED`;
+  timeouts por etapa e global, caps de tamanho/contagem de linhas,
+  `tools/call` nunca executado.
+- `forge-cli mcp --verify` agora roda o probe real (não mais
+  `--version`): JSON reporta `probe.{ok,levels,tools,server,protocol,
+error}` com erros nomeados (`stdout-non-json`, `server-exit`,
+  `initialize-invalid`, `tools-list-invalid`, `timeout`, `spawn-failed`).
+
+#### P1-001 — registry-first na experiência
+
+- README: instalação npm primeiro (sem clone), contribuidor via
+  clone depois; seção PyPI marcada como método recomendado
+  (registry-first, não registry-only).
+
 ### Cycle 11 — instalação registry-first (PyPI)
 
 #### Wave 7 — performance (números medidos, não inventados)

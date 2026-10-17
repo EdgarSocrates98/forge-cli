@@ -319,6 +319,7 @@ export async function runRegistryInstall(
         offline: cli.offline,
         cacheDir: registryCacheDir(home),
         fetchImpl: deps.fetchImpl,
+        ephemeral: true, // P0-002: plan não persiste nem cache
       });
       if ('kind' in resolved) {
         planned.push({ forge: name, ok: false, detail: describeResolveError(resolved) });
@@ -801,6 +802,7 @@ async function runRegistryLifecycle(
       offline: cli.offline,
       cacheDir: registryCacheDir(home),
       fetchImpl: deps.fetchImpl,
+      ephemeral: isCheck, // P0-002: update --check não persiste nem cache
     });
     if ('kind' in resolved) {
       items.push({

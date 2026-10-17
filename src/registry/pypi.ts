@@ -115,6 +115,11 @@ export interface ResolveOptions {
   offline?: boolean;
   cacheDir: string;
   fetchImpl?: FetchLike;
+  /**
+   * P0-002: em `--plan`/`--check`/`--dry-run` o fetch ainda pode acontecer,
+   * mas nada é persistido — nem mesmo o cache TTL de metadados.
+   */
+  ephemeral?: boolean;
 }
 
 /** Payload PyPI é pequeno — cap defensivo contra resposta inflada. */
@@ -217,7 +222,7 @@ export async function resolveRelease(
             return { kind: 'malformed', dist, detail: 'resposta sem campo releases' };
           }
         } else {
-          writeCache(opts.cacheDir, dist, parsed);
+          if (!opts.ephemeral) writeCache(opts.cacheDir, dist, parsed);
           payload = parsed;
         }
       }

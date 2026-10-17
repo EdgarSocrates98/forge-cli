@@ -16,7 +16,8 @@ import { readForgeManifest } from '../manifest.js';
 import { isSafeRepoName, resolveInside } from '../safety.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { cliHome, commandOutput, resolveTargetDir } from '../utils/system.js';
+import { probeMcpServer } from '../mcp/handshake.js';
+import { cliHome, resolveTargetDir } from '../utils/system.js';
 
 // ---------------------------------------------------------------------------
 // `forge-cli hosts <verbo>` — §2.5. Retorna exit code (0 ok / 1 falha / 2 uso)
@@ -197,8 +198,9 @@ export async function runHostsCommand(
 /**
  * `forge-cli mcp [forge…]` — resolve o argv MCP de cada Forja (forge.json do
  * clone, ou receipt registry + template `mcp` do catálogo) e reporta se o
- * argv[0] existe no disco. `--verify` executa `<argv[0]> --version` quando o
- * binário é absoluto dentro da venv (handshake mínimo honesto).
+ * argv[0] existe no disco. `--verify` executa handshake MCP real
+ * (JSON-RPC `initialize` + `tools/list` via stdio) quando o binário é
+ * absoluto dentro da venv — níveis EXECUTABLE→MCP_INITIALIZED→TOOLS_DISCOVERED.
  */
 export async function runMcpCommand(
   cli: CliOptions,
@@ -249,9 +251,19 @@ export async function runMcpCommand(
     };
     if (!binPresent) item.detail = 'binário MCP ausente na venv';
     if (verify && binPresent && path.isAbsolute(argv[0])) {
-      const out = await commandOutput(argv[0], ['--version']);
-      item.handshake = { ok: out !== null, out: (out ?? '').trim().slice(0, 80) };
-      if (out === null) item.ok = false;
+      const probe = await probeMcpServer(argv);
+      item.probe = {
+        ok: probe.ok,
+        levels: probe.levels,
+        tools: probe.tools,
+        server: probe.serverInfo,
+        protocol: probe.protocolVersion,
+        error: probe.error,
+      };
+      if (!probe.ok) {
+        item.ok = false;
+        item.detail = probe.error ? `${probe.error.code}: ${probe.error.detail}` : 'probe falhou';
+      }
     }
     results.push(item);
   }

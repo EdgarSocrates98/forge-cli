@@ -1,30 +1,84 @@
 name: publish-npm
 
-# npm Trusted Publishing (OIDC) — sem token armazenado, com provenance.
-# Requer: trusted publisher registrado em npmjs.com apontando para
-#   owner/repo: EdgarSocrates98/forge-cli  workflow: publish-npm.yml
-# Disparo manual: gh workflow run publish-npm
+# npm Trusted Publishing (OIDC) — sem token persistente, com provenance.
+# Setup obrigatório (npmjs.com → package settings → trusted publishing):
+#   owner/repo: EdgarSocrates98/forge-cli · workflow: publish-npm.yml
+#   environment: npm (mesmo nome do GitHub Environment, com aprovação)
+# Disparo: gh workflow run publish-npm -f version=<x.y.z> [-f tag=v<x.y.z>]
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão aprovada (deve casar package.json)'
+        required: true
+        type: string
+      tag:
+        description: 'Tag opcional a validar (ex.: v0.1.1)'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: npm-release-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
-  npm:
-    # Disabled until the npm trusted publisher is configured — flip `if: false`.
-    if: false
+  validate:
     runs-on: ubuntu-24.04
-    permissions:
-      id-token: write # OIDC token for npm trusted publishing + provenance
+    outputs:
+      sha: ${{ steps.gate.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24.x
+      - name: Verify npm runtime (>=11.5.1 para OIDC)
+        run: |
+          node --version
+          npm --version
+          node -e "const v=require('child_process').execSync('npm -v').toString().trim().split('.').map(Number); if (v[0]<11||(v[0]===11&&(v[1]<5||(v[1]===5&&v[2]<1)))) { console.error('npm <11.5.1'); process.exit(1); }"
+      - name: Quality gates (código não confiável de PR nunca chega aqui)
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run lint
+          npm run format:check
+          npm test
+          npm run build
+      - name: npm pack integrity (artifact que será publicado)
+        run: npm pack --dry-run --json > /tmp/pack.json && node -e "const p=require('/tmp/pack.json')[0]; if(!p.files.length) throw new Error('pacote vazio'); console.log(p.filename, p.size+'B')"
+      - name: Release gate
+        id: gate
+        run: |
+          OUT=$(node scripts/release/verify-version.mjs "${{ inputs.version }}" ${tag:+'--tag'} ${{ inputs.tag }} 2>/dev/null || true)
+          echo "$OUT"
+          echo "$OUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d); if(!j.ok){console.error(j.code+': '+j.detail);process.exit(2)} console.log('sha='+j.sha)})" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: npm # approval humana + trusted-publisher binding
+    permissions:
+      contents: read
+      id-token: write # OIDC — só no job de publicação
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.sha }} # mesmo SHA validado — sem TOCTOU
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24.x
           registry-url: https://registry.npmjs.org
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - run: npm test
-      # npm>=11.5.1 auto-detects OIDC; --provenance requires it anyway.
-      - run: npm publish --provenance
+      - name: Publish com provenance (OIDC auto-detectado pelo npm>=11.5.1)
+        run: npm publish --provenance --access public
+      - name: Post-publish verify (registry + provenance + smoke)
+        run: |
+          sleep 10 # propagação do registry
+          npm view theforge-cli@${{ inputs.version }} version --registry https://registry.npmjs.org | grep -qx "${{ inputs.version }}" || { echo 'versão não encontrada no registry'; exit 1; }
+          npm view theforge-cli@${{ inputs.version }} dist.attestations --json --registry https://registry.npmjs.org || echo 'attestations: indisponível nesta conta'
+          cd "$(mktemp -d)" && npm init -y >/dev/null && npm install theforge-cli@${{ inputs.version }} --no-audit --no-fund >/dev/null
+          npx theforge-cli --help >/dev/null && echo 'smoke: --help OK'
