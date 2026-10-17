@@ -1,9 +1,10 @@
 // P0-001: invariantes do pipeline npm Trusted Publishing — assertivas sobre o
 // workflow real (não sobre cópia), + unidade do release gate.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 const root = path.join(__dirname, '..');
 const wf = readFileSync(path.join(root, '.github', 'workflows', 'publish-npm.yml'), 'utf8');
@@ -38,12 +39,34 @@ describe('P0-001: publish-npm.yml invariantes', () => {
 });
 
 describe('verify-version.mjs — release gate', () => {
+  // Pacote sintético em tmp (version 0.1.0, já publicada no npm): torna o
+  // teste de version-exists determinístico independente do bump corrente.
+  const fake = mkdtempSync(path.join(tmpdir(), 'release-gate-'));
+  mkdirSync(path.join(fake, 'scripts', 'release'), { recursive: true });
+  cpSync(
+    path.join(root, 'scripts', 'release', 'verify-version.mjs'),
+    path.join(fake, 'scripts', 'release', 'verify-version.mjs'),
+  );
+  writeFileSync(
+    path.join(fake, 'package.json'),
+    JSON.stringify({
+      name: 'theforge-cli',
+      version: '0.1.0',
+      license: 'MIT',
+      repository: { url: 'git+https://github.com/EdgarSocrates98/forge-cli.git' },
+      files: ['dist'],
+    }),
+  );
+  afterAll(() => rmSync(fake, { recursive: true, force: true }));
+
   const gate = (args: string[]) => {
     try {
       return JSON.parse(
-        execFileSync('node', [path.join(root, 'scripts/release/verify-version.mjs'), ...args], {
-          encoding: 'utf8',
-        }),
+        execFileSync(
+          'node',
+          [path.join(fake, 'scripts', 'release', 'verify-version.mjs'), ...args],
+          { encoding: 'utf8' },
+        ),
       ) as { ok: boolean; code?: string };
     } catch (e) {
       return JSON.parse((e as { stdout: string }).stdout) as { ok: boolean; code?: string };
