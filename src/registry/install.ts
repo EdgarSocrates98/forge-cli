@@ -8,12 +8,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path';
 import { execa } from 'execa';
 import type { RegistryEntry } from './catalog.js';
-import {
-  resolveRelease,
-  type FetchLike,
-  type ResolveError,
-  type ResolvedRelease,
-} from './pypi.js';
+import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
   compareVersions,
   parseVersion,

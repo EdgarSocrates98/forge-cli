@@ -129,9 +129,7 @@ describe('registryInstall', () => {
       cacheDir: path.join(tmp, 'c'),
       pythons: [py('3.11.0')],
       run: async (_c, args) =>
-        args.includes('pip')
-          ? { exitCode: 1, stderr: 'ResolutionImpossible' }
-          : { exitCode: 0 },
+        args.includes('pip') ? { exitCode: 1, stderr: 'ResolutionImpossible' } : { exitCode: 0 },
       fetchImpl: fetchOk,
     });
     expect(res).toMatchObject({ stage: 'pip' });
