@@ -7,6 +7,27 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (4ª rodada)
+
+- **Membership own-property**: `--version toString` (ou qualquer membro
+  do prototype) não é mais tratado como release existente — `plan`
+  chegava a certificar `apiforge-af==toString` como instalável.
+- **Instalação por artefato verificado**: o pip recebe o caminho local
+  da wheel/sdist com sha256 conferido — um arquivo plantado no wheel
+  cache com nome da dist nunca é escolhido por resolução de nome.
+  Sem artefato verificável → `hash-mismatch`, não instala. (Limite
+  honesto: dependências transitivas resolvem por nome em
+  `--find-links`; só o artefato da dist é vinculado por hash.)
+- **Reinstall sem `--clean`** recusa com `already-installed` — antes
+  `python -m venv` recriava sobre a venv boa e uma falha posterior a
+  destruía com o state intacto.
+- **`--report`/`--verbose`**: label correto (`--report`, não
+  `--report-path`) e `--verbose` entra na lista de avisados.
+- **Exit code consistente**: uninstall com nome desconhecido sai 2 em
+  modo humano também (antes só `--json` retornava erro).
+- **Cache TTL robusto a clock skew**: `fetchedAt` futuro conta como
+  stale, não como eternamente fresh.
+
 #### Corrigido após revisão (3ª rodada)
 
 - **PEP 440**: `XaN.postM` agora compara `post` dentro da fase de

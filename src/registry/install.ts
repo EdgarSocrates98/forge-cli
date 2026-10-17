@@ -142,6 +142,7 @@ export type InstallError =
   | { stage: 'download'; detail: string }
   | { stage: 'offline-missing-artifact'; detail: string }
   | { stage: 'hash-mismatch'; detail: string }
+  | { stage: 'already-installed'; detail: string }
   | { stage: 'pip'; detail: string }
   | { stage: 'verify'; detail: string };
 
@@ -193,15 +194,16 @@ export function selectInterpreter(
   return { python: candidates[0] };
 }
 
-/** sha256 do arquivo no wheel cache contra o digest publicado no PyPI. */
+/** sha256 dos artefatos da dist no wheel cache contra o digest do PyPI. */
 function checkDistHashes(
   distFiles: { filename: string; sha256?: string; packagetype?: string }[],
   wheels: string,
-): { verifiedHash?: string } | { detail: string } {
+): { verifiedHash?: string; verifiedFile?: string } | { detail: string } {
   const have = existsSync(wheels) ? readdirSync(wheels) : [];
   // Verifica TODOS os artefatos da dist presentes no cache (wheel + sdist
   // quando ambos existem) — não para no primeiro.
   let verifiedHash: string | undefined;
+  let verifiedFile: string | undefined;
   for (const f of distFiles) {
     if (!have.includes(f.filename) || !f.sha256) continue;
     const digest = createHash('sha256')
@@ -212,9 +214,14 @@ function checkDistHashes(
         detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
       };
     }
-    verifiedHash = f.packagetype === 'bdist_wheel' ? digest : (verifiedHash ?? digest);
+    // A wheel verificada é o que o pip instala — prefere-a para o receipt
+    // e para o alvo da instalação (caminho explícito, não resolução por nome).
+    if (f.packagetype === 'bdist_wheel' || verifiedFile === undefined) {
+      verifiedFile = f.filename;
+      verifiedHash = digest;
+    }
   }
-  return { verifiedHash };
+  return { verifiedHash, verifiedFile };
 }
 
 /** Arquivos da própria dist (wheel `dist_…` e sdist `dist-…` legado). */
@@ -251,6 +258,14 @@ export async function registryInstall(
   const python = picked.python;
 
   const venvDir = forgeVenv(deps.home, entry.name);
+  // Reinstall sobre venv existente sem --clean destruiria a instalação
+  // boa se uma etapa posterior falhar — recusa antes de criar nada.
+  if (!deps.clean && existsSync(venvDir)) {
+    return {
+      stage: 'already-installed',
+      detail: `${entry.name}: já instalado em ${venvDir} — reinstale com --clean`,
+    };
+  }
   if (deps.clean) {
     rmSync(path.join(forgesRoot(deps.home), entry.name), { recursive: true, force: true });
     // state também é limpo — senão uma falha depois deixa versão antiga
@@ -277,6 +292,7 @@ export async function registryInstall(
   // offline exige artefatos presentes — nunca finge instalar sem rede.
   const distFiles = distArtifactFiles(resolved.files, entry.dist);
   let verifiedHash: string | undefined;
+  let verifiedFile: string | undefined;
   if (deps.offline) {
     const have = existsSync(wheels) ? readdirSync(wheels) : [];
     if (!distFiles.length || !distFiles.some((f) => have.includes(f.filename))) {
@@ -293,6 +309,7 @@ export async function registryInstall(
       return { stage: 'hash-mismatch', detail: check.detail };
     }
     verifiedHash = check.verifiedHash;
+    verifiedFile = check.verifiedFile;
   } else {
     const dl = await run(vpy, [
       '-m',
@@ -317,6 +334,17 @@ export async function registryInstall(
       return { stage: 'hash-mismatch', detail: check.detail };
     }
     verifiedHash = check.verifiedHash;
+    verifiedFile = check.verifiedFile;
+  }
+
+  // Sem artefato verificado não há instalação — um arquivo plantado no
+  // cache (fora dos metadados) jamais pode vencer a resolução do pip.
+  if (!verifiedFile) {
+    cleanup();
+    return {
+      stage: 'hash-mismatch',
+      detail: `${spec}: nenhum artefato da dist com sha256 verificável nos metadados`,
+    };
   }
 
   const pipArgs = [
@@ -327,7 +355,9 @@ export async function registryInstall(
     '--find-links',
     wheels,
     ...(deps.offline ? ['--no-index'] : []),
-    spec,
+    // Caminho explícito do artefato verificado — pip não resolve por nome,
+    // então um arquivo plantado com a mesma dist==versão nunca é escolhido.
+    path.join(wheels, verifiedFile),
   ];
   const pip = await run(vpy, pipArgs);
   if (pip.exitCode !== 0) {
