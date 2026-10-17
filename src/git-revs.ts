@@ -22,22 +22,19 @@ export interface UpdateCheck {
 
 /** Faz fetch (não altera a working tree) e compara HEAD com o upstream. */
 export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
-  // Sem remote configurado não há o que buscar: 'no-upstream' honesto,
-  // nunca 'unknown' (que implicaria erro transitório de rede/auth).
-  const remotes = await execa('git', ['remote'], { cwd: repoDir, reject: false });
-  if (remotes.exitCode !== 0 || !String(remotes.stdout).trim()) {
-    return { behind: 0, ahead: 0, failure: 'no-upstream' };
-  }
-  try {
-    await execa('git', ['fetch', '--quiet', '--tags'], { cwd: repoDir, env: NO_PROMPT });
-  } catch (error) {
-    return { behind: 0, ahead: 0, failure: classifyGitFailure(errorDetail(error)) };
-  }
+  // `@{u}` primeiro: resolve até sem remote nomeado (branch.<name>.remote
+  // pode ser '.' ou uma URL). Sem upstream configurado → 'no-upstream'
+  // honesto, nunca 'unknown' (que implicaria erro transitório de rede/auth).
   const up = await execa('git', ['rev-parse', '--abbrev-ref', '@{u}'], {
     cwd: repoDir,
     reject: false,
   });
   if (up.exitCode !== 0) return { behind: 0, ahead: 0, failure: 'no-upstream' };
+  try {
+    await execa('git', ['fetch', '--quiet', '--tags'], { cwd: repoDir, env: NO_PROMPT });
+  } catch (error) {
+    return { behind: 0, ahead: 0, failure: classifyGitFailure(errorDetail(error)) };
+  }
   const counts = await execa('git', ['rev-list', '--left-right', '--count', 'HEAD...@{u}'], {
     cwd: repoDir,
     reject: false,

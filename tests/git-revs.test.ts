@@ -123,6 +123,22 @@ describe('updateCheck', () => {
     expect(check.failure).toBe('no-upstream');
   });
 
+  it('tracking local sem remote nomeado (branch.remote=.) não é no-upstream', async () => {
+    const dir = path.join(tmp, 'localtrack');
+    execFileSync('git', ['init', '-q', dir]);
+    initRepo(dir);
+    commit(dir, 'a');
+    // upstream aponta para a própria árvore: `git remote` sai vazio,
+    // mas `@{u}` resolve — deve passar pelo fetch, não ser no-upstream.
+    const br = git(dir, 'branch', '--show-current');
+    git(dir, 'config', `branch.${br}.remote`, '.');
+    git(dir, 'config', `branch.${br}.merge`, `refs/heads/${br}`);
+    expect(git(dir, 'remote')).toBe('');
+    const check = await updateCheck(dir);
+    expect(check.failure).toBeUndefined();
+    expect(check.behind).toBe(0);
+  });
+
   it('fetch falhando (remote morto) ⇒ failure classificado, nunca throw', async () => {
     const origin = path.join(tmp, 'origin3');
     execFileSync('git', ['init', '-q', origin]);

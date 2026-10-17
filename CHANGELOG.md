@@ -12,8 +12,9 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - **`update --check` sem upstream**: repositório sem remote configurado
   (ou sem tracking no branch) reportava `não foi possível verificar
 (unknown)` — implicando falha transitória onde o estado honesto é
-  `no-upstream`. Novo literal em `SyncFailure`; `updateCheck` detecta
-  ausência de remote antes do fetch e ausência de `@{u}` depois dele;
+  `no-upstream`. Novo literal em `SyncFailure`; `updateCheck` resolve
+  `@{u}` **antes** do fetch (cobre `branch.<name>.remote` apontando para
+  `.` ou URL sem remote nomeado) e só então classifica `no-upstream`;
   o texto mostra `sem upstream configurado` e o JSON propaga
   `failure: "no-upstream"`.
 
@@ -45,10 +46,12 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   chaves irrelevante, tipos distintos não colidem), TTL (expirado,
   timestamp futuro, `ttl<=0`), entrada corrompida/shape inválido →
   miss, eviction bounded por idade com tiebreak por nome.
-- `tests/git-revs.test.ts` (+5 casos): `updateCheck` reporta
-  `no-upstream` com e sem remote configurado, fetch falho classificado
-  sem throw, `remoteTags` em remote `file://` real (ordem semver,
-  `--limit`, remote inacessível → `null`).
+- `tests/git-revs.test.ts` (+6 casos): `updateCheck` reporta
+  `no-upstream` com e sem remote configurado, tracking local
+  (`branch.<name>.remote=.`, `git remote` vazio) resolve `@{u}` e não é
+  `no-upstream`, fetch falho classificado sem throw, `remoteTags` em
+  remote `file://` real (ordem semver, `--limit`, remote inacessível →
+  `null`).
 - `tests/e2e-cli.test.ts` (+1 caso): `update --check` ponta a ponta
   reporta `no-upstream`/`sem upstream configurado` sem pendência.
 - `tests/doctor2.test.ts` (+4 casos): helpers de contexto (`listDir`
