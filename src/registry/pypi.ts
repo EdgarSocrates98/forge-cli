@@ -88,7 +88,9 @@ function readCache(
     const raw = readFileSync(pypiCacheFile(cacheDir, dist), 'utf8');
     const wrap = JSON.parse(raw) as { fetchedAt?: number; payload?: PypiPayload };
     if (typeof wrap.fetchedAt !== 'number' || !wrap.payload) return null;
-    return { payload: wrap.payload, fresh: Date.now() - wrap.fetchedAt < CACHE_TTL_MS };
+    // timestamp futuro (clock skew) → não é "fresh", é suspeito
+    const age = Date.now() - wrap.fetchedAt;
+    return { payload: wrap.payload, fresh: age >= 0 && age < CACHE_TTL_MS };
   } catch {
     return null;
   }
@@ -185,7 +187,9 @@ export async function resolveRelease(
   if (!version) {
     return { kind: 'malformed', dist, detail: 'nenhuma versão estável instalável' };
   }
-  if (!(version in releases)) {
+  // `in` aceitaria membros do prototype ('toString', 'constructor') —
+  // membership deve ser own-property.
+  if (!Object.hasOwn(releases, version)) {
     return {
       kind: 'version-not-found',
       dist,

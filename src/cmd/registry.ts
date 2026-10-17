@@ -77,6 +77,7 @@ function describeInstallError(e: InstallError): string {
   if (e.stage === 'resolve') return describeResolveError(e.error);
   if (e.stage === 'offline-missing-artifact') return `${S.registryOfflineMissing}: ${e.detail}`;
   if (e.stage === 'hash-mismatch') return `${S.registryHashMismatch}: ${e.detail}`;
+  if (e.stage === 'already-installed') return e.detail;
   return `${e.stage}: ${e.detail}`;
 }
 
@@ -124,8 +125,9 @@ const REGISTRY_IGNORED_FLAGS: [keyof CliOptions, string][] = [
   ['gatewayProfile', '--gateway-profile'],
   ['trustCustom', '--trust-custom'],
   ['runAfterSyncFailure', '--run-after-sync-failure'],
-  ['reportPath', '--report-path'],
+  ['reportPath', '--report'],
   ['onlyChanged', '--only-changed'],
+  ['verbose', '--verbose'],
 ];
 
 /** Flags do fluxo git sem efeito no método registry — nunca silencioso. */
@@ -440,4 +442,6 @@ export async function runRegistryUninstall(
   for (const r of results) {
     if (r.removed) log.success(`${r.forge}: removido`);
   }
+  // Nomes desconhecidos são falha nos dois modos — mesmo contrato que --json.
+  if (unknown.length) process.exit(2);
 }

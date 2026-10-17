@@ -76,7 +76,7 @@ describe('ignoredRegistryFlags', () => {
       '--gateway-profile',
       '--trust-custom',
       '--run-after-sync-failure',
-      '--report-path',
+      '--report',
       '--only-changed',
       '--timeout',
       '--jobs',

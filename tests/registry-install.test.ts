@@ -12,6 +12,7 @@ import {
   registryInstall,
   registryUninstall,
   type RunLike,
+  type RunResult,
 } from '../src/registry/install.js';
 import type { FetchLike } from '../src/registry/pypi.js';
 import { parseVersion } from '../src/registry/versions.js';
@@ -20,14 +21,20 @@ let tmp: string;
 beforeEach(() => (tmp = mkdtempSync(path.join(os.tmpdir(), 'reg-inst-'))));
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
+// Conteúdo fake da wheel; o digest do PyPI é o sha256 real do conteúdo
+// (o install agora instala pelo caminho verificado — o arquivo precisa existir).
+const WHEEL_BYTES = 'fake-wheel-bytes';
+const WHEEL_SHA = createHash('sha256').update(WHEEL_BYTES).digest('hex');
+const WHEEL_NAME = 'apiforge_af-0.1.0-py3-none-any.whl';
+
 const PYPI = {
   info: { requires_python: '>=3.10' },
   releases: {
     '0.1.0': [
       {
-        filename: 'apiforge_af-0.1.0-py3-none-any.whl',
+        filename: WHEEL_NAME,
         url: 'https://f/apiforge_af-0.1.0.whl',
-        digests: { sha256: 'a'.repeat(64) },
+        digests: { sha256: WHEEL_SHA },
         packagetype: 'bdist_wheel',
       },
     ],
@@ -39,9 +46,22 @@ const py = (v: string) => ({ exe: ['python3'], version: v, parsed: parseVersion(
 const ENTRY = registryEntry('api-forge')!;
 
 function runOk(calls: string[][]): RunLike {
+  return runWith(calls, async () => ({ exitCode: 0, stdout: 'ok' }));
+}
+
+/** Runner que grava a wheel fake no `pip download` e delega o resto. */
+function runWith(
+  calls: string[][],
+  handler: (cmd: string, args: string[]) => Promise<RunResult> | RunResult,
+): RunLike {
   return async (cmd, args) => {
     calls.push([cmd, ...args]);
-    return { exitCode: 0, stdout: 'ok' };
+    // `pip download --dest <dir>` → grava a wheel fake como pip faria
+    const di = args.indexOf('--dest');
+    if (args.includes('download') && di !== -1) {
+      writeFileSync(path.join(args[di + 1], WHEEL_NAME), WHEEL_BYTES);
+    }
+    return handler(cmd, args);
   };
 }
 
@@ -71,13 +91,13 @@ describe('registryInstall', () => {
     expect(calls[1]).toContain('download');
     expect(calls[1].slice(-1)).toEqual(['apiforge-af==0.1.0']);
     expect(calls[2]).toContain('install');
-    expect(calls[2]).toContain('apiforge-af==0.1.0');
+    expect(calls[2].at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl$/);
     expect(calls[3][0]).toBe(res.bin);
     expect(calls[3][1]).toBe('--help');
 
     const receipt = JSON.parse(readFileSync(receiptPath(tmp, 'api-forge'), 'utf8'));
     expect(receipt.version).toBe('0.1.0');
-    expect(receipt.files[0].sha256).toBe('a'.repeat(64));
+    expect(receipt.files[0].sha256).toBe(WHEEL_SHA);
     const state = loadForgeState(tmp);
     expect(state.forges['api-forge'].dist).toBe('apiforge-af');
   });
@@ -133,10 +153,11 @@ describe('registryInstall', () => {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
       pythons: [py('3.12.4')],
-      run: async (_c, args) =>
+      run: runWith([], async (_c, args) =>
         args.includes('install')
           ? { exitCode: 1, stderr: 'ResolutionImpossible' }
           : { exitCode: 0 },
+      ),
       fetchImpl: fetchOk,
     });
     expect(res).toMatchObject({ stage: 'pip' });
@@ -147,10 +168,11 @@ describe('registryInstall', () => {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
       pythons: [py('3.12.4')],
-      run: async (cmd) =>
+      run: runWith([], async (cmd) =>
         cmd.endsWith('/bin/apiforge') || cmd.endsWith('apiforge.exe')
           ? { exitCode: 2 }
           : { exitCode: 0 },
+      ),
       fetchImpl: fetchOk,
     });
     expect(res).toMatchObject({ stage: 'verify' });
@@ -270,8 +292,9 @@ describe('segurança e edge cases do install', () => {
     const res = await registryInstall(ENTRY, undefined, {
       ...base(),
       clean: true,
-      run: async (_c, args) =>
+      run: runWith([], async (_c, args) =>
         args.includes('install') ? { exitCode: 9, stderr: 'pip falhou' } : { exitCode: 0 },
+      ),
     });
     expect(res).toMatchObject({ stage: 'pip' });
     expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
@@ -310,8 +333,9 @@ describe('segurança e edge cases do install', () => {
   it('falha no pip → venv órfã removida', async () => {
     const res = await registryInstall(ENTRY, undefined, {
       ...base(),
-      run: async (_c, args) =>
+      run: runWith([], async (_c, args) =>
         args.includes('install') ? { exitCode: 1, stderr: 'x' } : { exitCode: 0 },
+      ),
     });
     expect(res).toMatchObject({ stage: 'pip' });
     expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
@@ -329,14 +353,58 @@ describe('segurança e edge cases do install', () => {
     expect(res).toMatchObject({ stage: 'resolve', error: { kind: 'specifier-unknown' } });
   });
 
+  it('pin "toString" → version-not-found (membership é own-property)', async () => {
+    const res = await registryInstall(ENTRY, 'toString', {
+      ...base(),
+      run: runOk([]),
+    });
+    expect(res).toMatchObject({ stage: 'resolve', error: { kind: 'version-not-found' } });
+  });
+
+  it('reinstall sem --clean recusa — nunca destrói venv boa', async () => {
+    const first = await registryInstall(ENTRY, undefined, { ...base(), run: runOk([]) });
+    expect(first).not.toHaveProperty('stage');
+    // o mock não cria a venv de verdade — simula o estado pós-install real
+    mkdirSync(forgeVenv(tmp, 'api-forge'), { recursive: true });
+    const second = await registryInstall(ENTRY, undefined, { ...base(), run: runOk([]) });
+    expect(second).toMatchObject({ stage: 'already-installed' });
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.1.0');
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(true);
+  });
+
+  it('artefato plantado no cache (fora dos metadados) nunca é escolhido', async () => {
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      run: runWith(calls, async (_c, args) => {
+        const di = args.indexOf('--dest');
+        if (args.includes('download') && di !== -1) {
+          // simula arquivo plantado no destino além da wheel legítima
+          writeFileSync(
+            path.join(args[di + 1], 'apiforge_af-0.1.0-cp312-cp312-linux_x86_64.whl'),
+            'evil',
+          );
+        }
+        return { exitCode: 0 };
+      }),
+    });
+    expect(res).not.toHaveProperty('stage');
+    const pipCall = calls.find((c) => c.includes('install'))!;
+    // instala pelo caminho da wheel verificada — nunca pelo nome/spec
+    expect(pipCall.at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl$/);
+    expect(pipCall.at(-1)).not.toContain('cp312');
+  });
+
   it('release toda yanked: pin explícito instala e marca receipt', async () => {
     const payload = {
       info: { requires_python: '>=3.10' },
       releases: {
         '0.1.0': [
           {
-            filename: 'apiforge_af-0.1.0-py3-none-any.whl',
+            filename: WHEEL_NAME,
             url: 'https://f/x.whl',
+            digests: { sha256: WHEEL_SHA },
+            packagetype: 'bdist_wheel',
             yanked: true,
           },
         ],
@@ -344,7 +412,7 @@ describe('segurança e edge cases do install', () => {
     };
     const res = await registryInstall(ENTRY, '0.1.0', {
       ...base(),
-      run: async () => ({ exitCode: 0 }),
+      run: runOk([]),
       fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
     });
     if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
