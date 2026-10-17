@@ -250,7 +250,7 @@ describe('segurança e edge cases do install', () => {
     expect(calls[0][0]).toBe('python3');
   });
 
-  it('--clean remove venv existente antes de instalar', async () => {
+  it('--clean remove venv e state existentes antes de instalar', async () => {
     mkdirSync(path.join(forgeVenv(tmp, 'api-forge'), 'stale'), { recursive: true });
     const res = await registryInstall(ENTRY, undefined, {
       ...base(),
@@ -259,6 +259,23 @@ describe('segurança e edge cases do install', () => {
     });
     expect(res).not.toHaveProperty('stage');
     expect(existsSync(path.join(forgeVenv(tmp, 'api-forge'), 'stale'))).toBe(false);
+  });
+
+  it('--clean + falha posterior → state não aponta versão órfã', async () => {
+    // instalação prévia bem-sucedida grava state
+    const ok = await registryInstall(ENTRY, undefined, { ...base(), run: runOk([]) });
+    expect(ok).not.toHaveProperty('stage');
+    expect(loadForgeState(tmp).forges['api-forge']).toBeTruthy();
+    // --clean wipeia dir+state; pip falha depois → state fica vazio
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      clean: true,
+      run: async (_c, args) =>
+        args.includes('install') ? { exitCode: 9, stderr: 'pip falhou' } : { exitCode: 0 },
+    });
+    expect(res).toMatchObject({ stage: 'pip' });
+    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
   });
 
   it('sha256 divergente → hash-mismatch + venv removida', async () => {

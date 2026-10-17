@@ -149,6 +149,9 @@ export async function runRegistryInstall(
   const quiet = cli.jsonReport;
   const entries = names.map((n) => ({ name: n, entry: registryEntry(n) }));
   const unknown = entries.filter((e) => !e.entry);
+  // Alias de dist (`apiforge-af`) normaliza para o nome da Forja —
+  // estado/venv/receipt sempre por `entry.name`.
+  for (const e of entries) if (e.entry) e.name = e.entry.name;
   if (unknown.length) {
     const msg = `${unknown.map((u) => u.name).join(', ')}: sem dist no catálogo registry — use o método git`;
     if (quiet) emitJson({ error: msg }, 2);
@@ -162,6 +165,9 @@ export async function runRegistryInstall(
     : [];
   if (warnings.length && !quiet) log.warn(warnings[0]);
 
+  // Pin com 'v' prefixo (`--version v0.2.0`) — PyPI usa a chave sem 'v'.
+  const pin = cli.ref?.replace(/^v(?=\d)/, '');
+
   const pythons = deps.pythons ?? (await probePythons());
   if (!pythons.length) {
     const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
@@ -171,12 +177,12 @@ export async function runRegistryInstall(
   }
   if (!quiet) log.info(`Python detectado: ${pythons.map((p) => p.version).join(', ')}`);
 
-  // `--plan`/`--check`: resolve e seleciona interpretador sem tocar o disco.
+  // `--plan`/`--check`: resolve e seleciona interpretador sem instalar —
   if (cli.plan || cli.check) {
     const planned: RegistryPlanItem[] = [];
     for (const { name, entry } of entries) {
       const resolved = await resolveRelease(entry!.dist, {
-        pin: cli.ref,
+        pin,
         offline: cli.offline,
         cacheDir: registryCacheDir(home),
         fetchImpl: deps.fetchImpl,
@@ -234,7 +240,7 @@ export async function runRegistryInstall(
   for (const { name, entry } of entries) {
     const spin = spinner();
     if (!quiet) spin.start(`${name}: resolvendo ${entry!.dist}…`);
-    const receipt = await registryInstall(entry!, cli.ref, {
+    const receipt = await registryInstall(entry!, pin, {
       home,
       cacheDir: registryCacheDir(home),
       offline: cli.offline,
@@ -287,9 +293,12 @@ export function runRegistryList(
 ): void {
   const home = deps.home ?? os.homedir();
   const state = loadForgeState(home);
-  const wanted = deps.names?.length ? new Set(deps.names) : null;
-  if (wanted) {
-    const bad = [...wanted].filter((n) => !registryEntry(n));
+  // Aceita nome da Forja ou da dist; normaliza para `entry.name`.
+  const wanted = deps.names?.length
+    ? new Set(deps.names.map((n) => registryEntry(n)?.name).filter((n): n is string => Boolean(n)))
+    : null;
+  if (deps.names?.length) {
+    const bad = deps.names.filter((n) => !registryEntry(n));
     if (bad.length) {
       const msg = `${bad.join(', ')}: fora do catálogo registry`;
       if (cli.jsonReport) emitJson({ error: msg }, 2);
@@ -345,11 +354,15 @@ export async function runRegistryUninstall(
     log.error(S.errRegistryUninstallNeedsNames);
     process.exit(2);
   }
-  const plan = targets.map((name) => ({
-    name,
-    entry: registryEntry(name),
-    installed: installed.includes(name),
-  }));
+  // Alias de dist aceito: estado e venv vivem por `entry.name`.
+  const plan = targets.map((name) => {
+    const entry = registryEntry(name);
+    return {
+      name: entry?.name ?? name,
+      entry,
+      installed: entry ? installed.includes(entry.name) : false,
+    };
+  });
   const unknown = plan.filter((p) => !p.entry).map((p) => p.name);
   const removals = plan.filter((p) => p.entry && p.installed);
   const skipped = plan.filter((p) => p.entry && !p.installed).map((p) => p.name);
