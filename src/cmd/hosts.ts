@@ -2,7 +2,7 @@ import path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import { log, note } from '@clack/prompts';
 import { type CliOptions } from '../cli-args.js';
-import { adapterFor, detectAll } from '../hosts/index.js';
+import { adapterFor, detectAll, HOST_ADAPTERS } from '../hosts/index.js';
 import { registryEntry } from '../registry/catalog.js';
 import { loadForgeState } from '../registry/install.js';
 import {
@@ -198,10 +198,23 @@ export async function runHostsCommand(
 /**
  * `forge-cli mcp [forge…]` — resolve o argv MCP de cada Forja (forge.json do
  * clone, ou receipt registry + template `mcp` do catálogo) e reporta se o
- * argv[0] existe no disco. `--verify` executa handshake MCP real
- * (JSON-RPC `initialize` + `tools/list` via stdio) quando o binário é
- * absoluto dentro da venv — níveis EXECUTABLE→MCP_INITIALIZED→TOOLS_DISCOVERED.
+ * argv[0] existe no disco. `--verify` executa handshake MCP real via stdio
+ * quando o binário é absoluto na venv — níveis cumulativos
+ * INSTALLED→EXECUTABLE→INITIALIZED→TOOLS_DISCOVERED→SAFE_TOOL_CALLED, mais
+ * HOST_VERIFIED quando a config de um host referencia o server.
  */
+async function hostReferencesServer(forgeId: string, home: string): Promise<boolean> {
+  for (const adapter of HOST_ADAPTERS) {
+    try {
+      const v = await adapter.validateIntegration(forgeId, hostHome(home));
+      if (v.ok) return true;
+    } catch {
+      // host sem config legível não é evidência — segue para o próximo
+    }
+  }
+  return false;
+}
+
 export async function runMcpCommand(
   cli: CliOptions,
   args: string[],
@@ -251,13 +264,23 @@ export async function runMcpCommand(
     };
     if (!binPresent) item.detail = 'binário MCP ausente na venv';
     if (verify && binPresent && path.isAbsolute(argv[0])) {
-      const probe = await probeMcpServer(argv);
+      // Allowlist vem SÓ do catálogo — nunca inferida do nome da tool.
+      const safeTools = registryEntry(name)?.mcp_safe_tools;
+      const probe = await probeMcpServer(argv, { safeTools });
+      let levels = probe.levels;
+      // HOST_VERIFIED: a config de um host referencia este server — evidência
+      // separada do handshake; só faz sentido com o probe saudável.
+      if (probe.ok && (await hostReferencesServer(forge.forge_id, home))) {
+        levels = [...levels, 'HOST_VERIFIED'];
+      }
       item.probe = {
         ok: probe.ok,
-        levels: probe.levels,
+        levels,
         tools: probe.tools,
         server: probe.serverInfo,
         protocol: probe.protocolVersion,
+        ...(probe.calledTool ? { calledTool: probe.calledTool } : {}),
+        ...(probe.detail ? { detail: probe.detail } : {}),
         error: probe.error,
       };
       if (!probe.ok) {

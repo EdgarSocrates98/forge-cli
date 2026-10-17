@@ -199,17 +199,26 @@ describe('askMenu renderiza e navega com teclas reais (streams simulados)', () =
     setTimeout(() => io.input.write('\r'), 50);
     expect(await pending).toBe('install');
     const screen = io.text();
-    for (const label of ['Instalar Forjas', 'Atualizar Forjas', 'Desinstalar Forjas', 'Sair']) {
+    // O select pagina — só a primeira janela renderiza. As entradas
+    // registry-first ocupam o topo; 'Sair' continua existindo no modelo.
+    for (const label of [
+      'Instalar Forjas',
+      'Forjas instaladas',
+      'Atualizar Forjas',
+      'Servidores MCP',
+      'Skills e agents',
+    ]) {
       expect(screen).toContain(label);
     }
+    expect(MENU_ITEMS.map((i) => i.value)).toContain('exit');
   });
 
-  it('seta para baixo + Enter escolhe a próxima opção (wizard)', async () => {
+  it('seta para baixo + Enter escolhe instaladas (registry-first)', async () => {
     const io = makeIo();
     const pending = askMenu({ input: io.input, output: io.output });
     setTimeout(() => io.input.write(DOWN), 50);
     setTimeout(() => io.input.write('\r'), 120);
-    expect(await pending).toBe('wizard');
+    expect(await pending).toBe('installed');
   });
 
   it('duas setas para baixo + Enter escolhe atualizar', async () => {

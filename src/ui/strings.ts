@@ -13,6 +13,18 @@ export const S = {
   preflightNode: 'Node.js >= 20',
   preflightPwsh: 'powershell.exe disponível',
   preflightPython: 'Python 3 disponível (recomendado)',
+  preflightNpm: 'npm disponível',
+  preflightPyTool: 'pip/pipx/uv (pacotes Python)',
+  preflightPath: '~/.forge-cli gravável (shims/PATH)',
+  preflightOsArch: 'SO/arquitetura',
+  preflightExisting: 'Instalações registry existentes',
+  preflightHintGit: 'instale git (apt/brew/winget) e repita',
+  preflightHintNode: 'instale Node >= 20 via nvm/fnm ou nodejs.org',
+  preflightHintNpm: 'npm vem com o Node — reinstale Node completo',
+  preflightHintPwsh: 'instale PowerShell 7+ (winget install PowerShell)',
+  preflightHintPython: 'método registry precisa de Python >= 3.10',
+  preflightHintPyTool: 'instale pipx/uv ou `python -m ensurepip`',
+  preflightHintPath: 'ajuste permissões de ~ ou defina FORGE_CLI_HOME',
   pythonNotFound: 'não encontrado',
   preflightFailed: 'Ambiente incompleto — instale as dependências acima e tente novamente.',
   phaseClone: 'Sincronizando',
@@ -53,6 +65,8 @@ export const S = {
   statusPartial: 'instalação parcial',
   statusDrifted: 'alterada fora do forge-cli (revisão difere do registro)',
   errCloneNeedsNames: 'clone exige nomes de Forjas (ou --all/--only)',
+  errYesNeedsSelection:
+    '--yes nunca pergunta — informe a seleção explicitamente (--all, --only ou nomes)',
   errUnknownCommand: 'Comando desconhecido',
   errRefDirty: 'Working tree com alterações locais — não é seguro trocar de revisão',
   refCheckedOut: 'Revisão',
@@ -120,10 +134,24 @@ export const S = {
     'uninstall sem nomes remove o PATH (legado); prefira: forge-cli self uninstall',
   menuTitle: 'Como podemos ajudar?',
   menuInstall: 'Instalar Forjas',
-  menuInstallHint: 'clona e executa os instaladores',
+  menuInstallHint: 'registry (PyPI + venv) ou git',
+  menuInstalled: 'Forjas instaladas',
+  menuInstalledHint: 'receipts registry + estado local',
   menuWizard: 'Assistente inteligente',
   menuWizardHint: 'descobrir → recomendar → instalar',
   menuUpdate: 'Atualizar Forjas',
+  menuHosts: 'Integrações de host',
+  menuHostsHint: 'claude/devin/codex/copilot',
+  menuMcp: 'Servidores MCP',
+  menuMcpHint: 'comando MCP por Forja',
+  menuSkills: 'Skills e agents',
+  menuSkillsHint: 'componentes nativos por Forja',
+  menuAdvanced: 'Avançado',
+  menuAdvancedHint: '.env e verificação MCP profunda',
+  menuEnv: 'Assistente de .env',
+  menuEnvHint: 'inspect/validar/migrar variáveis',
+  menuMcpVerify: 'Verificação MCP completa',
+  menuMcpVerifyHint: 'handshake + tools/call allowlisted',
   menuReinstall: 'Reinstalar Forjas',
   menuReinstallHint: 'mantém a revisão atual',
   menuRepair: 'Reparar instalação',
@@ -253,6 +281,13 @@ export const S = {
   wizardCancelSafe: 'Cancelamento seguro — nada foi alterado',
   wizardStepPrefix: 'Passo',
   wizardPlanSteps: 'Passos do plano',
+  wizardMethodAsk: 'Método de instalação',
+  wizardMethodRegistry: 'registry (PyPI + venv isolada)',
+  wizardMethodRegistryHint: 'recomendado — fora do workspace, receipt auditável',
+  wizardMethodGit: 'git (clone + setup no workspace)',
+  wizardMethodGitHint: 'código-fonte local, atualização via pull',
+  wizardMethodDistless: 'sem dist no catálogo registry — ficam de fora',
+  wizardRegistryPlan: 'Plano registry-first (dist/venv — sem hash de plano git)',
   envTitle: 'Ambiente (.env)',
   envInspectTitle: 'Inspeção de .env',
   envFileAbsent: 'sem .env',
@@ -278,6 +313,15 @@ export const S = {
   envRollbackNone: 'Nenhum backup de .env encontrado',
   envDoctorTitle: 'Diagnóstico de .env',
   envValueNeverShown: 'valores nunca são exibidos',
+  envWizardNonInteractive:
+    'env wizard é interativo — para não-interativo use `env init` ou `env migrate --yes`',
+  envWizardRequired: '[obrigatória]',
+  envWizardOptional: '[opcional]',
+  envWizardKeep: '(Enter = manter o valor atual)',
+  envWizardRequiredMsg: 'valor obrigatório — informe ou Ctrl+C para sair',
+  envWizardInvalid: 'formato inválido para esta variável',
+  envWizardNothing: 'Nada a alterar — todos os valores já estavam definidos',
+  envWizardDone: '.env atualizado (backup .env.bak)',
   hostsTitle: 'Hosts de IA',
   hostAbsent: 'ausente',
   hostInstalled: 'instalado',
@@ -339,8 +383,11 @@ Uso:
   forge-cli discover            Descoberta limitada do ambiente + sinais
   forge-cli recommend           Recomendações explicáveis a partir dos sinais
   forge-cli env <verbo> [forja] Inteligência de .env: inspect|plan|init|validate|migrate|doctor
+                                wizard: assistente interativo (máscara, default, validação, .env.bak)
   forge-cli hosts [verbo]       Hosts de IA: list|plan|register|validate|rollback
-  forge-cli mcp [forja…]        Comando MCP por Forja (clone ou venv registry); --verify testa --version
+  forge-cli mcp [forja…]        Comando MCP por Forja (clone ou venv registry)
+                                --verify: handshake + tools/list + tools/call da
+                                tool allowlisted do catálogo (níveis cumulativos)
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
   forge-cli self update         Atualiza o próprio CLI conforme o método de instalação
@@ -352,6 +399,11 @@ Uso:
   forge-cli learning <verbo>    Observações locais opt-in: status|enable|disable|report
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
   forge-cli registry            Lista o catálogo PyPI e o que está instalado via registry
+  forge-cli registry lock <f>   Gera <forja>.offline-lock.json (fecho transitivo,
+                                sha256 + tags; online uma vez, exige pip >= 23)
+  forge-cli registry install <f> --offline --lock <arquivo>
+                                Instala travado: fecho verificado + --no-index
+  forge-cli --version           Versão do forge-cli
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
@@ -371,12 +423,15 @@ Opções:
   --ref <rev>        Fixa a Forja (uma só) em commit/tag (checkout destacado)
   --version <tag>    Fixa a Forja (uma só) em uma versão (tag, com ou sem 'v')
   --method <m>       Método de instalação: git (clone+setup) ou registry (PyPI+venv)
-  --offline          No método registry: resolve só pelo cache local do PyPI
+  --offline          Sem rede: registry resolve pelo cache PyPI + wheel cache;
+                     no método git só usa clones já existentes (cache parcial)
+  --lock <arquivo>   Com --offline: instalação travada por offline-lock.json
+  --out <path>       Com 'registry lock': destino do lock (arquivo ou dir)
+  --no-color         Desativa ANSI (NO_COLOR no ambiente também vale)
   --clean            Com 'reinstall': remove e reclona na mesma revisão (com backup)
   --profile <p>      Instalador nativo da Forja: minimal|recommended|full
   --scope <s>        Instalador nativo da Forja: project|workspace|user
   --components <a,b> Instalador nativo da Forja: ex. skills,agents,mcp
-  --offline          Não acessa a rede; só usa clones já existentes (sem prometer cache completo)
   --verbose          Mostra a saída completa dos comandos (e não só as últimas linhas)
   --host <h>         Instalador nativo: claude|devin|codex|copilot|all (onde suportado)
   --gateway-profile <g>  Instalador nativo: economy|balanced|deep (onde suportado)

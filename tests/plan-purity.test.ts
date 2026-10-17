@@ -33,10 +33,12 @@ import { parseVersion } from '../src/registry/versions.js';
 vi.mock('../src/mcp/handshake.js', () => ({
   probeMcpServer: vi.fn(async () => ({
     ok: true,
-    levels: ['EXECUTABLE', 'MCP_INITIALIZED', 'TOOLS_DISCOVERED'],
+    levels: ['INSTALLED', 'EXECUTABLE', 'INITIALIZED', 'TOOLS_DISCOVERED'],
     tools: 1,
     serverInfo: { name: 'fake', version: '0' },
     protocolVersion: '2024-11-05',
+    calledTool: null,
+    detail: 'no-allowlisted-tool',
     error: null,
   })),
 }));

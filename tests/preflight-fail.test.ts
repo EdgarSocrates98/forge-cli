@@ -27,6 +27,7 @@ describe('preflight failure paths', () => {
       (c) => c.name === S.preflightGit || c.name === S.preflightPwsh,
     );
     expect(commandChecks.every((c) => !c.ok)).toBe(true);
-    expect(checks.find((c) => c.severity === 'warn')?.ok).toBe(false);
+    // com execa falhando, warns de npm/python/pip falham sem derrubar o bloco
+    expect(checks.some((c) => c.severity === 'warn' && !c.ok)).toBe(true);
   });
 });

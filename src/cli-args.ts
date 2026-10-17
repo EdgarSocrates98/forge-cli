@@ -36,6 +36,14 @@ export interface CliOptions {
   gatewayProfile?: string;
   verbose: boolean;
   offline: boolean;
+  /** `--lock <file>` — lock offline (registry install --offline). */
+  lockFile?: string;
+  /** `--no-color` — desliga ANSI mesmo em TTY (NO_COLOR também honrado). */
+  noColor?: boolean;
+  /** `forge-cli --version` sozinho → versão do CLI (não pin de Forja). */
+  versionFlag?: boolean;
+  /** `--out <path>` — destino do `registry lock` (arquivo ou dir). */
+  out?: string;
   profile?: string;
   scope?: string;
   components?: string;
@@ -50,11 +58,15 @@ export interface CliOptions {
 export class CliError extends Error {}
 
 export function parseCliArgs(argv: string[]): CliOptions {
+  // `--version` é string (pin de Forja, alias de --ref); sozinho, sem valor,
+  // é a versão do próprio CLI — disambiguação antes do parseArgs estrito.
+  const versionFlag = argv.length === 1 && argv[0] === '--version';
+  const parseArgv = versionFlag ? [] : argv;
   let values;
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
-      args: argv,
+      args: parseArgv,
       options: {
         dir: { type: 'string' },
         all: { type: 'boolean' },
@@ -89,6 +101,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'run-after-sync-failure': { type: 'boolean' },
         rollback: { type: 'boolean' },
         verify: { type: 'boolean' },
+        lock: { type: 'string' },
+        'no-color': { type: 'boolean' },
+        out: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -153,6 +168,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
     native: values.native ?? false,
     rollback: values.rollback ?? false,
     verify: values.verify ?? false,
+    lockFile: values.lock,
+    noColor: values['no-color'] ?? false,
+    versionFlag,
+    out: values.out,
     host: values.host,
     gatewayProfile: values['gateway-profile'],
     verbose: values.verbose ?? false,
@@ -171,6 +190,43 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
 export function isNonInteractive(cli: CliOptions): boolean {
   return cli.all || (cli.only?.length ?? 0) > 0 || cli.retryFailed;
+}
+
+/** Bloco contextual por comando — `forge-cli <cmd> --help` / `help <cmd>`. */
+const COMMAND_USAGE: Record<string, string> = {
+  install:
+    '\ninstall <forjas> — git clone + setup (default) ou PyPI+venv (--method registry).\n' +
+    '  --plan só mostra o plano; --ref/--version fixa UMA Forja; --all/--only selecionam.',
+  update:
+    '\nupdate [forjas] — pull + setup. --check só verifica; --method registry usa o receipt.\n' +
+    '  Sem nomes no interativo: oferece as Forjas presentes; --yes exige seleção.',
+  registry:
+    '\nregistry [list|install|lock] — catálogo PyPI + receipts.\n' +
+    '  registry install <f> --offline --lock <arquivo>: instalação travada (--no-index).\n' +
+    '  registry lock <f> [--out <arq|dir>]: gera <forja>.offline-lock.json (online, pip>=23).',
+  mcp:
+    '\nmcp [forja…] — argv MCP por Forja (clone ou venv registry).\n' +
+    '  --verify: handshake real — níveis INSTALLED→EXECUTABLE→INITIALIZED→\n' +
+    '  TOOLS_DISCOVERED→SAFE_TOOL_CALLED→HOST_VERIFIED. tools/call só na allowlist do catálogo.',
+  hosts: '\nhosts [list|plan|register|validate|rollback] — integração claude/devin/codex/copilot.',
+  env:
+    '\nenv <verbo> [forja] — inspect|plan|init|validate|migrate|wizard|doctor.\n' +
+    '  wizard é interativo (required/default/máscara/validação, .env.bak); demais honram --json/--yes.',
+  doctor: '\ndoctor [--fix] — diagnóstico do ambiente; --fix repara o que falhar.',
+  wizard: '\nwizard — assistente guiado: descobrir → recomendar → instalar (interativo).',
+  versions: '\nversions [forjas] — tags/versões do remote e revisão atual.',
+  status: '\nstatus [forjas] — clones presentes, versões e alterações locais.',
+  uninstall:
+    '\nuninstall <forjas> — remove clones limpos com backup (exige --yes).\n' +
+    '  --method registry remove venv + receipt + wheel cache.',
+  self: '\nself install|uninstall|update — registra/remove/atualiza o próprio forge-cli.',
+};
+
+/** Ajuda contextual: posicionais vazios → global; com comando → global + bloco. */
+export function usageFor(positionals: string[]): string {
+  const head = positionals[0] === 'help' ? positionals[1] : positionals[0];
+  const extra = head === undefined ? undefined : COMMAND_USAGE[head];
+  return extra ? `${S.usage}${extra}` : S.usage;
 }
 
 export type Selection = { repos: ForgeRepo[] } | { error: string };

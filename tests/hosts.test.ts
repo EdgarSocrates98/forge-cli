@@ -658,11 +658,12 @@ if(m.method==='tools/list'){process.stdout.write(JSON.stringify({jsonrpc:'2.0',i
     return { code, probe: doc.mcp[0].probe };
   };
 
-  it('--verify: handshake real MCP_INITIALIZED + TOOLS_DISCOVERED', async () => {
+  it('--verify: handshake real INSTALLED→…→TOOLS_DISCOVERED', async () => {
     const { code, probe } = await probeOf('ok');
     expect(code).toBe(0);
     expect(probe?.ok).toBe(true);
-    expect(probe?.levels).toEqual(['MCP_INITIALIZED', 'TOOLS_DISCOVERED']);
+    // spark-forge-aws tem allowlist, mas a fixture anuncia 't1' → not-advertised.
+    expect(probe?.levels).toEqual(['INSTALLED', 'EXECUTABLE', 'INITIALIZED', 'TOOLS_DISCOVERED']);
     expect(probe?.tools).toBe(1);
   }, 20_000);
 

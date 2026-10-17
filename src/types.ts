@@ -69,6 +69,8 @@ export interface PreflightCheck {
   ok: boolean;
   detail: string;
   severity: CheckSeverity;
+  /** Dica de remediação exibida quando o check falha. */
+  hint?: string;
 }
 
 export interface PrereqCheck {
