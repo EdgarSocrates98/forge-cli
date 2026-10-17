@@ -125,17 +125,21 @@ export function mergeRegistryPhase(
   registry: Record<string, RegistryInstallReceipt>,
 ): void {
   for (const i of infos) {
-    const reg = registry[i.name];
-    if (reg && !existsSync(reg.bin)) {
+    // Registry é dado não confiável (state.json pode estar malformado):
+    // own-property + campos checados — 'constructor' não casa e um
+    // receipt sem `verify`/`bin` não derruba o status.
+    const reg = Object.hasOwn(registry, i.name) ? registry[i.name] : undefined;
+    if (!reg || typeof reg !== 'object') continue;
+    const tag = `pypi ${reg.dist ?? '?'}==${reg.version ?? '?'}`;
+    const binMissing = typeof reg.bin !== 'string' || !existsSync(reg.bin);
+    if (binMissing) {
       if (i.phase === 'not-installed' || i.phase === 'installed') i.phase = 'drifted';
-      i.describe = [i.describe, `pypi ${reg.dist}==${reg.version} (bin ausente)`]
-        .filter(Boolean)
-        .join(' + ');
-    } else if (reg && i.phase === 'not-installed') {
+      i.describe = [i.describe, `${tag} (bin ausente)`].filter(Boolean).join(' + ');
+    } else if (i.phase === 'not-installed') {
       i.phase = 'installed';
-      i.describe = `pypi ${reg.dist}==${reg.version}${reg.verify.ok ? '' : ' (verify falhou)'}`;
-    } else if (reg) {
-      i.describe = [i.describe, `pypi ${reg.dist}==${reg.version}`].filter(Boolean).join(' + ');
+      i.describe = `${tag}${reg.verify?.ok ? '' : ' (verify falhou)'}`;
+    } else {
+      i.describe = [i.describe, tag].filter(Boolean).join(' + ');
     }
   }
 }

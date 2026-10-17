@@ -21,7 +21,7 @@ import {
 } from './cmd/query.js';
 import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
 import { runRegistryInstall, runRegistryList, runRegistryUninstall } from './cmd/registry.js';
-import { registryNames } from './registry/catalog.js';
+import { registryEntry, registryNames } from './registry/catalog.js';
 import {
   runPinCommand,
   runUnpinCommand,
@@ -326,7 +326,9 @@ async function main(): Promise<void> {
       log.error(S.errRegistryNeedsNames);
       process.exit(2);
     }
-    if (cli.ref && names.length !== 1) {
+    // `--ref` exige UMA Forja — após normalização de alias:
+    // `install api-forge apiforge-af --ref` é uma só Forja, não duas.
+    if (cli.ref && new Set(names.map((n) => registryEntry(n)?.name ?? n)).size !== 1) {
       log.error(S.errRefNeedsOne);
       process.exit(2);
     }

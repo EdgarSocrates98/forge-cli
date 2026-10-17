@@ -540,21 +540,46 @@ describe('review-11 — hardening', () => {
     throw new Error('esperava hash-mismatch');
   });
 
-  it('requires_python autoritativo prevalece sobre o piso do catálogo', async () => {
-    // Metadados declaram >=3.9 (mais permissivo que minPython 3.12 do
-    // catálogo) — a fonte autoritativa é o PyPI, o piso é só fallback.
+  it('piso do catálogo compõe com requires_python (max implícito)', async () => {
+    // Release declara >=3.9 (mais permissivo que minPython 3.12 do
+    // catálogo): requires_python é autoritativo SOBRE o release, mas o
+    // piso é o mínimo suportado pela forge-cli — 3.9 não é habilitado.
     const payload = {
       info: { requires_python: '>=3.9' },
       releases: PYPI.releases,
     };
-    const calls: string[][] = [];
-    const res = await registryInstall(ENTRY, undefined, {
+    const fetch = async () => ({ status: 200, body: JSON.stringify(payload) });
+    const low = await registryInstall(ENTRY, undefined, {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
       pythons: [py('3.9.9')],
-      run: runOk(calls),
-      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+      run: runOk([]),
+      fetchImpl: fetch,
     });
-    expect(res).not.toHaveProperty('stage');
+    expect(low).toMatchObject({ stage: 'resolve' });
+    // e um interpretador dentro das duas restrições instala normalmente
+    const ok = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c2'),
+      pythons: [py('3.13.1')],
+      run: runOk([]),
+      fetchImpl: fetch,
+    });
+    expect(ok).not.toHaveProperty('stage');
+  });
+
+  it('venv existente recusa ANTES da resolução (fail fast offline)', async () => {
+    mkdirSync(forgeVenv(tmp, 'api-forge'), { recursive: true });
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      // fetch que estouraria 'network' se a resolução acontecesse
+      fetchImpl: async () => {
+        throw new Error('sem rede');
+      },
+    });
+    expect(res).toMatchObject({ stage: 'already-installed' });
   });
 });

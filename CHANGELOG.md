@@ -7,6 +7,37 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (7ª rodada)
+
+- **Uninstall não-TTY sem `--yes` (crítico)**: `uninstall --method
+registry` pendurava em `confirm()` com stdin não-TTY (CI, pipes,
+  `--json --report` em automação). Agora recusa limpa — imprime
+  `needsYes`, grava o relatório se `--report` e sai 0, mesmo contrato
+  do fluxo git. Verificado real: `uninstall < /dev/null` → exit 0.
+- **`state.json` com valores não-objeto não derruba**: `{"forges":
+{"api-forge":"garbage"}}` é filtrado em `loadForgeState`; `registry`,
+  `status` e `list` não crasham (antes `TypeError` em `inst.verify.ok`)
+  — verificado real com o payload exato da revisão.
+- **Own-property no state**: `state.forges[name]` via `Object.hasOwn` —
+  `uninstall constructor`/`toString` sai 2 como desconhecido em vez de
+  casar membros do `Object.prototype` (a mesma classe do review-9, no
+  resolver — agora também no state).
+- **Recusa antes da resolução**: venv existente sem `--clean` falha
+  `already-installed` antes de gastar a chamada PyPI (fail fast,
+  inclusive offline).
+- **`--ref` pós-dedup**: `install api-forge apiforge-af --ref` é uma só
+  Forja (dedup por alias na validação do dispatcher).
+- **Confirmação mostra a versão resolvida**: o note de confirmação do
+  install interativo exibe `dist==versão` real (resolução antes do
+  confirm usa o cache no install seguinte — sem rede duplicada).
+- **Piso composto**: `minPython` do catálogo compõe com
+  `requires_python` (max implícito) — release que alargue o spec para
+  baixo do piso da forge-cli não habilita interpretadores sem suporte.
+- **`binPresent` estruturado**: `forge-cli registry --json` emite
+  `binPresent: boolean` em vez de embutir "(ausente)" no campo `bin`.
+- **`mergeRegistryPhase` tolerante**: own-property + campos checados —
+  receipt sem `verify`/`bin` não derruba o `status`/`list`.
+
 #### Corrigido após revisão (6ª rodada)
 
 - **Path traversal no uninstall (bloqueio)**: `name`/`dist` vindos do

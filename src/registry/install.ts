@@ -71,9 +71,16 @@ export function loadForgeState(home: string): ForgeState {
   if (!existsSync(file)) return { forges: {} };
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as ForgeState;
-    return typeof raw.forges === 'object' && raw.forges && !Array.isArray(raw.forges)
-      ? raw
-      : { forges: {} };
+    if (typeof raw.forges !== 'object' || !raw.forges || Array.isArray(raw.forges)) {
+      return { forges: {} };
+    }
+    // Valores não-objeto (state editado ou corrompido por dentro) são
+    // descartados — leitores assumem receipt-shaped e não devem crashar.
+    const forges: ForgeState['forges'] = {};
+    for (const [k, v] of Object.entries(raw.forges)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) forges[k] = v;
+    }
+    return { ...raw, forges };
   } catch {
     // estado corrompido não é silenciosamente sobrescrito — preserva evidência
     try {
@@ -167,10 +174,11 @@ export type InstallError =
   | { stage: 'verify'; detail: string };
 
 /**
- * Interpretador mais novo que satisfaz `requires_python` (+ piso do catálogo).
- * O piso só se aplica quando a metadado autoritativo está ausente — quando o
- * PyPI declara `requires_python`, ele manda (a Forja pode alargar o suporte
- * sem o catálogo precisar acompanhar).
+ * Interpretador mais novo que satisfaz `requires_python` E o piso do
+ * catálogo — max implícito das duas restrições. `requires_python` é a
+ * fonte autoritativa do release, mas `minPython` é o mínimo que a
+ * forge-cli suporta operacionalmente: uma release que alargue o spec
+ * para baixo do nosso piso não habilita interpretadores sem suporte.
  * Interpretadores pré-release só vencem quando nenhum estável satisfaz —
  * `packaging` também os exclui de specs estáveis.
  * `null` no especificador = fora do subconjunto — diagnóstico distinto.
@@ -180,7 +188,7 @@ export function selectInterpreter(
   resolved: Pick<ResolvedRelease, 'requiresPython' | 'version'>,
   pythons: ProbedInterpreter[],
 ): { python: ProbedInterpreter } | { error: ResolveError } {
-  const floor = resolved.requiresPython ? null : parseVersion(entry.minPython);
+  const floor = parseVersion(entry.minPython);
   let sawUnknownSpec = false;
   const usable = pythons.filter((p) => {
     if (floor && compareVersions(p.parsed, floor) < 0) return false;
@@ -209,7 +217,9 @@ export function selectInterpreter(
             kind: 'python-incompatible',
             dist: entry.dist,
             version: resolved.version,
-            requires: resolved.requiresPython ?? `>=${entry.minPython} (piso do catálogo)`,
+            requires: [resolved.requiresPython, `>=${entry.minPython} (piso forge-cli)`]
+              .filter(Boolean)
+              .join(' e '),
             have: pythons.map((p) => p.version).join(', '),
           },
     };
@@ -278,6 +288,17 @@ export async function registryInstall(
     return { stage: 'no-python', detail: 'nenhum interpretador Python detectado' };
   }
 
+  const venvDir = forgeVenv(deps.home, entry.name);
+  // Reinstall sobre venv existente sem --clean destruiria a instalação
+  // boa se uma etapa posterior falhar — recusa ANTES da resolução PyPI
+  // (fail fast, inclusive offline, sem gastar a chamada de rede).
+  if (!deps.clean && existsSync(venvDir)) {
+    return {
+      stage: 'already-installed',
+      detail: `${entry.name}: já instalado em ${venvDir} — reinstale com --clean`,
+    };
+  }
+
   const resolved = await resolveRelease(entry.dist, {
     pin,
     offline: deps.offline,
@@ -290,15 +311,6 @@ export async function registryInstall(
   if ('error' in picked) return { stage: 'resolve', error: picked.error };
   const python = picked.python;
 
-  const venvDir = forgeVenv(deps.home, entry.name);
-  // Reinstall sobre venv existente sem --clean destruiria a instalação
-  // boa se uma etapa posterior falhar — recusa antes de criar nada.
-  if (!deps.clean && existsSync(venvDir)) {
-    return {
-      stage: 'already-installed',
-      detail: `${entry.name}: já instalado em ${venvDir} — reinstale com --clean`,
-    };
-  }
   if (deps.clean) {
     rmSync(path.join(forgesRoot(deps.home), entry.name), { recursive: true, force: true });
     // state também é limpo — senão uma falha depois deixa versão antiga
@@ -486,8 +498,10 @@ export function registryUninstall(
   const cacheRemoved = wheels !== null && existsSync(wheels);
   if (wheels) rmSync(wheels, { recursive: true, force: true });
   const state = loadForgeState(deps.home);
-  const hadReceipt = Boolean(state.forges[target.name]);
-  delete state.forges[target.name];
+  // own-property: state é dado não confiável — 'constructor' e afins
+  // não podem casar membros do Object.prototype.
+  const hadReceipt = Object.hasOwn(state.forges, target.name);
+  if (hadReceipt) delete state.forges[target.name];
   saveForgeState(deps.home, state);
   return { removed, receiptRemoved: hadReceipt, cacheRemoved };
 }
