@@ -77,8 +77,12 @@ jobs:
         run: npm publish --provenance --access public
       - name: Post-publish verify (registry + provenance + smoke)
         run: |
-          sleep 10 # propagação do registry
-          npm view theforge-cli@${{ inputs.version }} version --registry https://registry.npmjs.org | grep -qx "${{ inputs.version }}" || { echo 'versão não encontrada no registry'; exit 1; }
+          # propagação do registry pode levar alguns minutos — poll com backoff
+          for i in $(seq 1 18); do
+            npm view theforge-cli@${{ inputs.version }} version --registry https://registry.npmjs.org 2>/dev/null | grep -qx "${{ inputs.version }}" && break
+            [ "$i" = 18 ] && { echo 'versão não encontrada no registry'; exit 1; }
+            sleep 10
+          done
           npm view theforge-cli@${{ inputs.version }} dist.attestations --json --registry https://registry.npmjs.org || echo 'attestations: indisponível nesta conta'
           cd "$(mktemp -d)" && npm init -y >/dev/null && npm install theforge-cli@${{ inputs.version }} --no-audit --no-fund >/dev/null
           npx theforge-cli --help >/dev/null && echo 'smoke: --help OK'
