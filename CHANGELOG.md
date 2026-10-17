@@ -7,6 +7,40 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (dispatch + integridade, 2ª rodada)
+
+- **`--plan`/`--dry-run`/`--check` honrados no registry**: resolvem e
+  mostram o plano (dist==versão, interpretador, venv, wheel cache) sem
+  criar venv, baixar artefatos ou gravar estado — antes executavam uma
+  instalação real.
+- **`--method registry` recusado no topo do dispatch** (`versions`,
+  `status`, `list`, `self update`, `doctor`, …) — antes só
+  `update`/`clone`/`reinstall`/`rollback`/`pin`/`unpin` alcançavam o
+  check e o resto executava o fluxo git.
+- **`--json` limpo nos caminhos de erro/aviso**: nomes desconhecidos,
+  skips de uninstall e a exigência de `--yes` emitem JSON estruturado
+  (`error`, `planned`, `skipped`, `warnings`) — antes logs humanos
+  poluíam stdout e quebravam `JSON.parse`.
+- **Flags ignoradas cobertas por completo**: `--skip-scripts`,
+  `--shallow`, `--fix`, `--rollback`, `--gateway-profile`,
+  `--trust-custom`, `--run-after-sync-failure`, `--report`,
+  `--only-changed` agora avisam também; `--clean` é honrado (recria a
+  venv) e `--check` funciona como plano.
+- **HTTP 5xx/429 do PyPI cai no cache local** (antes só exceções de
+  transporte); sem cache continua falhando honestamente.
+- **`--offline` verifica sha256 do wheel cacheado** contra o digest do
+  PyPI — cache adulterado aborta com `hash-mismatch`.
+- **Interpretador pré-release** só é escolhido quando nenhum estável
+  satisfaz `requires_python` (alinha com `packaging`).
+- **`distArtifactFiles`** usa prefixo normalizado com separador —
+  `dist_extra-…` não colide e sdists legados com `-` são encontrados.
+- **Ordenação PEP 440**: `XaN.devM`/`X.postN.devM` ordenam antes do
+  mesmo marco sem `.dev` (e branch morto removido).
+- **`registry <nome>`** filtra o catálogo; nome fora do catálogo →
+  erro 2.
+- **Pós-instalação** mostra o caminho do binário instalado (venv
+  isolada — PATH é decisão do usuário).
+
 #### Corrigido após revisão (dispatch + integridade)
 
 - **`--ref`/`--version` em multi-Forja** agora recusa como no fluxo git

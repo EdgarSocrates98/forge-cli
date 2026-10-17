@@ -13,12 +13,15 @@ import { exitCancelled } from '../prompts.js';
 import { pythonCandidates } from '../preflight.js';
 import { registryEntry, REGISTRY_PACKAGES } from '../registry/catalog.js';
 import {
+  forgeVenv,
   loadForgeState,
   registryInstall,
   registryUninstall,
+  selectInterpreter,
+  wheelCacheDir,
   type InstallError,
 } from '../registry/install.js';
-import type { ResolveError } from '../registry/pypi.js';
+import { resolveRelease, type FetchLike, type ResolveError } from '../registry/pypi.js';
 import { compareVersions, parseVersion, type ParsedVersion } from '../registry/versions.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
@@ -88,6 +91,23 @@ export interface RegistryInstallResult {
   version?: string;
 }
 
+interface RegistryPlanItem {
+  forge: string;
+  ok: boolean;
+  detail?: string;
+  dist?: string;
+  version?: string;
+  requiresPython?: string;
+  python?: string;
+  venv?: string;
+  wheels?: string;
+  source?: string;
+  staleCache?: boolean;
+  yanked?: boolean;
+}
+
+// Flags do fluxo git sem efeito no método registry — avisadas, nunca mudas.
+// `--plan`/`--check`/`--clean` são honradas (plan mode / wipe), não avisadas.
 const REGISTRY_IGNORED_FLAGS: [keyof CliOptions, string][] = [
   ['dir', '--dir'],
   ['profile', '--profile'],
@@ -96,7 +116,16 @@ const REGISTRY_IGNORED_FLAGS: [keyof CliOptions, string][] = [
   ['host', '--host'],
   ['native', '--native'],
   ['skipVerify', '--skip-verify'],
+  ['skipScripts', '--skip-scripts'],
   ['retryFailed', '--retry-failed'],
+  ['shallow', '--shallow'],
+  ['fix', '--fix'],
+  ['rollback', '--rollback'],
+  ['gatewayProfile', '--gateway-profile'],
+  ['trustCustom', '--trust-custom'],
+  ['runAfterSyncFailure', '--run-after-sync-failure'],
+  ['reportPath', '--report-path'],
+  ['onlyChanged', '--only-changed'],
 ];
 
 /** Flags do fluxo git sem efeito no método registry — nunca silencioso. */
@@ -114,30 +143,92 @@ export function ignoredRegistryFlags(cli: CliOptions): string[] {
 export async function runRegistryInstall(
   cli: CliOptions,
   names: string[],
-  deps: { home?: string; pythons?: ProbedPython[] } = {},
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike } = {},
 ): Promise<RegistryInstallResult[]> {
   const home = deps.home ?? os.homedir();
   const quiet = cli.jsonReport;
   const entries = names.map((n) => ({ name: n, entry: registryEntry(n) }));
   const unknown = entries.filter((e) => !e.entry);
   if (unknown.length) {
-    for (const u of unknown) {
-      log.error(`${u.name}: sem dist no catálogo registry — use o método git`);
-    }
+    const msg = `${unknown.map((u) => u.name).join(', ')}: sem dist no catálogo registry — use o método git`;
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
     process.exit(2);
   }
 
   const ignored = ignoredRegistryFlags(cli);
-  if (ignored.length && !quiet) {
-    log.warn(`${S.registryIgnoredFlags}: ${ignored.join(', ')}`);
-  }
+  const warnings: string[] = ignored.length
+    ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`]
+    : [];
+  if (warnings.length && !quiet) log.warn(warnings[0]);
 
   const pythons = deps.pythons ?? (await probePythons());
   if (!pythons.length) {
-    log.error('Nenhum interpretador Python detectado — instale Python ≥3.10');
+    const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
+    if (quiet) emitJson({ error: msg, warnings }, 1);
+    log.error(msg);
     process.exit(1);
   }
   if (!quiet) log.info(`Python detectado: ${pythons.map((p) => p.version).join(', ')}`);
+
+  // `--plan`/`--check`: resolve e seleciona interpretador sem tocar o disco.
+  if (cli.plan || cli.check) {
+    const planned: RegistryPlanItem[] = [];
+    for (const { name, entry } of entries) {
+      const resolved = await resolveRelease(entry!.dist, {
+        pin: cli.ref,
+        offline: cli.offline,
+        cacheDir: registryCacheDir(home),
+        fetchImpl: deps.fetchImpl,
+      });
+      if ('kind' in resolved) {
+        planned.push({ forge: name, ok: false, detail: describeResolveError(resolved) });
+        continue;
+      }
+      const picked = selectInterpreter(entry!, resolved, pythons);
+      if ('error' in picked) {
+        planned.push({ forge: name, ok: false, detail: describeResolveError(picked.error) });
+        continue;
+      }
+      planned.push({
+        forge: name,
+        ok: true,
+        dist: entry!.dist,
+        version: resolved.version,
+        requiresPython: resolved.requiresPython,
+        python: picked.python.version,
+        venv: forgeVenv(home, name),
+        wheels: wheelCacheDir(registryCacheDir(home), entry!.dist),
+        source: resolved.source,
+        staleCache: resolved.staleCache,
+        yanked: resolved.yanked,
+      });
+    }
+    if (quiet) {
+      emitJson(
+        { method: 'pypi', plan: true, planned, warnings },
+        planned.every((p) => p.ok) ? 0 : 1,
+      );
+    }
+    note(
+      planned
+        .map((p) =>
+          p.ok
+            ? `${p.forge} → ${p.dist}==${p.version} (python ${p.python}, venv ${p.venv})`
+            : `${p.forge} → falhou: ${p.detail}`,
+        )
+        .join('\n'),
+      'Plano (nada foi alterado)',
+    );
+    if (planned.some((p) => !p.ok)) process.exit(1);
+    outro(`${icons.ok} plano resolvido — execute sem --plan para instalar`);
+    return planned.map((p) => ({
+      forge: p.forge,
+      ok: p.ok,
+      detail: p.ok ? 'planned' : (p.detail ?? 'falhou'),
+      version: p.version,
+    }));
+  }
 
   const results: RegistryInstallResult[] = [];
   for (const { name, entry } of entries) {
@@ -148,13 +239,19 @@ export async function runRegistryInstall(
       cacheDir: registryCacheDir(home),
       offline: cli.offline,
       pythons,
+      clean: cli.clean,
+      fetchImpl: deps.fetchImpl,
     });
     if ('stage' in receipt) {
       if (!quiet) spin.stop(`${name}: ${theme.err('falhou')}`);
       results.push({ forge: name, ok: false, detail: describeInstallError(receipt) });
       continue;
     }
-    if (receipt.staleCache && !quiet) log.warn(`${S.registryStaleCache} (${entry!.dist})`);
+    if (receipt.staleCache) {
+      const w = `${S.registryStaleCache} (${entry!.dist})`;
+      warnings.push(w);
+      if (!quiet) log.warn(w);
+    }
     if (!quiet) {
       spin.stop(
         `${name}: ${theme.ok('instalado')} ${theme.dim(`${receipt.dist}==${receipt.version}`)}`,
@@ -169,20 +266,38 @@ export async function runRegistryInstall(
   }
 
   if (cli.jsonReport) {
-    emitJson({ method: 'pypi', results }, results.every((r) => r.ok) ? 0 : 1);
+    emitJson({ method: 'pypi', results, warnings }, results.every((r) => r.ok) ? 0 : 1);
   }
   for (const r of results) {
     if (!r.ok) log.error(`${r.forge}: ${r.detail}`);
   }
   if (results.some((r) => !r.ok)) process.exit(1);
+  const bins = results.map((r) => {
+    const inst = loadForgeState(home).forges[r.forge];
+    return inst ? `${r.forge} → ${inst.bin}` : '';
+  });
+  note(bins.filter(Boolean).join('\n'), 'Para usar, adicione ao PATH ou invoque o caminho');
   outro(`${icons.ok} instalação registry-first concluída`);
   return results;
 }
 
-export function runRegistryList(cli: CliOptions, deps: { home?: string } = {}): void {
+export function runRegistryList(
+  cli: CliOptions,
+  deps: { home?: string; names?: string[] } = {},
+): void {
   const home = deps.home ?? os.homedir();
   const state = loadForgeState(home);
-  const rows = REGISTRY_PACKAGES.map((e) => {
+  const wanted = deps.names?.length ? new Set(deps.names) : null;
+  if (wanted) {
+    const bad = [...wanted].filter((n) => !registryEntry(n));
+    if (bad.length) {
+      const msg = `${bad.join(', ')}: fora do catálogo registry`;
+      if (cli.jsonReport) emitJson({ error: msg }, 2);
+      log.error(msg);
+      process.exit(2);
+    }
+  }
+  const rows = REGISTRY_PACKAGES.filter((e) => !wanted || wanted.has(e.name)).map((e) => {
     const inst = state.forges[e.name];
     return {
       forge: e.name,
@@ -226,6 +341,7 @@ export async function runRegistryUninstall(
   const installed = Object.keys(loadForgeState(home).forges);
   const targets = resolveRegistryTargets(cli, names, installed);
   if (!targets.length) {
+    if (cli.jsonReport) emitJson({ error: S.errRegistryUninstallNeedsNames }, 2);
     log.error(S.errRegistryUninstallNeedsNames);
     process.exit(2);
   }
@@ -234,12 +350,29 @@ export async function runRegistryUninstall(
     entry: registryEntry(name),
     installed: installed.includes(name),
   }));
-  const unknown = plan.filter((p) => !p.entry);
-  for (const u of unknown) log.error(`${u.name}: sem dist no catálogo registry`);
+  const unknown = plan.filter((p) => !p.entry).map((p) => p.name);
   const removals = plan.filter((p) => p.entry && p.installed);
-  const skipped = plan.filter((p) => p.entry && !p.installed);
-  for (const sk of skipped) log.warn(`${sk.name}: não estava instalado via registry — ignorado`);
+  const skipped = plan.filter((p) => p.entry && !p.installed).map((p) => p.name);
+  const warnings = skipped.map((n) => `${n}: não estava instalado via registry — ignorado`);
+  if (!cli.jsonReport) {
+    for (const u of unknown) log.error(`${u}: sem dist no catálogo registry`);
+    for (const w of warnings) log.warn(w);
+  }
   if (!removals.length) {
+    if (cli.jsonReport) {
+      emitJson(
+        {
+          method: 'pypi',
+          removed: [],
+          skipped,
+          warnings,
+          ...(unknown.length
+            ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` }
+            : {}),
+        },
+        unknown.length ? 2 : 0,
+      );
+    }
     if (unknown.length) process.exit(2);
     log.info('Nada a remover.');
     return;
@@ -255,7 +388,15 @@ export async function runRegistryUninstall(
   }
   if (!cli.yes) {
     if (cli.jsonReport) {
-      emitJson({ error: S.registryUninstallNeedsYes, planned: removals.map((r) => r.name) }, 2);
+      emitJson(
+        {
+          error: S.registryUninstallNeedsYes,
+          planned: removals.map((r) => r.name),
+          skipped,
+          warnings,
+        },
+        2,
+      );
     }
     const answer = await confirm({ message: S.registryUninstallConfirm });
     if (isCancel(answer) || !answer) {
@@ -269,7 +410,20 @@ export async function runRegistryUninstall(
     const res = registryUninstall(r.entry!, { home });
     return { forge: r.name, removed: res.removed };
   });
-  if (cli.jsonReport) emitJson({ method: 'pypi', results });
+  if (cli.jsonReport) {
+    emitJson(
+      {
+        method: 'pypi',
+        results,
+        skipped,
+        warnings,
+        ...(unknown.length
+          ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` }
+          : {}),
+      },
+      unknown.length ? 2 : 0,
+    );
+  }
   for (const r of results) {
     if (r.removed) log.success(`${r.forge}: removido`);
   }

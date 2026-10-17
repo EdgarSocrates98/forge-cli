@@ -46,7 +46,7 @@ function phaseRank(v: ParsedVersion): number {
   if (v.dev !== undefined && !v.pre && v.post === undefined) return 0;
   if (v.pre) return 1;
   if (v.post !== undefined) return 3;
-  return v.dev !== undefined ? 0 : 2;
+  return 2;
 }
 
 export function compareVersions(a: ParsedVersion, b: ParsedVersion): number {
@@ -59,10 +59,18 @@ export function compareVersions(a: ParsedVersion, b: ParsedVersion): number {
   if (aPhase === 1) {
     const tag = PRE_ORDER[a.pre!.tag] - PRE_ORDER[b.pre!.tag];
     if (tag !== 0) return tag;
-    return a.pre!.n - b.pre!.n;
+    const pre = a.pre!.n - b.pre!.n;
+    if (pre !== 0) return pre;
   }
-  if (aPhase === 3) return (a.post ?? 0) - (b.post ?? 0);
-  return 0;
+  if (aPhase === 3) {
+    const post = (a.post ?? 0) - (b.post ?? 0);
+    if (post !== 0) return post;
+  }
+  // `.devN` no mesmo marco (XaN.devM, X.postN.devM) ordena antes dele.
+  if (a.dev === undefined && b.dev === undefined) return 0;
+  if (a.dev === undefined) return 1;
+  if (b.dev === undefined) return -1;
+  return a.dev - b.dev;
 }
 
 export function isPrerelease(v: ParsedVersion): boolean {

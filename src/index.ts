@@ -125,6 +125,14 @@ async function main(): Promise<void> {
     console.log(usage());
     process.exit(2);
   }
+  if (
+    cli.method === 'registry' &&
+    resolved.command !== 'install' &&
+    resolved.command !== 'uninstall'
+  ) {
+    log.error(S.errMethodUnsupported);
+    process.exit(2);
+  }
   if (resolved.command === 'doctor') {
     process.exitCode = await runDoctor2Command(cli);
     return;
@@ -190,7 +198,7 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'registry') {
-    runRegistryList(cli);
+    runRegistryList(cli, { names: resolved.names });
     return;
   }
   if (resolved.command === 'learning') {
@@ -261,14 +269,6 @@ async function main(): Promise<void> {
   if (resolved.command === 'self-uninstall') {
     await runUninstallCommand();
     return;
-  }
-  if (
-    cli.method === 'registry' &&
-    resolved.command !== 'install' &&
-    resolved.command !== 'uninstall'
-  ) {
-    log.error(S.errMethodUnsupported);
-    process.exit(2);
   }
   if (resolved.command === 'uninstall' && cli.method === 'registry') {
     await runRegistryUninstall(cli, resolved.names);

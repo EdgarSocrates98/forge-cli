@@ -3,9 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliOptions } from '../src/cli-args.js';
-import { ignoredRegistryFlags, probePythons, resolveRegistryTargets } from '../src/cmd/registry.js';
-import { loadForgeState, forgeStatePath } from '../src/registry/install.js';
-import { isPrerelease } from '../src/registry/versions.js';
+import {
+  ignoredRegistryFlags,
+  probePythons,
+  resolveRegistryTargets,
+  runRegistryInstall,
+} from '../src/cmd/registry.js';
+import { forgeStatePath, forgeVenv, loadForgeState } from '../src/registry/install.js';
+import { isPrerelease, parseVersion } from '../src/registry/versions.js';
 
 let tmp: string;
 beforeEach(() => (tmp = mkdtempSync(path.join(os.tmpdir(), 'reg-cmd-'))));
@@ -43,17 +48,78 @@ describe('resolveRegistryTargets', () => {
 describe('ignoredRegistryFlags', () => {
   it('lista flags com efeito ignorado no método registry', () => {
     const flags = ignoredRegistryFlags(
-      cli({ dir: '/tmp/x', profile: 'full', skipVerify: true, timeoutSet: true, jobsSet: true }),
+      cli({
+        dir: '/tmp/x',
+        profile: 'full',
+        skipVerify: true,
+        skipScripts: true,
+        shallow: true,
+        fix: true,
+        rollback: true,
+        gatewayProfile: 'g',
+        trustCustom: true,
+        runAfterSyncFailure: true,
+        reportPath: '/tmp/r.json',
+        onlyChanged: true,
+        timeoutSet: true,
+        jobsSet: true,
+      }),
     );
-    expect(flags).toContain('--dir');
-    expect(flags).toContain('--profile');
-    expect(flags).toContain('--skip-verify');
-    expect(flags).toContain('--timeout');
-    expect(flags).toContain('--jobs');
+    for (const f of [
+      '--dir',
+      '--profile',
+      '--skip-verify',
+      '--skip-scripts',
+      '--shallow',
+      '--fix',
+      '--rollback',
+      '--gateway-profile',
+      '--trust-custom',
+      '--run-after-sync-failure',
+      '--report-path',
+      '--only-changed',
+      '--timeout',
+      '--jobs',
+    ]) {
+      expect(flags).toContain(f);
+    }
     expect(flags).not.toContain('--scope');
+    // honradas, não ignoradas
+    expect(flags).not.toContain('--plan');
+    expect(flags).not.toContain('--check');
+    expect(flags).not.toContain('--clean');
   });
   it('sem flags → vazio', () => {
     expect(ignoredRegistryFlags(cli())).toEqual([]);
+  });
+});
+
+describe('runRegistryInstall --plan', () => {
+  const PYPI = {
+    info: { requires_python: '>=3.10' },
+    releases: {
+      '0.1.0': [
+        {
+          filename: 'apiforge_af-0.1.0-py3-none-any.whl',
+          url: 'https://f/x.whl',
+          digests: { sha256: 'a'.repeat(64) },
+          packagetype: 'bdist_wheel',
+        },
+      ],
+    },
+  };
+
+  it('resolve sem mutar — nenhuma venv, receipt ou state', async () => {
+    const res = await runRegistryInstall(cli({ plan: true }), ['api-forge'], {
+      home: tmp,
+      pythons: [{ exe: ['python3'], version: '3.12.4', parsed: parseVersion('3.12.4')! }],
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(PYPI) }),
+    });
+    expect(res).toEqual([
+      expect.objectContaining({ forge: 'api-forge', ok: true, version: '0.1.0' }),
+    ]);
+    expect(existsSync(forgeStatePath(tmp))).toBe(false);
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
   });
 });
 

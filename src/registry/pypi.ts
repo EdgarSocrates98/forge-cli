@@ -137,11 +137,19 @@ export async function resolveRelease(
       const res = await fetchImpl(`${PYPI_JSON}/${encodeURIComponent(dist)}/json`);
       if (res.status === 404) return { kind: 'not-found', dist };
       if (res.status !== 200) {
-        return { kind: 'network', detail: `PyPI respondeu HTTP ${res.status}` };
+        const cached = readCache(opts.cacheDir, dist);
+        if (cached) {
+          payload = cached.payload;
+          fromCache = true;
+          staleCache = !cached.fresh;
+        } else {
+          return { kind: 'network', detail: `PyPI respondeu HTTP ${res.status}` };
+        }
+      } else {
+        const parsed = JSON.parse(res.body) as PypiPayload;
+        writeCache(opts.cacheDir, dist, parsed);
+        payload = parsed;
       }
-      const parsed = JSON.parse(res.body) as PypiPayload;
-      writeCache(opts.cacheDir, dist, parsed);
-      payload = parsed;
     } catch (error) {
       const cached = readCache(opts.cacheDir, dist);
       if (cached) {
