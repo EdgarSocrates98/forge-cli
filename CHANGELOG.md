@@ -7,6 +7,26 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Wave 4 — hosts/MCP registry-aware
+
+- **`forge-cli mcp [forja…]`**: resolve o argv MCP por Forja e reporta
+  presença do binário. Fonte: `forge.json` do clone, ou — sem clone —
+  receipt registry + template `mcp` do catálogo (`{bin}` → bin da venv,
+  `{binDir}/x` → script irmão; `.exe` no Windows). `--verify` roda
+  `<argv[0]> --version` como handshake mínimo. `--json` emit
+  `{forge, mcp_command, binPresent, handshake?}` por item. Forja sem
+  `mcp_command` honesto (ex.: the-forge) sai `ok:false`, nunca inventa.
+- **`hosts plan|register|validate|rollback` sem clone**: `forgeDescriptor`
+  cai para o receipt + catálogo quando o manifest não está no
+  workspace — `hosts register claude api-forge` numa instalação
+  registry grava `mcpServers['api-forge'].command` apontando para o
+  `apiforge-mcp` da venv. Backup/rollback/`--yes` inalterados.
+- Catálogo: campo `mcp` por Forja espelhando o `mcp_command` de cada
+  `forge.json` (api-forge `apiforge-mcp`, platform-forge
+  `platformforge-mcp`, doctors `[bin] mcp`, spark-forge `[bin] mcp serve`).
+- `CliOptions.verify` + flag `--verify` registrada (parser é strict).
+
+
 #### Wave 3 — lifecycle registry
 
 - **`update --method registry`**: resolve a mais nova no PyPI, compara

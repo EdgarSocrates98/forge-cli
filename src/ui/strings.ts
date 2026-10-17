@@ -340,6 +340,7 @@ Uso:
   forge-cli recommend           Recomendações explicáveis a partir dos sinais
   forge-cli env <verbo> [forja] Inteligência de .env: inspect|plan|init|validate|migrate|doctor
   forge-cli hosts [verbo]       Hosts de IA: list|plan|register|validate|rollback
+  forge-cli mcp [forja…]        Comando MCP por Forja (clone ou venv registry); --verify testa --version
   forge-cli self install        Registra forge-cli no PATH do usuário
   forge-cli self uninstall      Remove o registro do PATH
   forge-cli self update         Atualiza o próprio CLI conforme o método de instalação

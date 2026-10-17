@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CliOptions } from '../src/cli-args.js';
 import {
+  runRegistryInstall,
   runRegistryPin,
   runRegistryReinstall,
   runRegistryRollback,
@@ -347,7 +348,6 @@ describe('delegação nativa no registry', () => {
   beforeEach(() => (calls.length = 0));
 
   it('install --native roda <venv-bin> install --dry-run (sem --yes)', async () => {
-    const { runRegistryInstall } = await import('../src/cmd/registry.js');
     await runRegistryInstall(cli({ native: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
@@ -363,7 +363,6 @@ describe('delegação nativa no registry', () => {
   });
 
   it('install --native --yes → --yes (não --dry-run) + flags documentadas viram argv', async () => {
-    const { runRegistryInstall } = await import('../src/cmd/registry.js');
     await runRegistryInstall(
       cli({ native: true, yes: true, profile: 'minimal', scope: 'user' }),
       ['api-forge'],
@@ -375,7 +374,6 @@ describe('delegação nativa no registry', () => {
   });
 
   it('--profile inválido falha antes de gastar rede', async () => {
-    const { runRegistryInstall } = await import('../src/cmd/registry.js');
     const fetchSpy = vi.fn(fetchOk);
     const codes = exitCodes();
     await runRegistryInstall(cli({ profile: 'nope' }), ['api-forge'], {
@@ -403,7 +401,6 @@ describe('delegação nativa no registry', () => {
   });
 
   it('forge-doctor-api (--native) → skip honesto (script do repo, não da wheel)', async () => {
-    const { runRegistryInstall } = await import('../src/cmd/registry.js');
     // dist forge-doctor-api precisa de fixture própria — reuse apiforge-af não vale.
     // O caminho testável é delegateNative com entry + receipt sintéticos:
     const { delegateNative } = await import('../src/cmd/registry.js');

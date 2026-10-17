@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliOptions } from '../src/cli-args.js';
-import { runHostsCommand } from '../src/cmd/hosts.js';
+import { runHostsCommand, runMcpCommand } from '../src/cmd/hosts.js';
 import { adapterFor, hostAdapters } from '../src/hosts/index.js';
 import type { HostAdapter, HostProbe } from '../src/hosts/types.js';
 
@@ -64,6 +64,7 @@ const baseCli: CliOptions = {
   check: false,
   native: false,
   rollback: false,
+  verify: false,
   verbose: false,
   offline: false,
   clean: false,
@@ -483,5 +484,124 @@ describe('runHostsCommand', () => {
   it('host desconhecido ⇒ 2', async () => {
     const code = await runHostsCommand(cli({ dir: ws }), ['plan', 'nope', 'api-forge'], home);
     expect(code).toBe(2);
+  });
+
+  it('registry: sem clone, receipt+template resolvem o argv na venv', async () => {
+    const venvBin = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv', 'bin');
+    mkdirSync(venvBin, { recursive: true });
+    const bin = path.join(venvBin, 'apiforge');
+    writeFileSync(bin, '#!/bin/sh\n');
+    writeJson(path.join(home, '.forge-cli', 'forges', 'state.json'), {
+      forges: { 'api-forge': { forge: 'api-forge', bin } },
+    });
+    const code = await runHostsCommand(
+      cli({ dir: ws, yes: true }),
+      ['register', 'claude', 'api-forge'],
+      home,
+    );
+    expect(code).toBe(0);
+    const merged = JSON.parse(readFileSync(claudeJson(), 'utf8')) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    const expected = process.platform === 'win32' ? 'apiforge-mcp.exe' : 'apiforge-mcp';
+    expect(merged.mcpServers['api-forge'].command).toBe(path.join(venvBin, expected));
+    expect(merged.mcpServers['api-forge'].args).toEqual([]);
+  });
+
+  it('registry: template {bin} usa o bin da venv como argv[0]', async () => {
+    const venvBin = path.join(home, '.forge-cli', 'forges', 'forge-doctor-data', 'venv', 'bin');
+    mkdirSync(venvBin, { recursive: true });
+    const bin = path.join(venvBin, 'forge-doctor-data');
+    writeFileSync(bin, '#!/bin/sh\n');
+    writeJson(path.join(home, '.forge-cli', 'forges', 'state.json'), {
+      forges: { 'forge-doctor-data': { forge: 'forge-doctor-data', bin } },
+    });
+    const code = await runHostsCommand(
+      cli({ dir: ws, yes: true }),
+      ['register', 'claude', 'forge-doctor-data'],
+      home,
+    );
+    expect(code).toBe(0);
+    const merged = JSON.parse(readFileSync(claudeJson(), 'utf8')) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    expect(merged.mcpServers['forge-doctor-data'].command).toBe(bin);
+    expect(merged.mcpServers['forge-doctor-data'].args).toEqual(['mcp']);
+  });
+
+  it('registry: Forja sem template MCP nem manifest ⇒ plano nulo', async () => {
+    const venvBin = path.join(home, '.forge-cli', 'forges', 'the-forge', 'venv', 'bin');
+    mkdirSync(venvBin, { recursive: true });
+    const bin = path.join(venvBin, 'theforge');
+    writeFileSync(bin, '#!/bin/sh\n');
+    writeJson(path.join(home, '.forge-cli', 'forges', 'state.json'), {
+      forges: { 'the-forge': { forge: 'the-forge', bin } },
+    });
+    const code = await runHostsCommand(
+      cli({ dir: ws, yes: true }),
+      ['register', 'claude', 'the-forge'],
+      home,
+    );
+    expect(code).toBe(1); // sem mcp_command honesto → sem registro
+    expect(existsSync(claudeJson())).toBe(false);
+  });
+});
+
+describe('runMcpCommand', () => {
+  const seedReceipt = (name: string, bin: string, siblings: string[] = []): void => {
+    mkdirSync(path.dirname(bin), { recursive: true });
+    writeFileSync(bin, '#!/bin/sh\n');
+    for (const sib of siblings) writeFileSync(path.join(path.dirname(bin), sib), '#!/bin/sh\n');
+    const stateDir = path.join(home, '.forge-cli', 'forges');
+    mkdirSync(stateDir, { recursive: true });
+    writeJson(path.join(stateDir, 'state.json'), {
+      forges: { [name]: { forge: name, bin } },
+    });
+  };
+
+  it('registry: resolve argv do catálogo e bin presente ⇒ 0', async () => {
+    const bin = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv', 'bin', 'apiforge');
+    const mcpBin = process.platform === 'win32' ? 'apiforge-mcp.exe' : 'apiforge-mcp';
+    seedReceipt('api-forge', bin, [mcpBin]);
+    const code = await runMcpCommand(cli({ dir: ws }), ['api-forge'], home);
+    expect(code).toBe(0);
+  });
+
+  it('registry: bin ausente na venv ⇒ binPresent false, exit 1', async () => {
+    const bin = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv', 'bin', 'apiforge');
+    const stateDir = path.join(home, '.forge-cli', 'forges');
+    mkdirSync(stateDir, { recursive: true });
+    writeJson(path.join(stateDir, 'state.json'), {
+      forges: { 'api-forge': { forge: 'api-forge', bin } },
+    });
+    const code = await runMcpCommand(cli({ dir: ws }), ['api-forge'], home);
+    expect(code).toBe(1);
+  });
+
+  it('sem mcp_command (the-forge) ⇒ 1', async () => {
+    const bin = path.join(home, '.forge-cli', 'forges', 'the-forge', 'venv', 'bin', 'theforge');
+    seedReceipt('the-forge', bin);
+    const code = await runMcpCommand(cli({ dir: ws }), ['the-forge'], home);
+    expect(code).toBe(1);
+  });
+
+  it('--json emite array mcp com mcp_command resolvido', async () => {
+    const bin = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv', 'bin', 'apiforge');
+    const mcpBin = process.platform === 'win32' ? 'apiforge-mcp.exe' : 'apiforge-mcp';
+    seedReceipt('api-forge', bin, [mcpBin]);
+    const chunks: string[] = [];
+    const orig = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((s: string) => (chunks.push(s), true)) as typeof orig;
+    try {
+      await runMcpCommand(cli({ dir: ws, jsonReport: true }), ['api-forge'], home);
+    } finally {
+      process.stdout.write = orig;
+    }
+    const doc = JSON.parse(chunks.join('')) as {
+      mcp: { forge: string; mcp_command: string[]; binPresent: boolean }[];
+    };
+    expect(doc.mcp[0].forge).toBe('api-forge');
+    expect(doc.mcp[0].binPresent).toBe(true);
+    expect(doc.mcp[0].mcp_command[0]).toContain('apiforge-mcp');
   });
 });

@@ -45,7 +45,7 @@ import {
 } from './cmd/manage.js';
 import { runInstallFlow } from './cmd/run.js';
 import { runEnvCommand } from './cmd/env.js';
-import { runHostsCommand } from './cmd/hosts.js';
+import { runHostsCommand, runMcpCommand } from './cmd/hosts.js';
 import {
   runDiscoverCommand,
   runLockCommand,
@@ -75,6 +75,7 @@ const JSON_QUERY_COMMANDS = new Set([
   'recommend',
   'env',
   'hosts',
+  'mcp',
   'lock',
   'profile',
   'recover',
@@ -238,6 +239,10 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'hosts') {
     process.exitCode = await runHostsCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'mcp') {
+    process.exitCode = await runMcpCommand(cli, resolved.names);
     return;
   }
   if (resolved.command === 'wizard') {

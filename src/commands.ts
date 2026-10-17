@@ -20,6 +20,7 @@ export type Command =
   | 'recommend'
   | 'env'
   | 'hosts'
+  | 'mcp'
   | 'wizard'
   | 'lock'
   | 'profile'
@@ -73,6 +74,7 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
   if (head === 'recommend') return { command: 'recommend', names: rest };
   if (head === 'env') return { command: 'env', names: rest };
   if (head === 'hosts') return { command: 'hosts', names: rest };
+  if (head === 'mcp') return { command: 'mcp', names: rest };
   if (head === 'wizard') return { command: 'wizard', names: rest };
   if (head === 'lock') return { command: 'lock', names: rest };
   if (head === 'profile') return { command: 'profile', names: rest };
