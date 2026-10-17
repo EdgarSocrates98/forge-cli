@@ -223,8 +223,11 @@ export async function runHealFlow(
     entries,
     verifiedAll: entries.every((e) => e.verified === true),
   };
-  const file = healReceiptPath(opts.root, generatedAt);
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileAtomic(file, redactSecrets(JSON.stringify(receipt, null, 2)));
+  // P0-002: dry-run nunca persiste — plan é consulta, não operação.
+  if (!dryRun) {
+    const file = healReceiptPath(opts.root, generatedAt);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileAtomic(file, redactSecrets(JSON.stringify(receipt, null, 2)));
+  }
   return receipt;
 }

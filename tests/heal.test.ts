@@ -176,7 +176,7 @@ describe('runHealFlow — gating', () => {
     expect(existsSync(path.join(dir, '.env'))).toBe(false);
   });
 
-  it('dry-run never applies but still plans and receipts', async () => {
+  it('dry-run never applies and never persists — plan é read-only (P0-002)', async () => {
     const receipt = await runHealFlow([check('installation.forge-dir.absent'), envCheck()], {
       root: dir,
       dryRun: true,
@@ -187,7 +187,10 @@ describe('runHealFlow — gating', () => {
     expect(receipt.entries.map((e) => e.status)).toEqual(['skipped', 'skipped']);
     expect(receipt.entries.every((e) => e.evidence.includes('dry-run'))).toBe(true);
     expect(existsSync(path.join(dir, '.forge-cli', 'logs'))).toBe(false);
-    expect(existsSync(receiptFileFor(dir))).toBe(true);
+    // dry-run devolve o receipt em memória mas NÃO o persiste — escrever
+    // .forge-cli/receipts/ já é mutação observável do workspace.
+    expect(existsSync(receiptFileFor(dir))).toBe(false);
+    expect(existsSync(path.join(dir, '.forge-cli'))).toBe(false);
   });
 });
 
