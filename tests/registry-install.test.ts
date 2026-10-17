@@ -477,4 +477,84 @@ describe('registryUninstall', () => {
     expect(res.removed).toBe(false);
     expect(res.receiptRemoved).toBe(false);
   });
+
+  it('nome com path traversal é recusado — nada é deletado', () => {
+    const sentinel = path.join(tmp, 'fora-do-forges');
+    mkdirSync(sentinel, { recursive: true });
+    writeFileSync(path.join(sentinel, 'keep.txt'), 'não apague');
+    const res = registryUninstall({ name: '../../fora-do-forges' }, { home: tmp });
+    expect(res.refused).toBe('unsafe-name');
+    expect(res.removed).toBe(false);
+    expect(existsSync(path.join(sentinel, 'keep.txt'))).toBe(true);
+  });
+
+  it('dist maliciosa no receipt não apaga nada fora do wheel cache', () => {
+    // Forja "ghost" (fora do catálogo) com receipt envenenado:
+    // `dist: ../../<escape>` — o rmSync do wheel cache não pode escapar.
+    const forgeDir = path.join(tmp, '.forge-cli', 'forges', 'ghost-forge');
+    mkdirSync(forgeDir, { recursive: true });
+    const escape = path.join(tmp, 'escape');
+    mkdirSync(escape, { recursive: true });
+    writeFileSync(path.join(escape, 'keep.txt'), 'não apague');
+    const res = registryUninstall({ name: 'ghost-forge', dist: '../../escape' }, { home: tmp });
+    expect(res.refused).toBeUndefined();
+    expect(res.removed).toBe(true);
+    expect(res.cacheRemoved).toBe(false);
+    expect(existsSync(path.join(escape, 'keep.txt'))).toBe(true);
+    expect(existsSync(forgeDir)).toBe(false);
+  });
+});
+
+describe('review-11 — hardening', () => {
+  it('state com forges:[] (array) é tratado como vazio', () => {
+    const stateDir = path.join(tmp, '.forge-cli', 'forges');
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(path.join(stateDir, 'state.json'), '{"forges": []}');
+    expect(loadForgeState(tmp).forges).toEqual({});
+  });
+
+  it('hash-mismatch coloca o artefato em quarentena (.rejected)', async () => {
+    const calls: string[][] = [];
+    const tamperRun: RunLike = async (cmd, args) => {
+      calls.push([cmd, ...args]);
+      const di = args.indexOf('--dest');
+      if (args.includes('download') && di !== -1) {
+        writeFileSync(path.join(args[di + 1], WHEEL_NAME), 'tampered-bytes');
+      }
+      return { exitCode: 0, stdout: 'ok' };
+    };
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: tamperRun,
+      fetchImpl: fetchOk,
+    });
+    if ('stage' in res && res.stage === 'hash-mismatch') {
+      const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+      expect(res.detail).toContain('.rejected');
+      expect(existsSync(path.join(wheels, `${WHEEL_NAME}.rejected`))).toBe(true);
+      expect(existsSync(path.join(wheels, WHEEL_NAME))).toBe(false);
+      return;
+    }
+    throw new Error('esperava hash-mismatch');
+  });
+
+  it('requires_python autoritativo prevalece sobre o piso do catálogo', async () => {
+    // Metadados declaram >=3.9 (mais permissivo que minPython 3.12 do
+    // catálogo) — a fonte autoritativa é o PyPI, o piso é só fallback.
+    const payload = {
+      info: { requires_python: '>=3.9' },
+      releases: PYPI.releases,
+    };
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.9.9')],
+      run: runOk(calls),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    expect(res).not.toHaveProperty('stage');
+  });
 });
