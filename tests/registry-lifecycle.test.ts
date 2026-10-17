@@ -354,11 +354,11 @@ describe('delegação nativa no registry', () => {
       fetchImpl: fetchOk,
       run: runRec,
     });
-    // Última chamada = delegação nativa: argv[0] é o bin da venv
+    // Última chamada = delegação nativa: argv[0] é o bin do receipt (venv)
     const nat = calls.at(-1)!;
-    expect(nat[0]).toBe(path.join(forgeVenv(tmp, 'api-forge'), 'bin', 'apiforge'));
-    expect(nat.slice(1)).toEqual(['install', '--dry-run']);
     const receipt = loadForgeState(tmp).forges['api-forge'];
+    expect(nat[0]).toBe(receipt.bin);
+    expect(nat.slice(1)).toEqual(['install', '--dry-run']);
     expect(receipt.native).toMatchObject({ ran: true, dryRun: true, exitCode: 0 });
   });
 
