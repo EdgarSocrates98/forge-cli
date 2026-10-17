@@ -8,6 +8,7 @@ import {
   probePythons,
   resolveRegistryTargets,
   runRegistryInstall,
+  runRegistryList,
   runRegistryUninstall,
 } from '../src/cmd/registry.js';
 import { mergeRegistryPhase } from '../src/cmd/query.js';
@@ -292,6 +293,42 @@ describe('runRegistryUninstall', () => {
     const codes = exitCodes();
     await runRegistryUninstall(cli({ yes: true }), ['api-forge', 'bogus'], { home: tmp });
     expect(codes).toContain(2);
+    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
+  });
+
+  it('não-TTY sem --yes recusa limpa (exit 0), nunca trava em prompt', async () => {
+    seed('api-forge', 'apiforge-af');
+    const codes = exitCodes();
+    const writes: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
+      writes.push(chunk);
+      return true;
+    }) as never);
+    // vitest roda sem TTY — antes do fix este caminho chamava confirm()
+    // e pendurava esperando stdin que nunca chega.
+    await runRegistryUninstall(cli({}), ['api-forge'], { home: tmp });
+    expect(codes).toContain(0);
+    expect(writes.join('')).toContain('--yes');
+    // recusa não removeu nada
+    expect(loadForgeState(tmp).forges['api-forge']).toBeTruthy();
+    expect(existsSync(path.join(forgesRoot(tmp), 'api-forge'))).toBe(true);
+  });
+
+  it('nome do Object.prototype ("constructor") → desconhecido, sai 2', async () => {
+    const codes = exitCodes();
+    await runRegistryUninstall(cli({ yes: true }), ['constructor'], { home: tmp });
+    expect(codes).toContain(2);
+  });
+
+  it('state com receipt não-objeto não derruba o list', async () => {
+    const stateDir = path.join(tmp, '.forge-cli', 'forges');
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(
+      path.join(stateDir, 'state.json'),
+      JSON.stringify({ forges: { 'api-forge': 'garbage' } }),
+    );
+    expect(() => runRegistryList(cli({}), { home: tmp })).not.toThrow();
+    // entrada malformada é filtrada no load — aparece como não instalada
     expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
   });
 });

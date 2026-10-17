@@ -274,20 +274,29 @@ export async function runRegistryInstall(
   // (`confirmRun`) — só quando interativo. `--json`/`--yes`/pipes
   // não perguntam (contrato para máquinas).
   if (!quiet && !cli.yes && process.stdout.isTTY && process.stdin.isTTY) {
-    note(
-      deduped
-        .map(
-          ({ name, entry }) =>
-            `${name} → ${entry!.dist}${pin ? `==${pin}` : ''} (venv isolada em ${forgeVenv(home, name)})`,
-        )
-        .join('\n'),
-      'Instalação registry-first',
-    );
+    // Resolve agora para mostrar a versão exata no plano de confirmação;
+    // o install re-resolve via cache (TTL) — não é rede duplicada.
+    const lines: string[] = [];
+    for (const { name, entry } of deduped) {
+      const r = await resolveRelease(entry!.dist, {
+        pin,
+        offline: cli.offline,
+        cacheDir: registryCacheDir(home),
+        fetchImpl: deps.fetchImpl,
+      });
+      lines.push(
+        'kind' in r
+          ? `${name} → ${entry!.dist} (${describeResolveError(r)})`
+          : `${name} → ${r.dist}==${r.version} (venv isolada em ${forgeVenv(home, name)})`,
+      );
+    }
+    note(lines.join('\n'), 'Instalação registry-first');
     const answer = await confirm({ message: S.confirmRun });
     if (isCancel(answer) || !answer) {
       if (isCancel(answer)) exitCancelled();
       log.warn('Nada foi instalado.');
       process.exit(0);
+      return [];
     }
   }
 
@@ -369,13 +378,15 @@ export function runRegistryList(
   }
   const rows = REGISTRY_PACKAGES.filter((e) => !wanted || wanted.has(e.name)).map((e) => {
     const inst = state.forges[e.name];
+    const binOk = inst ? typeof inst.bin === 'string' && existsSync(inst.bin) : null;
     return {
       forge: e.name,
       dist: e.dist,
       installed: inst?.version ?? null,
       method: inst?.method ?? null,
-      verifyOk: inst ? inst.verify.ok : null,
-      bin: inst ? (existsSync(inst.bin) ? inst.bin : `${inst.bin} (ausente)`) : null,
+      verifyOk: inst ? (inst.verify?.ok ?? null) : null,
+      binPresent: binOk,
+      bin: inst ? (binOk ? inst.bin : `${inst.bin ?? '?'} (ausente)`) : null,
       minPython: e.minPython,
     };
   });
@@ -446,7 +457,9 @@ export async function runRegistryUninstall(
     }
     if (seen.has(name)) continue;
     seen.add(name);
-    const receipt = state[name];
+    // `state` é dado não confiável: own-property apenas — nomes como
+    // 'constructor' não podem casar membros do Object.prototype.
+    const receipt = Object.hasOwn(state, name) ? state[name] : undefined;
     plan.push({
       name,
       dist: entry?.dist ?? receipt?.dist,
@@ -501,12 +514,21 @@ export async function runRegistryUninstall(
     if (quiet) {
       emitJson(needYesDoc, 2);
     }
+    // Não-interativo sem --yes nunca trava em prompt — recusa limpa,
+    // mesmo contrato do fluxo git (manage.ts).
+    if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+      reportTo(needYesDoc);
+      log.warn(S.registryUninstallNeedsYes);
+      process.exit(0);
+      return;
+    }
     const answer = await confirm({ message: S.registryUninstallConfirm });
     if (isCancel(answer) || !answer) {
       if (isCancel(answer)) exitCancelled();
       reportTo(needYesDoc);
       log.warn(S.registryUninstallNeedsYes);
       process.exit(0);
+      return;
     }
   }
 
