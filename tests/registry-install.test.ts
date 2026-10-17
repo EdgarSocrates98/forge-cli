@@ -49,7 +49,7 @@ describe('registryInstall', () => {
     const res = await registryInstall(ENTRY, undefined, {
       home: tmp,
       cacheDir: path.join(tmp, 'cache'),
-      pythons: [py('3.11.9')],
+      pythons: [py('3.12.4')],
       run: runOk(calls),
       fetchImpl: fetchOk,
       now: () => '2026-10-17T00:00:00Z',
@@ -96,7 +96,7 @@ describe('registryInstall', () => {
 
   it('python incompatível → erro honesto antes de criar venv', async () => {
     const payload = {
-      info: { requires_python: '>=3.12' },
+      info: { requires_python: '>=3.13' },
       releases: PYPI.releases,
     };
     const calls: string[][] = [];
@@ -127,7 +127,7 @@ describe('registryInstall', () => {
     const res = await registryInstall(ENTRY, undefined, {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
-      pythons: [py('3.11.0')],
+      pythons: [py('3.12.4')],
       run: async (_c, args) =>
         args.includes('pip') ? { exitCode: 1, stderr: 'ResolutionImpossible' } : { exitCode: 0 },
       fetchImpl: fetchOk,
@@ -139,7 +139,7 @@ describe('registryInstall', () => {
     const res = await registryInstall(ENTRY, undefined, {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
-      pythons: [py('3.11.0')],
+      pythons: [py('3.12.4')],
       run: async (cmd) =>
         cmd.endsWith('/bin/apiforge') || cmd.endsWith('apiforge.exe')
           ? { exitCode: 2 }
@@ -162,13 +162,30 @@ describe('registryInstall', () => {
   });
 });
 
+describe('catálogo — pisos reais publicados', () => {
+  // Fonte de verdade: requires_python publicado no PyPI (consultado 2026-10-17).
+  // minPython é só o fallback offline — não pode ficar abaixo do real.
+  it.each([
+    ['the-forge', '3.11'],
+    ['api-forge', '3.12'],
+    ['platform-forge', '3.10'],
+    ['spark-forge-aws', '3.10'],
+    ['spark-forge-azure', '3.10'],
+    ['forge-doctor-data', '3.11'],
+    ['forge-doctor-api', '3.11'],
+  ])('%s declara piso %s', (name, min) => {
+    expect(registryEntry(name)?.minPython).toBe(min);
+    expect(registryEntry(name)?.dist).toBeTruthy();
+  });
+});
+
 describe('registryUninstall', () => {
   it('remove dir + receipt e atualiza state', async () => {
     const calls: string[][] = [];
     await registryInstall(ENTRY, undefined, {
       home: tmp,
       cacheDir: path.join(tmp, 'c'),
-      pythons: [py('3.11.0')],
+      pythons: [py('3.12.4')],
       run: runOk(calls),
       fetchImpl: fetchOk,
     });

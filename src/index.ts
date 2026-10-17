@@ -69,6 +69,7 @@ const JSON_QUERY_COMMANDS = new Set([
   'ask',
   'predict',
   'context',
+  'registry',
   'ai',
   'bundle',
   'learning',
