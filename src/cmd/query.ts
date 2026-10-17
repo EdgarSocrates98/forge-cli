@@ -11,6 +11,8 @@ import { icons, kindIcon, theme } from '../ui/theme.js';
 import { currentHead, hasGitRepo, resolveTargetDir } from '../utils/system.js';
 import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
+import os from 'node:os';
+import { loadForgeState } from '../registry/install.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
 import { processBatch } from './batch.js';
 import {
@@ -86,8 +88,13 @@ export async function runDoctorCommand(cli: CliOptions, names: string[] = []): P
 export async function runListCommand(cli: CliOptions): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
   const state = loadState(targetDir);
+  const registry = loadForgeState(os.homedir()).forges;
   const body = catalogFor(targetDir)
-    .map((repo) => listLine(repo, state?.repos[repo.name]))
+    .map((repo) => {
+      const line = listLine(repo, state?.repos[repo.name]);
+      const reg = registry[repo.name];
+      return reg ? `${line} ${theme.dim(`+ pypi ${reg.dist}==${reg.version}`)}` : line;
+    })
     .join('\n');
   if (cli.jsonReport) {
     emitJson(
@@ -96,6 +103,9 @@ export async function runListCommand(cli: CliOptions): Promise<void> {
         url: repo.url,
         description: repo.description,
         last: state?.repos[repo.name] ?? null,
+        registry: registry[repo.name]
+          ? { dist: registry[repo.name].dist, version: registry[repo.name].version }
+          : null,
       })),
     );
   }

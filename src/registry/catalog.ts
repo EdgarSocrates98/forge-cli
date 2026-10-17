@@ -29,7 +29,7 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     name: 'api-forge',
     dist: 'apiforge-af',
     bin: 'apiforge',
-    minPython: '3.10',
+    minPython: '3.12',
     origin: 'official',
   },
   {
@@ -57,14 +57,14 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     name: 'forge-doctor-data',
     dist: 'forge-doctor-data',
     bin: 'forge-doctor-data',
-    minPython: '3.10',
+    minPython: '3.11',
     origin: 'official',
   },
   {
     name: 'forge-doctor-api',
     dist: 'forge-doctor-api',
     bin: 'forge-doctor-api',
-    minPython: '3.10',
+    minPython: '3.11',
     origin: 'official',
   },
 ];
