@@ -5,6 +5,56 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Não lançado]
 
+### Hardening pós-release
+
+#### Fixed
+
+- **`update --check` sem upstream**: repositório sem remote configurado
+  (ou sem tracking no branch) reportava `não foi possível verificar
+(unknown)` — implicando falha transitória onde o estado honesto é
+  `no-upstream`. Novo literal em `SyncFailure`; `updateCheck` detecta
+  ausência de remote antes do fetch e ausência de `@{u}` depois dele;
+  o texto mostra `sem upstream configurado` e o JSON propaga
+  `failure: "no-upstream"`.
+
+#### Changed
+
+- **`planActionsFor` exportado** (`src/wizard.ts`): o construtor das
+  ações do plano revisado no wizard vira superfície testável, junto a
+  `renderOperationPlan` — o fluxo interativo (@clack/prompts) continua
+  fronteira de TUI não simulada.
+
+#### Tests
+
+- `tests/wizard.test.ts` (novo, 15 casos): renderização do plano
+  (hash truncado, expiração, passos, marcador de não-reversível,
+  truncamento de arquivos em 8) e `planActionsFor` (clone vs pull,
+  gating por passo, `.env` e `verify` sempre presentes).
+- `tests/hosts.test.ts` (+12 casos): adapter **cursor** completo
+  (detect absent→installed→configured→integrated, merge-json com
+  preview e sem copyable, manual quando integrado, JSON inválido
+  recusado sem clobber, dry-run), **copilot** (detect via `gh copilot`
+  - `.config/gh`, plan gated por `mcp-config.json` existente) e
+    **devin** (detect via `.config/devin`, apply/validate recusam com
+    `hostUnsupported`).
+- `tests/config.test.ts` (+6 casos): bloco `ai` do `loadConfig` —
+  chaves válidas, limites (512–262144 bytes, 1000–300000 ms,
+  0–86400000 ms TTL), tipos errados descartados, `ai` não-objeto
+  ignorado sem erro.
+- `tests/ai-cache.test.ts` (novo, 8 casos): chave canônica (ordem de
+  chaves irrelevante, tipos distintos não colidem), TTL (expirado,
+  timestamp futuro, `ttl<=0`), entrada corrompida/shape inválido →
+  miss, eviction bounded por idade com tiebreak por nome.
+- `tests/git-revs.test.ts` (+5 casos): `updateCheck` reporta
+  `no-upstream` com e sem remote configurado, fetch falho classificado
+  sem throw, `remoteTags` em remote `file://` real (ordem semver,
+  `--limit`, remote inacessível → `null`).
+- `tests/e2e-cli.test.ts` (+1 caso): `update --check` ponta a ponta
+  reporta `no-upstream`/`sem upstream configurado` sem pendência.
+- `tests/doctor2.test.ts` (+4 casos): helpers de contexto (`listDir`
+  ordenado/nulo, `readJson` ok/erro, `boundEntries` com flag de
+  truncamento, `mkCheck`/`errMsg`).
+
 ### Programa ecosystem-2026 (cyc8-05)
 
 #### Added

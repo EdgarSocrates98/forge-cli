@@ -371,3 +371,66 @@ describe('renderDoctorReport — PT-BR renderer', () => {
     expect(out).not.toContain('/100');
   });
 });
+
+describe('doctor2/context — helpers compartilhados', () => {
+  it('listDir retorna ordenado; ausente/ilegível → null (nunca lança)', async () => {
+    const { listDir } = await import('../src/doctor2/context.js');
+    const dir = tmp();
+    writeFileSync(path.join(dir, 'b.txt'), 'x');
+    writeFileSync(path.join(dir, 'a.txt'), 'x');
+    expect(listDir(dir)).toEqual(['a.txt', 'b.txt']);
+    expect(listDir(path.join(dir, 'nope'))).toBeNull();
+    expect(listDir(path.join(dir, 'a.txt'))).toBeNull(); // arquivo, não diretório
+  });
+
+  it('readJson: objeto ok; inválido/ausente → {ok:false,error}', async () => {
+    const { readJson } = await import('../src/doctor2/context.js');
+    const dir = tmp();
+    const good = path.join(dir, 'ok.json');
+    writeFileSync(good, '{"a":1}', 'utf8');
+    expect(readJson(good)).toEqual({ ok: true, value: { a: 1 } });
+    const bad = path.join(dir, 'bad.json');
+    writeFileSync(bad, '{oops', 'utf8');
+    const r = readJson(bad);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.length).toBeGreaterThan(0);
+    expect(readJson(path.join(dir, 'missing.json')).ok).toBe(false);
+  });
+
+  it('boundEntries: ≤cap passa inteiro; acima trunca e marca o report', async () => {
+    const { boundEntries } = await import('../src/doctor2/context.js');
+    const ctx = {
+      root: '',
+      home: '',
+      now: () => NOW,
+      catalog: [],
+      adapters: [],
+      maxReceipts: 20,
+      maxEntries: 3,
+      state: null,
+      truncated: { value: false },
+    };
+    expect(boundEntries(ctx, ['a', 'b'])).toEqual({ shown: ['a', 'b'], total: 2 });
+    expect(ctx.truncated.value).toBe(false);
+    const over = boundEntries(ctx, ['a', 'b', 'c', 'd', 'e']);
+    expect(over.shown).toEqual(['a', 'b', 'c']);
+    expect(over.total).toBe(5);
+    expect(ctx.truncated.value).toBe(true);
+  });
+
+  it('mkCheck carimba o relógio injetado; errMsg preserva message', async () => {
+    const { errMsg, mkCheck } = await import('../src/doctor2/context.js');
+    const check = mkCheck(() => NOW, {
+      id: 'x',
+      domain: 'system',
+      result: 'pass',
+      severity: 'info',
+      diagnosis: 'd',
+      evidence: [],
+      reversible: null,
+    });
+    expect(check.timestamp).toBe(NOW);
+    expect(errMsg(new Error('boom'))).toBe('boom');
+    expect(errMsg('plain')).toBe('plain');
+  });
+});

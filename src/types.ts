@@ -54,7 +54,7 @@ export interface SetupScript {
 export type SyncKind =
   'cloned' | 'pulled' | 'pull-failed' | 'non-git' | 'remote-mismatch' | 'fixed-ref';
 
-export type SyncFailure = 'diverged' | 'network' | 'auth' | 'unknown';
+export type SyncFailure = 'diverged' | 'network' | 'auth' | 'unknown' | 'no-upstream';
 
 export interface SyncResult {
   kind: SyncKind;

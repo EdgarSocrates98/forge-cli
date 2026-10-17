@@ -9,6 +9,7 @@ import {
   compareVersions,
   isValidRef,
   localTags,
+  remoteTags,
   updateCheck,
 } from '../src/git-revs.js';
 
@@ -96,6 +97,62 @@ describe('updateCheck', () => {
     const behind = await updateCheck(clone);
     expect(behind.behind).toBe(1);
     expect(git(clone, 'rev-list', '--count', 'HEAD')).toBe('1');
+  });
+
+  it('repo sem upstream ⇒ failure no-upstream, nunca unknown', async () => {
+    const dir = path.join(tmp, 'solo');
+    execFileSync('git', ['init', '-q', dir]);
+    initRepo(dir);
+    commit(dir, 'a');
+    const check = await updateCheck(dir);
+    expect(check.failure).toBe('no-upstream');
+    expect(check.behind).toBe(0);
+    expect(check.ahead).toBe(0);
+  });
+
+  it('repo sem upstream tracking mesmo com remote configurado', async () => {
+    const origin = path.join(tmp, 'origin2');
+    execFileSync('git', ['init', '-q', origin]);
+    initRepo(origin);
+    commit(origin, 'a');
+    const clone = path.join(tmp, 'clone2');
+    execFileSync('git', ['clone', '-q', '--no-checkout', origin, clone]);
+    // branch local sem tracking configurado
+    git(clone, 'checkout', '-b', 'local-only');
+    const check = await updateCheck(clone);
+    expect(check.failure).toBe('no-upstream');
+  });
+
+  it('fetch falhando (remote morto) ⇒ failure classificado, nunca throw', async () => {
+    const origin = path.join(tmp, 'origin3');
+    execFileSync('git', ['init', '-q', origin]);
+    initRepo(origin);
+    commit(origin, 'a');
+    const clone = path.join(tmp, 'clone3');
+    execFileSync('git', ['clone', '-q', origin, clone]);
+    rmSync(origin, { recursive: true, force: true });
+    const check = await updateCheck(clone);
+    expect(check.failure).toBeTruthy();
+    expect(check.failure).not.toBe('no-upstream'); // remote existe — é falha real
+    expect(check.behind).toBe(0);
+  });
+});
+
+describe('remoteTags', () => {
+  it('lista tags do remote local em ordem semver, respeitando limit', async () => {
+    const origin = path.join(tmp, 'rtags');
+    execFileSync('git', ['init', '-q', origin]);
+    initRepo(origin);
+    commit(origin, 'a');
+    git(origin, 'tag', 'v0.1.0');
+    git(origin, 'tag', 'v0.10.0');
+    git(origin, 'tag', 'v0.2.0');
+    expect(await remoteTags(`file://${origin}`)).toEqual(['v0.10.0', 'v0.2.0', 'v0.1.0']);
+    expect(await remoteTags(`file://${origin}`, 2)).toEqual(['v0.10.0', 'v0.2.0']);
+  });
+
+  it('remote inacessível ⇒ null honesto', async () => {
+    expect(await remoteTags(`file://${path.join(tmp, 'ghost')}`)).toBeNull();
   });
 });
 

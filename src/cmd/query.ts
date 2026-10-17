@@ -168,7 +168,11 @@ export async function runUpdateCheckCommand(cli: CliOptions, names: string[]): P
     const compat = compatOf(repo.name, dir);
     const check = await updateCheck(dir);
     if (check.failure) {
-      lines.push(`${repo.name} — ${theme.warn(`${S.updateCheckFailed} (${check.failure})`)}`);
+      const label =
+        check.failure === 'no-upstream'
+          ? S.updateNoUpstream
+          : `${S.updateCheckFailed} (${check.failure})`;
+      lines.push(`${repo.name} — ${theme.warn(label)}`);
       rows.push({ name: repo.name, state: 'unknown', behind: 0, ahead: 0, failure: check.failure });
     } else if (check.behind > 0) {
       pending++;
