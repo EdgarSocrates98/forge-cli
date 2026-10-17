@@ -40,6 +40,7 @@ export interface CliOptions {
   components?: string;
   clean: boolean;
   ref?: string;
+  method?: 'git' | 'registry';
   trustCustom: boolean;
   runAfterSyncFailure: boolean;
   positionals: string[];
@@ -82,6 +83,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         clean: { type: 'boolean' },
         ref: { type: 'string' },
         version: { type: 'string' },
+        method: { type: 'string' },
         'trust-custom': { type: 'boolean' },
         'run-after-sync-failure': { type: 'boolean' },
         rollback: { type: 'boolean' },
@@ -117,6 +119,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const ref = values.ref ?? values.version;
   if (ref !== undefined && !isValidRef(ref)) {
     throw new CliError(`${S.errRefInvalid}: ${ref}`);
+  }
+  if (values.method !== undefined && !['git', 'registry'].includes(values.method)) {
+    throw new CliError(`--method inválido: ${values.method} (use git|registry)`);
   }
 
   return {
@@ -154,6 +159,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     components: values.components,
     clean: values.clean ?? false,
     ref,
+    method: values.method as 'git' | 'registry' | undefined,
     trustCustom: values['trust-custom'] ?? false,
     runAfterSyncFailure: values['run-after-sync-failure'] ?? false,
     positionals,

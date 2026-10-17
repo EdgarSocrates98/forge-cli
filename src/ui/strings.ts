@@ -299,6 +299,7 @@ Uso:
   forge-cli doctor [--fix]      Diagnostica; --fix repara os que falharem
   forge-cli list                Lista o catálogo e o último estado conhecido
   forge-cli install [forjas]    Instala uma ou mais Forjas (sem nomes: interativo)
+                                --method registry instala do PyPI em venv isolada
   forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
   forge-cli update [forjas]     Atualiza (pull + setup); --check só verifica
   forge-cli versions [forjas]   Lista tags/versões e revisão atual
@@ -324,6 +325,7 @@ Uso:
   forge-cli bundle <verbo>      Portabilidade: export [chaves-não-secretas...]|import|verify
   forge-cli learning <verbo>    Observações locais opt-in: status|enable|disable|report
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
+  forge-cli registry            Lista o catálogo PyPI e o que está instalado via registry
 
 Opções:
   --dir <caminho>    Diretório de instalação (padrão: ./forge-workspace)
@@ -342,6 +344,8 @@ Opções:
   --shallow          Clona com git clone --depth 1 (só clones novos)
   --ref <rev>        Fixa a Forja (uma só) em commit/tag (checkout destacado)
   --version <tag>    Fixa a Forja (uma só) em uma versão (tag, com ou sem 'v')
+  --method <m>       Método de instalação: git (clone+setup) ou registry (PyPI+venv)
+  --offline          No método registry: resolve só pelo cache local do PyPI
   --clean            Com 'reinstall': remove e reclona na mesma revisão (com backup)
   --profile <p>      Instalador nativo da Forja: minimal|recommended|full
   --scope <s>        Instalador nativo da Forja: project|workspace|user
