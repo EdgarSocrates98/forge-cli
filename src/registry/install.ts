@@ -12,6 +12,7 @@ import type { RegistryEntry } from './catalog.js';
 import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
   compareVersions,
+  isPrerelease,
   parseVersion,
   satisfiesRequiresPython,
   type ParsedVersion,
@@ -119,6 +120,8 @@ export interface RegistryInstallDeps {
   fetchImpl?: FetchLike;
   platform?: NodeJS.Platform;
   now?: () => string;
+  /** `--clean`: remove venv/receipt existentes antes de instalar. */
+  clean?: boolean;
 }
 
 export type InstallError =
@@ -130,6 +133,83 @@ export type InstallError =
   | { stage: 'hash-mismatch'; detail: string }
   | { stage: 'pip'; detail: string }
   | { stage: 'verify'; detail: string };
+
+/**
+ * Interpretador mais novo que satisfaz `requires_python` (+ piso do catálogo).
+ * Interpretadores pré-release só vencem quando nenhum estável satisfaz —
+ * `packaging` também os exclui de specs estáveis.
+ * `null` no especificador = fora do subconjunto — diagnóstico distinto.
+ */
+export function selectInterpreter(
+  entry: RegistryEntry,
+  resolved: Pick<ResolvedRelease, 'requiresPython' | 'version'>,
+  pythons: ProbedInterpreter[],
+): { python: ProbedInterpreter } | { error: ResolveError } {
+  const floor = parseVersion(entry.minPython);
+  let sawUnknownSpec = false;
+  const usable = pythons.filter((p) => {
+    if (floor && compareVersions(p.parsed, floor) < 0) return false;
+    if (!resolved.requiresPython) return true;
+    const sat = satisfiesRequiresPython(resolved.requiresPython, p.parsed);
+    if (sat === null) {
+      sawUnknownSpec = true;
+      return false;
+    }
+    return sat;
+  });
+  const stable = usable.filter((p) => !isPrerelease(p.parsed));
+  const candidates = stable.length ? stable : usable;
+  if (!candidates.length) {
+    return {
+      error: sawUnknownSpec
+        ? {
+            kind: 'specifier-unknown',
+            dist: entry.dist,
+            version: resolved.version,
+            requires: resolved.requiresPython!,
+          }
+        : {
+            kind: 'python-incompatible',
+            dist: entry.dist,
+            version: resolved.version,
+            requires: resolved.requiresPython ?? `>=${entry.minPython}`,
+            have: pythons.map((p) => p.version).join(', '),
+          },
+    };
+  }
+  return { python: candidates[0] };
+}
+
+/** sha256 do arquivo no wheel cache contra o digest publicado no PyPI. */
+function checkDistHashes(
+  distFiles: { filename: string; sha256?: string }[],
+  wheels: string,
+): { verifiedHash?: string } | { detail: string } {
+  const have = existsSync(wheels) ? readdirSync(wheels) : [];
+  for (const f of distFiles) {
+    if (!have.includes(f.filename) || !f.sha256) continue;
+    const digest = createHash('sha256')
+      .update(readFileSync(path.join(wheels, f.filename)))
+      .digest('hex');
+    if (digest !== f.sha256) {
+      return {
+        detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
+      };
+    }
+    return { verifiedHash: digest };
+  }
+  return {};
+}
+
+/** Arquivos da própria dist (wheel `dist_…` e sdist `dist-…` legado). */
+export function distArtifactFiles(
+  files: { filename: string; sha256?: string; packagetype?: string }[],
+  dist: string,
+): typeof files {
+  const norm = dist.toLowerCase();
+  const prefixes = [`${norm.replace(/[-_.]/g, '_')}-`, `${norm.replace(/[-_.]/g, '-')}-`];
+  return files.filter((f) => prefixes.some((p) => f.filename.toLowerCase().startsWith(p)));
+}
 
 export async function registryInstall(
   entry: RegistryEntry,
@@ -150,42 +230,14 @@ export async function registryInstall(
   });
   if ('kind' in resolved) return { stage: 'resolve', error: resolved };
 
-  // Seleciona o interpretador mais novo que satisfaz requires_python (+ piso do catálogo).
-  // `null` = especificador fora do subconjunto — diagnóstico distinto de incompatível.
-  const floor = parseVersion(entry.minPython);
-  let sawUnknownSpec = false;
-  const usable = deps.pythons.filter((p) => {
-    if (floor && compareVersions(p.parsed, floor) < 0) return false;
-    if (!resolved.requiresPython) return true;
-    const sat = satisfiesRequiresPython(resolved.requiresPython, p.parsed);
-    if (sat === null) {
-      sawUnknownSpec = true;
-      return false;
-    }
-    return sat;
-  });
-  if (!usable.length) {
-    return {
-      stage: 'resolve',
-      error: sawUnknownSpec
-        ? {
-            kind: 'specifier-unknown',
-            dist: entry.dist,
-            version: resolved.version,
-            requires: resolved.requiresPython!,
-          }
-        : {
-            kind: 'python-incompatible',
-            dist: entry.dist,
-            version: resolved.version,
-            requires: resolved.requiresPython ?? `>=${entry.minPython}`,
-            have: deps.pythons.map((p) => p.version).join(', '),
-          },
-    };
-  }
-  const python = usable[0];
+  const picked = selectInterpreter(entry, resolved, deps.pythons);
+  if ('error' in picked) return { stage: 'resolve', error: picked.error };
+  const python = picked.python;
 
   const venvDir = forgeVenv(deps.home, entry.name);
+  if (deps.clean) {
+    rmSync(path.join(forgesRoot(deps.home), entry.name), { recursive: true, force: true });
+  }
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
   const cleanup = () => rmSync(venvDir, { recursive: true, force: true });
   const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
@@ -200,9 +252,7 @@ export async function registryInstall(
 
   // Artefatos: online baixa para o wheel cache (popula o modo offline);
   // offline exige artefatos presentes — nunca finge instalar sem rede.
-  const distFiles = resolved.files.filter((f) =>
-    f.filename.startsWith(entry.dist.replace(/-/g, '_')),
-  );
+  const distFiles = distArtifactFiles(resolved.files, entry.dist);
   let verifiedHash: string | undefined;
   if (deps.offline) {
     const have = existsSync(wheels) ? readdirSync(wheels) : [];
@@ -213,6 +263,13 @@ export async function registryInstall(
         detail: `${spec}: sem wheel/sdist em ${wheels} — instale online uma vez`,
       };
     }
+    // Cache local também é verificado — artefato adulterado aborta o install.
+    const check = checkDistHashes(distFiles, wheels);
+    if ('detail' in check) {
+      cleanup();
+      return { stage: 'hash-mismatch', detail: check.detail };
+    }
+    verifiedHash = check.verifiedHash;
   } else {
     const dl = await run(vpy, [
       '-m',
@@ -231,21 +288,12 @@ export async function registryInstall(
       };
     }
     // Integridade do artefato da própria dist contra o digest publicado no PyPI.
-    const have = readdirSync(wheels);
-    for (const f of distFiles) {
-      if (!have.includes(f.filename) || !f.sha256) continue;
-      const digest = createHash('sha256')
-        .update(readFileSync(path.join(wheels, f.filename)))
-        .digest('hex');
-      if (digest !== f.sha256) {
-        cleanup();
-        return {
-          stage: 'hash-mismatch',
-          detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
-        };
-      }
-      verifiedHash = digest;
+    const check = checkDistHashes(distFiles, wheels);
+    if ('detail' in check) {
+      cleanup();
+      return { stage: 'hash-mismatch', detail: check.detail };
     }
+    verifiedHash = check.verifiedHash;
   }
 
   const pipArgs = [

@@ -37,6 +37,11 @@ describe('compareVersions', () => {
     ['1.0a1', '1.0'],
     ['0.1.0', '0.2.0'],
     ['0.9.9', '0.10.0'],
+    ['1.0a1.dev1', '1.0a1'],
+    ['1.0a1.dev2', '1.0a1.dev3'],
+    ['1.0.post1.dev1', '1.0.post1'],
+    ['1.0.dev1', '1.0a1.dev1'],
+    ['1.0.post2', '1.0.post10'],
   ];
   it.each(cases)('%s < %s', (a, b) => {
     expect(compareVersions(v(a), v(b))).toBeLessThan(0);

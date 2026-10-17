@@ -39,7 +39,8 @@ async function cli(...args: string[]) {
     extendEnv: true,
   });
   const out = `${res.stdout}\n${res.stderr}`.replace(ANSI, '');
-  return { code: res.exitCode ?? -1, out };
+  const stdout = res.stdout.replace(ANSI, '');
+  return { code: res.exitCode ?? -1, out, stdout };
 }
 
 function fakeClone(name: string, url: string): string {
@@ -231,14 +232,71 @@ describe('dispatch --method registry', () => {
     expect(res.out).toContain('exigem exatamente uma Forja');
   });
 
-  it.each(['update', 'clone', 'reinstall', 'rollback'])(
-    '%s --method registry é recusado (método errado nunca executa)',
-    async (verb) => {
-      const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
-      expect(res.code).toBe(2);
-      expect(res.out).toContain('só é suportado em install|uninstall');
-    },
-  );
+  it.each([
+    'update',
+    'clone',
+    'reinstall',
+    'rollback',
+    'pin',
+    'unpin',
+    'versions',
+    'status',
+    'list',
+  ])('%s --method registry é recusado antes de qualquer dispatch', async (verb) => {
+    const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('só é suportado em install|uninstall');
+  });
+
+  it('self update --method registry é recusado (não roda npm)', async () => {
+    const res = await cli('self', 'update', '--method', 'registry');
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('só é suportado em install|uninstall');
+  });
+
+  it('uninstall --method registry --json misto → stdout é JSON puro', async () => {
+    const res = await cli(
+      'uninstall',
+      'api-forge',
+      'platform-forge',
+      '--method',
+      'registry',
+      '--yes',
+      '--json',
+    );
+    expect(res.code).toBe(0);
+    const doc = JSON.parse(res.stdout);
+    expect(doc.method).toBe('pypi');
+    expect(doc.skipped).toEqual(['api-forge', 'platform-forge']);
+    expect(doc.warnings.length).toBe(2);
+  });
+
+  it('uninstall --method registry --json sem --yes → erro JSON, exit 2, nada removido', async () => {
+    const forges = path.join(home, '.forge-cli', 'forges');
+    mkdirSync(forges, { recursive: true });
+    writeFileSync(
+      path.join(forges, 'state.json'),
+      JSON.stringify({
+        forges: {
+          'api-forge': {
+            forge: 'api-forge',
+            method: 'pypi',
+            dist: 'apiforge-af',
+            version: '0.1.0',
+            verify: { command: [], ok: true },
+          },
+        },
+      }),
+    );
+    const res = await cli('uninstall', 'api-forge', '--method', 'registry', '--json');
+    expect(res.code).toBe(2);
+    const doc = JSON.parse(res.stdout);
+    expect(doc.error).toBeTruthy();
+    expect(doc.planned).toEqual(['api-forge']);
+    expect(
+      JSON.parse(readFileSync(path.join(forges, 'state.json'), 'utf8')).forges['api-forge'],
+    ).toBeTruthy();
+  });
 
   it('uninstall --method registry sem nomes/only/all recusa (não cai no legado)', async () => {
     const res = await cli('uninstall', '--method', 'registry', '--yes');

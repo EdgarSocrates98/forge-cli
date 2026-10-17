@@ -84,6 +84,17 @@ describe('resolveRelease', () => {
     expect(err).toMatchObject({ kind: 'network' });
   });
 
+  it('HTTP 5xx com cache quente cai no cache (falha honesta só sem cache)', async () => {
+    await resolveRelease('d', { cacheDir: tmp, fetchImpl: okFetch }); // popula
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 503, body: '' }),
+    });
+    expect(res).not.toHaveProperty('kind');
+    if ('kind' in res) return;
+    expect(res.source).toBe('cache');
+  });
+
   it('falha de rede cai no cache quando existe', async () => {
     await resolveRelease('d', { cacheDir: tmp, fetchImpl: okFetch }); // popula
     const res = await resolveRelease('d', {

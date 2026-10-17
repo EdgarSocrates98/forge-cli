@@ -197,12 +197,15 @@ describe('segurança e edge cases do install', () => {
     const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
     mkdirSync(wheels, { recursive: true });
     writeFileSync(path.join(wheels, 'apiforge_af-0.1.0-py3-none-any.whl'), 'wb');
-    // resolve offline exige metadata cache também — grava o cache do PyPI
+    // resolve offline exige metadata cache também — digest real do artefato
+    const realHash = createHash('sha256').update('wb').digest('hex');
+    const pypi = structuredClone(PYPI);
+    pypi.releases['0.1.0'][0].digests.sha256 = realHash;
     const metaDir = path.join(tmp, 'c');
     mkdirSync(metaDir, { recursive: true });
     writeFileSync(
       path.join(metaDir, 'apiforge-af.json'),
-      JSON.stringify({ fetchedAt: Date.now(), payload: PYPI }),
+      JSON.stringify({ fetchedAt: Date.now(), payload: pypi }),
     );
     const calls: string[][] = [];
     const res = await registryInstall(ENTRY, undefined, {
@@ -214,6 +217,48 @@ describe('segurança e edge cases do install', () => {
     const pipArgs = calls.find((c) => c.includes('install'))!;
     expect(pipArgs).toContain('--no-index');
     expect(pipArgs).toContain('--find-links');
+  });
+
+  it('offline com artefato adulterado → hash-mismatch (cache verificado também)', async () => {
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, 'apiforge_af-0.1.0-py3-none-any.whl'), 'tampered');
+    mkdirSync(path.join(tmp, 'c'), { recursive: true });
+    writeFileSync(
+      path.join(tmp, 'c', 'apiforge-af.json'),
+      JSON.stringify({ fetchedAt: Date.now(), payload: PYPI }),
+    );
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      offline: true,
+      run: async () => ({ exitCode: 0 }),
+    });
+    expect(res).toMatchObject({ stage: 'hash-mismatch' });
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+  });
+
+  it('prefere interpretador estável sobre pré-release quando ambos satisfazem', async () => {
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      pythons: [py('3.14.0a1'), py('3.12.4')],
+      run: runOk(calls),
+    });
+    expect(res).not.toHaveProperty('stage');
+    if ('stage' in res) return;
+    expect(res.python).toBe('3.12.4');
+    expect(calls[0][0]).toBe('python3');
+  });
+
+  it('--clean remove venv existente antes de instalar', async () => {
+    mkdirSync(path.join(forgeVenv(tmp, 'api-forge'), 'stale'), { recursive: true });
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      clean: true,
+      run: runOk([]),
+    });
+    expect(res).not.toHaveProperty('stage');
+    expect(existsSync(path.join(forgeVenv(tmp, 'api-forge'), 'stale'))).toBe(false);
   });
 
   it('sha256 divergente → hash-mismatch + venv removida', async () => {
