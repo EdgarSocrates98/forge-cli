@@ -102,8 +102,10 @@ const seedRegistryInstall = (name = 'api-forge') => {
   const venv = forgeVenv(home, name);
   const binDir = path.join(venv, 'bin');
   mkdirSync(binDir, { recursive: true });
-  writeFileSync(path.join(binDir, 'apiforge'), '#!/bin/sh\n');
-  writeFileSync(path.join(binDir, 'apiforge-mcp'), '#!/bin/sh\n');
+  for (const s of ['apiforge', 'apiforge-mcp']) {
+    writeFileSync(path.join(binDir, s), '#!/bin/sh\n');
+    if (process.platform === 'win32') writeFileSync(path.join(binDir, `${s}.exe`), '');
+  }
   mkdirSync(path.dirname(forgeStatePath(home)), { recursive: true });
   writeFileSync(
     forgeStatePath(home),
