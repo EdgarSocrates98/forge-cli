@@ -7,6 +7,36 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (6ª rodada)
+
+- **Path traversal no uninstall (bloqueio)**: `name`/`dist` vindos do
+  `state.json`/receipt (dado não confiável — entrada fora do catálogo é
+  desinstalável por design) agora passam por `isSafeRepoName` +
+  `resolveInside`, a mesma convenção do `safety.ts` para caminhos
+  destrutivos. Nome inseguro = recusa nomeada com exit 2, nunca chega
+  ao `rmSync`; `dist` maliciosa só impede a limpeza do wheel cache
+  (venv+state ainda saem).
+- **Pin não-exato**: `--version 0.1` casa a chave `0.1.0` do PyPI por
+  equivalência parseada (PEP 440 zero-padding — o pip aceita `==0.1`).
+- **Confirmação interativa no install**: TTY + sem `--yes` mostra o
+  plano (`confirmRun`) antes de instalar, mesmo contrato do fluxo git;
+  `--json`/pipes/`--yes` seguem sem perguntar.
+- **`requires_python` autoritativo**: o piso `minPython` do catálogo só
+  se aplica quando os metadados do PyPI não declaram spec — o release
+  pode alargar o suporte sem depender de atualização do catálogo.
+- **`info.requires_python` escopado**: o campo descreve a release mais
+  nova; como fallback só vale quando a versão resolvida é ela (um pin
+  antigo não recebe o spec novo por engano).
+- **Cache e leitura defensivos**: `writeCache` atômico; cap de 16 MiB
+  aplicado antes de bufar o corpo (content-length + cancel do stream);
+  `state` com `forges: []` tratado como vazio.
+- **Quarentena em hash-mismatch**: artefato divergente é renomeado para
+  `.rejected` — preserva evidência, desbloqueia o retry e nunca é
+  selecionável pelo `--find-links` (extensão fora de `.whl`/`.tar.gz`).
+- **stderr redacted**: detalhes de erro de subprocesso passam por
+  `redactSecrets` — credenciais de `PIP_INDEX_URL` não vazam no stdout
+  JSON, no `--report` nem no log humano.
+
 #### Corrigido após revisão (5ª rodada)
 
 - **Dedupe pós-normalização**: `install api-forge apiforge-af` (nome +

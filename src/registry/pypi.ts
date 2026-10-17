@@ -4,8 +4,9 @@
  * confiável: tipos checados em cada campo usado e falha honesta quando a
  * resposta não tem o formato esperado.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { writeFileAtomic } from '../safety.js';
 import { compareVersions, latestStable, parseVersion } from './versions.js';
 
 export interface ReleaseFile {
@@ -99,10 +100,9 @@ function readCache(
 function writeCache(cacheDir: string, dist: string, payload: PypiPayload): void {
   try {
     mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(
+    writeFileAtomic(
       pypiCacheFile(cacheDir, dist),
       JSON.stringify({ fetchedAt: Date.now(), payload }),
-      'utf8',
     );
   } catch {
     // cache é melhoria, nunca bloqueia
@@ -125,11 +125,34 @@ async function defaultFetch(url: string): Promise<{ status: number; body: string
     headers: { accept: 'application/json' },
     signal: AbortSignal.timeout(15_000),
   });
-  const body = await res.text();
-  if (body.length > MAX_PAYLOAD_BYTES) {
+  // Cap antes de bufar o corpo inteiro — content-length declara,
+  // e o reader aborta se o stream exceder mesmo sem header honesto.
+  const declared = Number(res.headers.get('content-length') ?? '0');
+  if (declared > MAX_PAYLOAD_BYTES) {
+    void res.body?.cancel();
     throw new Error(`payload excede ${MAX_PAYLOAD_BYTES} bytes`);
   }
-  return { status: res.status, body };
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const body = await res.text();
+    if (body.length > MAX_PAYLOAD_BYTES) {
+      throw new Error(`payload excede ${MAX_PAYLOAD_BYTES} bytes`);
+    }
+    return { status: res.status, body };
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_PAYLOAD_BYTES) {
+      await reader.cancel();
+      throw new Error(`payload excede ${MAX_PAYLOAD_BYTES} bytes`);
+    }
+    chunks.push(value);
+  }
+  return { status: res.status, body: new TextDecoder().decode(Buffer.concat(chunks)) };
 }
 
 export async function resolveRelease(
@@ -203,17 +226,33 @@ export async function resolveRelease(
     if (!files.length) return false;
     return files.some((f) => !f.yanked);
   });
-  const version = opts.pin ?? latestStable(installable);
+  const latest = latestStable(installable);
+  let version = opts.pin ?? latest;
   if (!version) {
     return { kind: 'malformed', dist, detail: 'nenhuma versão estável instalável' };
   }
   // `in` aceitaria membros do prototype ('toString', 'constructor') —
-  // membership deve ser own-property.
+  // membership deve ser own-property. Quando o pin não é uma chave exata,
+  // tenta equivalência parseada: pip aceita `==0.1` para a chave `0.1.0`
+  // (PEP 440 zero-padding), então o pin casa a chave real da release.
+  if (!Object.hasOwn(releases, version) && opts.pin) {
+    const pinned = parseVersion(version);
+    if (pinned) {
+      const canonical = Object.keys(releases)
+        .filter((k) => {
+          const parsed = parseVersion(k);
+          return parsed !== null && compareVersions(parsed, pinned) === 0;
+        })
+        .sort()
+        .at(0);
+      if (canonical) version = canonical;
+    }
+  }
   if (!Object.hasOwn(releases, version)) {
     return {
       kind: 'version-not-found',
       dist,
-      requested: version,
+      requested: opts.pin ?? version,
       available: Object.keys(releases)
         .filter((v) => parseVersion(v))
         .sort((a, b) => compareVersions(parseVersion(a)!, parseVersion(b)!)),
@@ -222,10 +261,13 @@ export async function resolveRelease(
 
   const files = parseFiles(releases[version]);
   // `requires_python`: prefere a wheel (o que o pip instala) → sdist → info.
+  // `info.requires_python` descreve a release MAIS NOVA — só é fallback
+  // quando a versão resolvida é ela, senão aplicaria o spec novo a um
+  // pin antigo cujos arquivos não declaram o campo.
   const requiresPython =
     files.find((f) => f.packagetype === 'bdist_wheel' && f.requiresPython)?.requiresPython ??
     files.find((f) => f.requiresPython)?.requiresPython ??
-    asString(payload.info?.requires_python);
+    (version === latest ? asString(payload.info?.requires_python) : undefined);
 
   return {
     dist,

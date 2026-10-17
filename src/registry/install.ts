@@ -5,10 +5,18 @@
  * injetáveis para teste determinístico.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { execa } from 'execa';
-import { writeFileAtomic } from '../safety.js';
+import { isSafeRepoName, redactSecrets, resolveInside, writeFileAtomic } from '../safety.js';
 import type { RegistryEntry } from './catalog.js';
 import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
@@ -63,7 +71,9 @@ export function loadForgeState(home: string): ForgeState {
   if (!existsSync(file)) return { forges: {} };
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as ForgeState;
-    return typeof raw.forges === 'object' && raw.forges ? raw : { forges: {} };
+    return typeof raw.forges === 'object' && raw.forges && !Array.isArray(raw.forges)
+      ? raw
+      : { forges: {} };
   } catch {
     // estado corrompido não é silenciosamente sobrescrito — preserva evidência
     try {
@@ -158,6 +168,9 @@ export type InstallError =
 
 /**
  * Interpretador mais novo que satisfaz `requires_python` (+ piso do catálogo).
+ * O piso só se aplica quando a metadado autoritativo está ausente — quando o
+ * PyPI declara `requires_python`, ele manda (a Forja pode alargar o suporte
+ * sem o catálogo precisar acompanhar).
  * Interpretadores pré-release só vencem quando nenhum estável satisfaz —
  * `packaging` também os exclui de specs estáveis.
  * `null` no especificador = fora do subconjunto — diagnóstico distinto.
@@ -167,7 +180,7 @@ export function selectInterpreter(
   resolved: Pick<ResolvedRelease, 'requiresPython' | 'version'>,
   pythons: ProbedInterpreter[],
 ): { python: ProbedInterpreter } | { error: ResolveError } {
-  const floor = parseVersion(entry.minPython);
+  const floor = resolved.requiresPython ? null : parseVersion(entry.minPython);
   let sawUnknownSpec = false;
   const usable = pythons.filter((p) => {
     if (floor && compareVersions(p.parsed, floor) < 0) return false;
@@ -196,7 +209,7 @@ export function selectInterpreter(
             kind: 'python-incompatible',
             dist: entry.dist,
             version: resolved.version,
-            requires: resolved.requiresPython ?? `>=${entry.minPython}`,
+            requires: resolved.requiresPython ?? `>=${entry.minPython} (piso do catálogo)`,
             have: pythons.map((p) => p.version).join(', '),
           },
     };
@@ -220,8 +233,18 @@ function checkDistHashes(
       .update(readFileSync(path.join(wheels, f.filename)))
       .digest('hex');
     if (digest !== f.sha256) {
+      // Quarentena: renomeia para `.rejected` — preserva evidência,
+      // desbloqueia a retry e nunca é selecionável pelo pip (extensão
+      // fora de .whl/.tar.gz/.zip não entra em --find-links).
+      const culprit = path.join(wheels, f.filename);
+      try {
+        rmSync(`${culprit}.rejected`, { force: true });
+        renameSync(culprit, `${culprit}.rejected`);
+      } catch {
+        // melhor esforço: o erro primário é a divergência
+      }
       return {
-        detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
+        detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}… — artefato movido para ${f.filename}.rejected`,
       };
     }
     // A wheel verificada é o que o pip instala — prefere-a para o receipt
@@ -299,7 +322,10 @@ export async function registryInstall(
   const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
   if (venv.exitCode !== 0) {
     cleanup();
-    return { stage: 'venv', detail: venv.stderr ?? venv.stdout ?? 'falha ao criar venv' };
+    return {
+      stage: 'venv',
+      detail: redactSecrets(venv.stderr ?? venv.stdout ?? 'falha ao criar venv'),
+    };
   }
 
   const vpy = venvPython(venvDir, platform);
@@ -343,7 +369,9 @@ export async function registryInstall(
       cleanup();
       return {
         stage: 'download',
-        detail: (dl.stderr ?? dl.stdout ?? 'falha no pip download').trim(),
+        // stderr do pip pode ecoar credenciais de PIP_INDEX_URL — redação
+        // vale para stdout-JSON, --report e log humano.
+        detail: redactSecrets((dl.stderr ?? dl.stdout ?? 'falha no pip download').trim()),
       };
     }
     // Integridade do artefato da própria dist contra o digest publicado no PyPI.
@@ -384,7 +412,10 @@ export async function registryInstall(
   const pip = await run(vpy, pipArgs);
   if (pip.exitCode !== 0) {
     cleanup();
-    return { stage: 'pip', detail: (pip.stderr ?? pip.stdout ?? 'falha no pip install').trim() };
+    return {
+      stage: 'pip',
+      detail: redactSecrets((pip.stderr ?? pip.stdout ?? 'falha no pip install').trim()),
+    };
   }
 
   const binPath = path.join(
@@ -436,14 +467,22 @@ export interface RegistryUninstallDeps {
 export function registryUninstall(
   target: { name: string; dist?: string },
   deps: RegistryUninstallDeps,
-): { removed: boolean; receiptRemoved: boolean; cacheRemoved: boolean } {
-  const dir = path.join(forgesRoot(deps.home), target.name);
+): { removed: boolean; receiptRemoved: boolean; cacheRemoved: boolean; refused?: string } {
+  // name/dist podem vir de state.json (alvo fora do catálogo) — dado não
+  // confiável. `resolveInside`/`isSafeRepoName` é a convenção do codebase
+  // para caminhos destrutivos: recusa traversal em vez de rmSync cego.
+  const dir = resolveInside(forgesRoot(deps.home), target.name);
+  if (!dir)
+    return { removed: false, receiptRemoved: false, cacheRemoved: false, refused: 'unsafe-name' };
   const removed = existsSync(dir);
   if (removed) rmSync(dir, { recursive: true, force: true });
   // Wheel cache também sai — sem reclaim de disco o cache acumularia
-  // artefatos de Forjas desinstaladas. Fora do catálogo (dist ausente)
-  // só venv+state são removidos.
-  const wheels = target.dist ? wheelCacheForHome(deps.home, target.dist) : null;
+  // artefatos de Forjas desinstaladas. Dist inválida/maliciosa é ignorada
+  // (venv+state ainda são removidos — o nome é quem identifica a Forja).
+  const wheels =
+    target.dist && isSafeRepoName(target.dist)
+      ? resolveInside(path.join(deps.home, '.forge-cli', 'cache', 'wheels'), target.dist)
+      : null;
   const cacheRemoved = wheels !== null && existsSync(wheels);
   if (wheels) rmSync(wheels, { recursive: true, force: true });
   const state = loadForgeState(deps.home);

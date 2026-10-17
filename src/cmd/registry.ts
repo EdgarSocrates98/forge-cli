@@ -11,7 +11,7 @@ import { log, note, outro, spinner } from '@clack/prompts';
 import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
 import { pythonCandidates } from '../preflight.js';
-import { redactSecrets, writeFileAtomic } from '../safety.js';
+import { isSafeRepoName, redactSecrets, writeFileAtomic } from '../safety.js';
 import { registryEntry, REGISTRY_PACKAGES } from '../registry/catalog.js';
 import {
   forgeVenv,
@@ -270,6 +270,27 @@ export async function runRegistryInstall(
     }));
   }
 
+  // Plano → confirmação → instalação: mesmo contrato do fluxo git
+  // (`confirmRun`) — só quando interativo. `--json`/`--yes`/pipes
+  // não perguntam (contrato para máquinas).
+  if (!quiet && !cli.yes && process.stdout.isTTY && process.stdin.isTTY) {
+    note(
+      deduped
+        .map(
+          ({ name, entry }) =>
+            `${name} → ${entry!.dist}${pin ? `==${pin}` : ''} (venv isolada em ${forgeVenv(home, name)})`,
+        )
+        .join('\n'),
+      'Instalação registry-first',
+    );
+    const answer = await confirm({ message: S.confirmRun });
+    if (isCancel(answer) || !answer) {
+      if (isCancel(answer)) exitCancelled();
+      log.warn('Nada foi instalado.');
+      process.exit(0);
+    }
+  }
+
   const results: RegistryInstallResult[] = [];
   for (const { name, entry } of deduped) {
     const spin = spinner();
@@ -410,12 +431,19 @@ export async function runRegistryUninstall(
 
   // Alias de dist normalizado; duplicatas nome+alias planejam uma só vez.
   // Fora do catálogo mas presente no state → ainda desinstalável (uma
-  // entrada removida do catálogo não pode travar a remoção).
+  // entrada removida do catálogo não pode travar a remoção). Chaves do
+  // state são dado não confiável: nome inseguro (path traversal) é
+  // recusa nomeada — nunca chega ao rmSync.
   const plan: { name: string; dist?: string; known: boolean; installed: boolean }[] = [];
+  const unsafe: string[] = [];
   const seen = new Set<string>();
   for (const raw of targets) {
     const entry = registryEntry(raw);
     const name = entry?.name ?? raw;
+    if (!isSafeRepoName(name)) {
+      unsafe.push(raw);
+      continue;
+    }
     if (seen.has(name)) continue;
     seen.add(name);
     const receipt = state[name];
@@ -426,12 +454,18 @@ export async function runRegistryUninstall(
       installed: installed.includes(name),
     });
   }
-  const unknown = plan.filter((p) => !p.known).map((p) => p.name);
+  const unknown = [...plan.filter((p) => !p.known).map((p) => p.name), ...unsafe];
+  const errText = [
+    ...plan.filter((p) => !p.known).map((p) => `${p.name}: sem dist no catálogo registry`),
+    ...unsafe.map((u) => `${u}: nome inseguro no state — recusado (path traversal)`),
+  ].join(' | ');
   const removals = plan.filter((p) => p.installed);
   const skipped = plan.filter((p) => p.known && !p.installed).map((p) => p.name);
   warnings.push(...skipped.map((n) => `${n}: não estava instalado via registry — ignorado`));
   if (!quiet) {
-    for (const u of unknown) log.error(`${u}: sem dist no catálogo registry`);
+    for (const u of plan.filter((p) => !p.known).map((p) => p.name))
+      log.error(`${u}: sem dist no catálogo registry`);
+    for (const u of unsafe) log.error(`${u}: nome inseguro no state — recusado (path traversal)`);
     for (const w of warnings.slice(ignored.length ? 1 : 0)) log.warn(w);
   }
   if (!removals.length) {
@@ -440,7 +474,7 @@ export async function runRegistryUninstall(
       removed: [],
       skipped,
       warnings,
-      ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+      ...(errText ? { error: errText } : {}),
     };
     reportTo(doc);
     if (quiet) emitJson(doc, unknown.length ? 2 : 0);
@@ -478,6 +512,7 @@ export async function runRegistryUninstall(
 
   const results = removals.map((r) => {
     const res = registryUninstall({ name: r.name, dist: r.dist }, { home });
+    if (res.refused) log.error(`${r.name}: recusado — ${res.refused}`);
     return { forge: r.name, removed: res.removed, cacheRemoved: res.cacheRemoved };
   });
   const doc = {
@@ -485,7 +520,7 @@ export async function runRegistryUninstall(
     results,
     skipped,
     warnings,
-    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+    ...(errText ? { error: errText } : {}),
   };
   reportTo(doc);
   if (quiet) emitJson(doc, unknown.length ? 2 : 0);

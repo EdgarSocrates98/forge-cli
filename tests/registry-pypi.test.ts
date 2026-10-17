@@ -71,6 +71,51 @@ describe('resolveRelease', () => {
     }
   });
 
+  it('pin "0.1" casa a chave "0.1.0" (PEP 440 zero-padding, como pip)', async () => {
+    const res = await resolveRelease('d', { pin: '0.1', cacheDir: tmp, fetchImpl: okFetch });
+    if ('kind' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(res.version).toBe('0.1.0');
+    expect(res.source).toBe('pinned');
+  });
+
+  it('info.requires_python só é fallback para a release mais nova', async () => {
+    // Pin numa release antiga cujos arquivos não declaram requires_python —
+    // `info` descreve a versão mais nova e não pode ser aplicada ao pin.
+    const payload = {
+      info: { requires_python: '>=99' },
+      releases: {
+        '0.1.0': [
+          {
+            filename: 'd-0.1.0-py3-none-any.whl',
+            url: 'https://f/d-0.1.0.whl',
+            packagetype: 'bdist_wheel',
+          },
+        ],
+        '0.2.0': [
+          {
+            filename: 'd-0.2.0-py3-none-any.whl',
+            url: 'https://f/d-0.2.0.whl',
+            packagetype: 'bdist_wheel',
+          },
+        ],
+      },
+    };
+    const res = await resolveRelease('d', {
+      pin: '0.1.0',
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    if ('kind' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(res.requiresPython).toBeUndefined();
+    // e na versão mais nova o fallback continua valendo
+    const latest = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    if ('kind' in latest) throw new Error(`unexpected: ${JSON.stringify(latest)}`);
+    expect(latest.requiresPython).toBe('>=99');
+  });
+
   it('404 → not-found; HTTP 5xx → network', async () => {
     const nf = await resolveRelease('x', {
       cacheDir: tmp,
