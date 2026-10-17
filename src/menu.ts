@@ -29,6 +29,25 @@ export const MENU_ITEMS: { value: MenuAction; label: string; hint?: string }[] =
   { value: 'exit', label: S.menuExit },
 ];
 
+/**
+ * `--method registry` tem fluxo guiado próprio: só os verbos que o
+ * engine registry suporta (clone/versions/git-only ficam fora).
+ * 'status' mapeia para `forge-cli registry` (lista de receipts).
+ */
+export const REGISTRY_MENU_ACTIONS: MenuAction[] = [
+  'install',
+  'update',
+  'reinstall',
+  'uninstall',
+  'status',
+  'exit',
+];
+
+export function menuItemsFor(cli: Pick<CliOptions, 'method'>): typeof MENU_ITEMS {
+  if (cli.method !== 'registry') return MENU_ITEMS;
+  return MENU_ITEMS.filter((i) => REGISTRY_MENU_ACTIONS.includes(i.value));
+}
+
 /** O menu só aparece no modo totalmente interativo: sem comando, flags de seleção ou plano. */
 export function shouldShowMenu(
   cli: Pick<
@@ -42,9 +61,6 @@ export function shouldShowMenu(
     cli.positionals.length === 0 &&
     !cli.help &&
     !cli.plan &&
-    // `--method registry` ainda não tem fluxo guiado — sem menu, o
-    // dispatcher recusa com errMethodUnsupported em vez de dead-end.
-    cli.method !== 'registry' &&
     !isNonInteractive(cli as CliOptions)
   );
 }
@@ -76,12 +92,15 @@ export interface PromptIo {
   output?: NodeJS.WritableStream;
 }
 
-export async function askMenu(io: PromptIo = {}): Promise<MenuAction> {
+export async function askMenu(
+  io: PromptIo = {},
+  items: typeof MENU_ITEMS = MENU_ITEMS,
+): Promise<MenuAction> {
   const choice = await select({
     ...(io.input ? { input: io.input as NodeJS.ReadStream } : {}),
     ...(io.output ? { output: io.output as NodeJS.WriteStream } : {}),
     message: S.menuTitle,
-    options: MENU_ITEMS.map((item) => ({
+    options: items.map((item) => ({
       value: item.value,
       label: item.label,
       hint: item.hint,
@@ -97,6 +116,9 @@ export interface MenuDeps {
   workspace(): Promise<string>;
   resolveDir(dir: string): string;
   pickRepos(dir: string): Promise<string[]>;
+  /** Registry: escolha no catálogo PyPI (install) ou no state local (lifecycle). */
+  pickRegistryCatalog?(): Promise<string[]>;
+  pickRegistryInstalled?(): Promise<string[]>;
 }
 
 /**
@@ -106,6 +128,16 @@ export interface MenuDeps {
 export async function applyMenu(cli: CliOptions, deps: MenuDeps): Promise<CliOptions | null> {
   const action = await deps.ask();
   if (action === 'exit') return null;
+  // Fluxo guiado registry: catálogo PyPI para install, state para lifecycle.
+  if (cli.method === 'registry') {
+    if (action === 'status') return { ...cli, positionals: ['registry'] };
+    if (action === 'install') {
+      const names = deps.pickRegistryCatalog ? await deps.pickRegistryCatalog() : [];
+      return { ...cli, positionals: ['install', ...names] };
+    }
+    const names = deps.pickRegistryInstalled ? await deps.pickRegistryInstalled() : [];
+    return { ...cli, positionals: [action, ...names] };
+  }
   if (action === 'install') return cli;
   const dir = cli.dir ? deps.resolveDir(cli.dir) : await deps.workspace();
   const names = actionNeedsRepos(action) ? await deps.pickRepos(dir) : [];

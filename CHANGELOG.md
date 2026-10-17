@@ -30,6 +30,30 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `update` com todos os alvos não-instalados sai 1 (nada aconteceu);
   confirmação interativa só em TTY duplo (automação segue com `--yes`).
 
+#### Wave 2 — TUI registry + delegação nativa (fase 2)
+
+- **Menu guiado `--method registry`**: `shouldShowMenu` não exclui mais
+  o método — `menuItemsFor` filtra o menu para os verbos suportados
+  (install/update/reinstall/uninstall/status/exit). `status` mapeia
+  para `forge-cli registry` (receipts). Install escolhe no catálogo
+  PyPI com hint de dist+piso Python; lifecycle escolhe nas instaladas.
+- **Delegação ao instalador nativo** (`delegateNative`): `--native` ou
+  qualquer flag de fase 2 (`--profile/--scope/--components/--host/
+--gateway-profile`) roda `<bin> install` **pelo bin da venv
+  verificada** — nunca um shim global. Sem `--yes` roda `--dry-run`
+  (default-deny). `{python} scripts/...` (forge-doctor-api) é skip
+  honesto — o script vive no repositório, não na wheel.
+- **Native em lifecycle**: update/reinstall rodam a op `update`
+  documentada; `uninstall --native` roda `ops.uninstall` **antes** de
+  remover a venv. Tudo gravado em `receipt.native` (argv, ran, dryRun,
+  exitCode, skipped, ignored).
+- **Validação fail-fast**: `--profile/--scope/--components/--host/
+--gateway-profile` inválidos recusam antes de gastar rede (exit 1),
+  mesmo contrato do fluxo git. Flags saem de REGISTRY_IGNORED_FLAGS —
+  agora são honradas.
+- **`.env` preservado**: instalações registry vivem em venvs isoladas
+  sob `~/.forge-cli/` — nunca tocam `.env` de projetos do usuário.
+
 #### Corrigido após revisão (7ª rodada)
 
 - **Uninstall não-TTY sem `--yes` (crítico)**: `uninstall --method

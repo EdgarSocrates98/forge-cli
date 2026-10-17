@@ -323,3 +323,113 @@ describe('catálogo sanity', () => {
     expect(forgesRoot(tmp)).toContain(tmp);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wave 2 — delegação ao instalador nativo (fase 2)
+// ---------------------------------------------------------------------------
+
+describe('delegação nativa no registry', () => {
+  const calls: string[][] = [];
+  const runRec: RunLike = async (cmd, args) => {
+    calls.push([cmd, ...args]);
+    const di = args.indexOf('--dest');
+    if (args.includes('download') && di !== -1) {
+      const name = args.join(' ').includes('0.2.0') ? WHEEL_NAME_2 : WHEEL_NAME;
+      writeFileSync(path.join(args[di + 1], name), WHEEL_BYTES);
+    }
+    const vi = args.indexOf('venv');
+    if (vi !== -1 && args.includes('-m') && args[vi + 1]) {
+      mkdirSync(args[vi + 1], { recursive: true });
+    }
+    return { exitCode: 0, stdout: 'ok' } as RunResult;
+  };
+
+  beforeEach(() => (calls.length = 0));
+
+  it('install --native roda <venv-bin> install --dry-run (sem --yes)', async () => {
+    const { runRegistryInstall } = await import('../src/cmd/registry.js');
+    await runRegistryInstall(cli({ native: true }), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runRec,
+    });
+    // Última chamada = delegação nativa: argv[0] é o bin da venv
+    const nat = calls.at(-1)!;
+    expect(nat[0]).toBe(path.join(forgeVenv(tmp, 'api-forge'), 'bin', 'apiforge'));
+    expect(nat.slice(1)).toEqual(['install', '--dry-run']);
+    const receipt = loadForgeState(tmp).forges['api-forge'];
+    expect(receipt.native).toMatchObject({ ran: true, dryRun: true, exitCode: 0 });
+  });
+
+  it('install --native --yes → --yes (não --dry-run) + flags documentadas viram argv', async () => {
+    const { runRegistryInstall } = await import('../src/cmd/registry.js');
+    await runRegistryInstall(
+      cli({ native: true, yes: true, profile: 'minimal', scope: 'user' }),
+      ['api-forge'],
+      { home: tmp, pythons: py(), fetchImpl: fetchOk, run: runRec },
+    );
+    const nat = calls.at(-1)!;
+    expect(nat.slice(1)).toEqual(['install', '--scope', 'user', '--profile', 'minimal', '--yes']);
+    expect(loadForgeState(tmp).forges['api-forge'].native?.argv.slice(1)).toContain('--yes');
+  });
+
+  it('--profile inválido falha antes de gastar rede', async () => {
+    const { runRegistryInstall } = await import('../src/cmd/registry.js');
+    const fetchSpy = vi.fn(fetchOk);
+    const codes = exitCodes();
+    await runRegistryInstall(cli({ profile: 'nope' }), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchSpy,
+      run: runRec,
+    });
+    expect(codes).toContain(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uninstall --native roda a op documentada antes de remover a venv', async () => {
+    seed('0.1.0');
+    const { runRegistryUninstall } = await import('../src/cmd/registry.js');
+    await runRegistryUninstall(cli({ yes: true, native: true }), ['api-forge'], {
+      home: tmp,
+      run: runRec,
+    });
+    const nat = calls.at(-1)!;
+    expect(nat[0]).toContain('apiforge');
+    // buildNativeOp: aprovado = argv sem --dry-run (não adiciona --yes)
+    expect(nat.slice(1)).toEqual(['install', 'uninstall']);
+    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
+  });
+
+  it('forge-doctor-api (--native) → skip honesto (script do repo, não da wheel)', async () => {
+    const { runRegistryInstall } = await import('../src/cmd/registry.js');
+    // dist forge-doctor-api precisa de fixture própria — reuse apiforge-af não vale.
+    // O caminho testável é delegateNative com entry + receipt sintéticos:
+    const { delegateNative } = await import('../src/cmd/registry.js');
+    const entry = registryEntry('forge-doctor-api')!;
+    const receipt = seed('0.1.0');
+    const n = await delegateNative(
+      cli({ native: true }),
+      entry,
+      { ...receipt, forge: 'forge-doctor-api', dist: 'forge-doctor-api' },
+      'install',
+      runRec,
+    );
+    expect(n).toMatchObject({ ran: false });
+    expect(n?.skipped).toContain('script');
+  });
+
+  it('update com --native roda a op update do instalador', async () => {
+    seed('0.1.0');
+    await runRegistryUpdate(cli({ native: true, yes: true }), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runRec,
+    });
+    const nat = calls.at(-1)!;
+    expect(nat.slice(1)).toEqual(['install', 'update']);
+    expect(loadForgeState(tmp).forges['api-forge'].native?.argv.slice(1)).toContain('update');
+  });
+});

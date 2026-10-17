@@ -25,8 +25,57 @@ describe('shouldShowMenu', () => {
     }
   });
 
-  it('não aparece com --method registry (menu não sabe rotear — evita dead-end)', () => {
-    expect(shouldShowMenu(parseCliArgs(['--method', 'registry']), true)).toBe(false);
+  it('aparece com --method registry — menu guiado registry-first existe', () => {
+    expect(shouldShowMenu(parseCliArgs(['--method', 'registry']), true)).toBe(true);
+  });
+});
+
+describe('menu registry', () => {
+  it('filtra ações não suportadas pelo engine registry', async () => {
+    const { menuItemsFor, REGISTRY_MENU_ACTIONS } = await import('../src/menu.js');
+    const items = menuItemsFor(parseCliArgs(['--method', 'registry']));
+    const values = items.map((i) => i.value);
+    // mesma coleção, na ordem do menu principal (status antes de uninstall)
+    expect([...values].sort()).toEqual([...REGISTRY_MENU_ACTIONS].sort());
+    expect(values).not.toContain('clone');
+    expect(values).not.toContain('wizard');
+    expect(values).not.toContain('doctor');
+  });
+
+  it('modo git mantém o menu completo', async () => {
+    const { menuItemsFor } = await import('../src/menu.js');
+    expect(menuItemsFor(parseCliArgs([])).length).toBe(MENU_ITEMS.length);
+  });
+
+  it('applyMenu registry: install escolhe no catálogo PyPI', async () => {
+    const picked = ['platform-forge'];
+    const next = await applyMenu(parseCliArgs(['--method', 'registry']), {
+      ask: async () => 'install',
+      workspace: async () => '/ws',
+      resolveDir: (d) => d,
+      pickRepos: async () => [],
+      pickRegistryCatalog: async () => picked,
+    });
+    expect(next?.positionals).toEqual(['install', 'platform-forge']);
+  });
+
+  it('applyMenu registry: lifecycle escolhe nas instaladas; status vira `registry`', async () => {
+    const upd = await applyMenu(parseCliArgs(['--method', 'registry']), {
+      ask: async () => 'update',
+      workspace: async () => '/ws',
+      resolveDir: (d) => d,
+      pickRepos: async () => [],
+      pickRegistryInstalled: async () => ['api-forge'],
+    });
+    expect(upd?.positionals).toEqual(['update', 'api-forge']);
+
+    const st = await applyMenu(parseCliArgs(['--method', 'registry']), {
+      ask: async () => 'status',
+      workspace: async () => '/ws',
+      resolveDir: (d) => d,
+      pickRepos: async () => [],
+    });
+    expect(st?.positionals).toEqual(['registry']);
   });
 });
 

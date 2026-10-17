@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import os from 'node:os';
 import { cancel, intro, log, note, outro } from '@clack/prompts';
 import { loadState } from './artifacts.js';
-import { CliError, isNonInteractive, parseCliArgs, usage } from './cli-args.js';
+import { CliError, isNonInteractive, parseCliArgs, usage, type CliOptions } from './cli-args.js';
 import { resolveCommand } from './commands.js';
 import { collectStatus } from './status.js';
 import { askRepos, askWorkspace } from './prompts.js';
@@ -9,7 +10,7 @@ import { S } from './ui/strings.js';
 import { theme } from './ui/theme.js';
 import { hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
-import { applyMenu, askMenu, shouldShowMenu } from './menu.js';
+import { applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
@@ -29,7 +30,10 @@ import {
   runRegistryUninstall,
   runRegistryUpdate,
 } from './cmd/registry.js';
-import { registryEntry, registryNames } from './registry/catalog.js';
+import { registryEntry, registryNames, REGISTRY_PACKAGES } from './registry/catalog.js';
+import { loadForgeState } from './registry/install.js';
+import { isCancel, multiselect } from '@clack/prompts';
+import { exitCancelled } from './prompts.js';
 import {
   runPinCommand,
   runUnpinCommand,
@@ -86,7 +90,7 @@ const JSON_QUERY_COMMANDS = new Set([
 ]);
 
 async function main(): Promise<void> {
-  let cli;
+  let cli: CliOptions;
   try {
     cli = parseCliArgs(process.argv.slice(2));
   } catch (error) {
@@ -107,7 +111,7 @@ async function main(): Promise<void> {
   }
   if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
     const next = await applyMenu(cli, {
-      ask: () => askMenu(),
+      ask: () => askMenu({}, menuItemsFor(cli)),
       workspace: askWorkspace,
       resolveDir: resolveTargetDir,
       pickRepos: async (dir) => {
@@ -118,6 +122,33 @@ async function main(): Promise<void> {
           status: new Map(infos.map((i) => [i.name, i])),
         });
         return chosen.map((r) => r.name);
+      },
+      pickRegistryCatalog: async () => {
+        const picked = await multiselect({
+          message: 'Forjas para instalar do PyPI (registry-first)',
+          options: REGISTRY_PACKAGES.map((e) => ({
+            value: e.name,
+            label: e.name,
+            hint: `${e.dist} · python >=${e.minPython}`,
+          })),
+          required: true,
+        });
+        if (isCancel(picked)) exitCancelled();
+        return picked as string[];
+      },
+      pickRegistryInstalled: async () => {
+        const installed = Object.keys(loadForgeState(os.homedir()).forges);
+        if (!installed.length) {
+          log.warn('Nenhuma Forja instalada via registry ainda — instale primeiro.');
+          return [];
+        }
+        const picked = await multiselect({
+          message: 'Forjas instaladas (registry)',
+          options: installed.map((n) => ({ value: n, label: n })),
+          required: true,
+        });
+        if (isCancel(picked)) exitCancelled();
+        return picked as string[];
       },
     });
     if (!next) {

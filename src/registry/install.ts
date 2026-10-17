@@ -48,6 +48,15 @@ export interface RegistryInstallReceipt {
   pinned?: string;
   /** Versões anteriores (mais antiga → mais recente) — alimenta `rollback`. */
   history?: { version: string; installedAt: string }[];
+  /** Delegação ao instalador nativo da Forja (fase 2) — evidência honesta. */
+  native?: {
+    argv: string[];
+    ran: boolean;
+    dryRun?: boolean;
+    exitCode?: number;
+    skipped?: string;
+    ignored?: string[];
+  };
 }
 
 export interface ForgeState {
@@ -145,7 +154,11 @@ export interface RunOpts {
 }
 export type RunLike = (cmd: string, args: string[], opts?: RunOpts) => Promise<RunResult>;
 
-async function execaRun(cmd: string, args: string[], opts: RunOpts = {}): Promise<RunResult> {
+export async function execaRun(
+  cmd: string,
+  args: string[],
+  opts: RunOpts = {},
+): Promise<RunResult> {
   const res = await execa(cmd, args, {
     reject: false,
     timeout: opts.timeoutMs ?? 300_000,
