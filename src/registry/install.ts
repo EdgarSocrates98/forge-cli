@@ -44,6 +44,10 @@ export interface RegistryInstallReceipt {
   verifiedHash?: string;
   yanked?: boolean;
   staleCache?: boolean;
+  /** Versão travada por `pin --method registry` — update a respeita. */
+  pinned?: string;
+  /** Versões anteriores (mais antiga → mais recente) — alimenta `rollback`. */
+  history?: { version: string; installedAt: string }[];
 }
 
 export interface ForgeState {
@@ -92,7 +96,22 @@ export function loadForgeState(home: string): ForgeState {
   }
 }
 
-function saveForgeState(home: string, state: ForgeState): void {
+/**
+ * Entrada sintética para Forja presente no state mas fora do catálogo:
+ * o receipt é a única fonte confiável — dist/bin por ele, piso derivado
+ * do interpretador que instalou (único com prova de compatibilidade).
+ */
+export function ghostEntry(name: string, receipt: RegistryInstallReceipt): RegistryEntry {
+  return {
+    name,
+    dist: receipt.dist,
+    bin: path.basename(receipt.bin).replace(/\.exe$/i, ''),
+    minPython: receipt.python.split('.').slice(0, 2).join('.'),
+    origin: 'official',
+  };
+}
+
+export function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
   // Escrita atômica (convenção do codebase) — kill no meio não corrompe.
   writeFileAtomic(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`);

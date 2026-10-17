@@ -30,6 +30,12 @@ Revisões inspecionadas (HEAD de `main` em 2026-10-12):
   confirmação; `--plan`, `--offline`, `--clean`, `--version` pinado,
   `--json` e `--report` são honrados. Não executa o instalador nativo
   (fase 2) — skills/agents/hosts ficam para o `<cli> install` da Forja.
+- **lifecycle registry** — `update` (mais nova no PyPI; `--check` só
+  planeja; respeita pin), `reinstall` (mesma versão do receipt — reparo
+  de drift), `rollback` (desempilha `history` do receipt; rollback de
+  rollback funciona), `pin`/`unpin` (trava a versão instalada no state).
+  Tudo com o mesmo contrato: receipts atômicos, `--json`/`--report`,
+  flags git ignoradas avisadas, nomes desconhecidos → exit 2, falhas → 1.
 
 ## Modelo de instalação em duas fases
 

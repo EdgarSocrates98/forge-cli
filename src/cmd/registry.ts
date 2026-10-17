@@ -12,15 +12,19 @@ import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
 import { pythonCandidates } from '../preflight.js';
 import { isSafeRepoName, redactSecrets, writeFileAtomic } from '../safety.js';
-import { registryEntry, REGISTRY_PACKAGES } from '../registry/catalog.js';
+import { registryEntry, REGISTRY_PACKAGES, type RegistryEntry } from '../registry/catalog.js';
 import {
   forgeVenv,
+  ghostEntry,
   loadForgeState,
   registryInstall,
   registryUninstall,
+  saveForgeState,
   selectInterpreter,
   wheelCacheDir,
   type InstallError,
+  type RegistryInstallReceipt,
+  type RunLike,
 } from '../registry/install.js';
 import { resolveRelease, type FetchLike, type ResolveError } from '../registry/pypi.js';
 import { compareVersions, parseVersion, type ParsedVersion } from '../registry/versions.js';
@@ -162,7 +166,7 @@ function writeRegistryReport(reportPath: string, doc: unknown): void {
 export async function runRegistryInstall(
   cli: CliOptions,
   names: string[],
-  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike } = {},
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
 ): Promise<RegistryInstallResult[]> {
   const home = deps.home ?? os.homedir();
   const quiet = registryQuiet(cli);
@@ -550,5 +554,494 @@ export async function runRegistryUninstall(
     if (r.removed) log.success(`${r.forge}: removido`);
   }
   // Nomes desconhecidos são falha nos dois modos — mesmo contrato que --json.
+  if (unknown.length) process.exit(2);
+}
+
+// ---------------------------------------------------------------------------
+// Wave 3 — lifecycle registry: update / reinstall / rollback / pin / unpin
+// ---------------------------------------------------------------------------
+
+interface LifecycleItem {
+  name: string;
+  entry: RegistryEntry;
+  receipt: RegistryInstallReceipt;
+  action: 'update' | 'reinstall' | 'rollback';
+  from: string;
+  to?: string;
+  detail?: string;
+}
+
+/** Recibo → entrada de catálogo real ou sintética (ghost-forge). */
+function entryFor(name: string, receipt: RegistryInstallReceipt) {
+  return registryEntry(name) ?? ghostEntry(name, receipt);
+}
+
+/**
+ * Escopo compartilhado: resolve alvos → receipts → plano. Recusas de nome
+ * inseguro e desconhecidos seguem o mesmo contrato do uninstall.
+ */
+function lifecycleTargets(
+  cli: CliOptions,
+  names: string[],
+  home: string,
+): { ok: LifecycleTarget[]; unknown: string[]; skipped: string[] } {
+  const state = loadForgeState(home).forges;
+  const targets = resolveRegistryTargets(cli, names, Object.keys(state));
+  const ok: LifecycleTarget[] = [];
+  const unknown: string[] = [];
+  const skipped: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of targets) {
+    const entry = registryEntry(raw);
+    const name = entry?.name ?? raw;
+    if (!isSafeRepoName(name) || seen.has(name)) {
+      if (!seen.has(name) && !isSafeRepoName(name)) unknown.push(raw);
+      continue;
+    }
+    seen.add(name);
+    const receipt = Object.hasOwn(state, name) ? state[name] : undefined;
+    if (!receipt) {
+      if (entry) skipped.push(name);
+      else unknown.push(name);
+      continue;
+    }
+    ok.push({ name, receipt });
+  }
+  return { ok, unknown, skipped };
+}
+
+interface LifecycleTarget {
+  name: string;
+  receipt: RegistryInstallReceipt;
+}
+
+async function runRegistryLifecycle(
+  cli: CliOptions,
+  names: string[],
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike },
+): Promise<void> {
+  const home = deps.home ?? os.homedir();
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  if (!targets.length && !skipped.length && !unknown.length) {
+    const msg = 'nenhuma Forja instalada via registry — nada a atualizar';
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+    return;
+  }
+  const ignored = ignoredRegistryFlags(cli);
+  const warnings: string[] = [
+    ...skipped.map((n) => `${n}: não estava instalado via registry — ignorado`),
+    ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
+  ];
+
+  const pinVersion = cli.ref?.replace(/^v(?=\d)/, '');
+  const isCheck = cli.plan || cli.check;
+  const items: LifecycleItem[] = [];
+  for (const t of targets) {
+    const entry = entryFor(t.name, t.receipt);
+    if (t.receipt.pinned && !pinVersion) {
+      items.push({
+        ...t,
+        entry,
+        action: 'update',
+        from: t.receipt.version,
+        detail: `${S.registryPinnedAt} ${t.receipt.pinned}`,
+      });
+      continue;
+    }
+    const resolved = await resolveRelease(entry.dist, {
+      pin: pinVersion,
+      offline: cli.offline,
+      cacheDir: registryCacheDir(home),
+      fetchImpl: deps.fetchImpl,
+    });
+    if ('kind' in resolved) {
+      items.push({
+        ...t,
+        entry,
+        action: 'update',
+        from: t.receipt.version,
+        detail: describeResolveError(resolved),
+      });
+      continue;
+    }
+    const same = resolved.version === t.receipt.version;
+    items.push({
+      ...t,
+      entry,
+      action: 'update',
+      from: t.receipt.version,
+      to: resolved.version,
+      detail: same ? 'já na mais recente' : undefined,
+    });
+  }
+
+  if (isCheck) {
+    const doc = {
+      method: 'pypi',
+      plan: true,
+      updates: items.map((i) => ({
+        forge: i.name,
+        from: i.from,
+        to: i.to ?? null,
+        status: i.detail ?? 'update',
+      })),
+      skipped,
+      warnings,
+      ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, unknown.length ? 2 : 0);
+    note(
+      items
+        .map((i) => `${i.name}: ${i.from} → ${i.to ?? '—'}${i.detail ? ` (${i.detail})` : ''}`)
+        .join('\n'),
+      'Plano de update',
+    );
+    if (unknown.length) process.exit(2);
+    return;
+  }
+
+  const actionable = items.filter((i) => i.to && i.to !== i.from);
+  if (!quiet) {
+    for (const i of items.filter((i) => i.detail)) log.warn(`${i.name}: ${i.detail}`);
+    for (const w of warnings) log.warn(w);
+    note(
+      actionable.length
+        ? actionable.map((i) => `${i.name}: ${i.from} → ${i.to}`).join('\n')
+        : 'nada a atualizar',
+      'Update registry-first',
+    );
+  }
+  if (!actionable.length) {
+    const doc = {
+      method: 'pypi',
+      updated: [],
+      skipped,
+      warnings,
+      ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, unknown.length ? 2 : skipped.length && !items.length ? 1 : 0);
+    if (!quiet) log.info('Nada a atualizar.');
+    if (unknown.length) process.exit(2);
+    // Alvo existe no catálogo mas não instalado → nada aconteceu, exit 1.
+    if (skipped.length && !items.length) process.exit(1);
+    return;
+  }
+  if (!quiet && !cli.yes && process.stdout.isTTY && process.stdin.isTTY) {
+    const answer = await confirm({ message: S.confirmRun });
+    if (isCancel(answer) || !answer) {
+      if (isCancel(answer)) exitCancelled();
+      reportTo({ error: S.registryUninstallNeedsYes });
+      log.warn(S.registryUninstallNeedsYes);
+      process.exit(0);
+      return;
+    }
+  }
+
+  const pythons = deps.pythons ?? (await probePythons());
+  const results = [];
+  const state = loadForgeState(home);
+  for (const i of actionable) {
+    const spin = spinner();
+    if (!quiet) spin.start(`${i.name}: ${i.from} → ${i.to}…`);
+    const receipt = await registryInstall(i.entry, i.to, {
+      home,
+      cacheDir: registryCacheDir(home),
+      offline: cli.offline,
+      pythons,
+      clean: true,
+      fetchImpl: deps.fetchImpl,
+      run: deps.run,
+    });
+    if ('stage' in receipt) {
+      if (!quiet) spin.stop(`${i.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
+      results.push({
+        forge: i.name,
+        ok: false,
+        from: i.from,
+        to: i.to,
+        detail: describeInstallError(receipt),
+      });
+      continue;
+    }
+    // histórico: versão anterior entra no topo — rollback desempilha.
+    const prev = state.forges[i.name];
+    receipt.history = [
+      ...(i.receipt.history ?? []),
+      { version: i.from, installedAt: i.receipt.installedAt },
+    ];
+    // `--ref` é override pontual — não cria nem remove pin.
+    receipt.pinned = prev?.pinned;
+    state.forges[i.name] = receipt;
+    if (!quiet) spin.stop(`${i.name}: ${theme.ok(`${i.from} → ${i.to}`)}`);
+    results.push({ forge: i.name, ok: true, from: i.from, to: i.to, bin: receipt.bin });
+  }
+  saveForgeState(home, state);
+  const doc = {
+    method: 'pypi',
+    updated: results,
+    skipped,
+    warnings,
+    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, results.every((r) => r.ok) ? (unknown.length ? 2 : 0) : 1);
+  if (results.some((r) => !r.ok)) process.exit(1);
+  if (unknown.length) process.exit(2);
+}
+
+export async function runRegistryUpdate(
+  cli: CliOptions,
+  names: string[],
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
+): Promise<void> {
+  await runRegistryLifecycle(cli, names, deps);
+}
+
+/** Reinstala a MESMA versão registrada no receipt — reparo de drift. */
+export async function runRegistryReinstall(
+  cli: CliOptions,
+  names: string[],
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
+): Promise<void> {
+  const home = deps.home ?? os.homedir();
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const ignored = ignoredRegistryFlags(cli);
+  const warnings = [
+    ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
+  ];
+  if (!targets.length) {
+    const msg = S.errRegistryReinstallNeedsNames;
+    reportTo({ error: msg, warnings, ...(unknown.length ? { unknown } : {}) });
+    if (quiet) emitJson({ error: msg, warnings, unknown }, unknown.length ? 2 : 1);
+    log.error(msg);
+    process.exit(unknown.length ? 2 : 1);
+    return;
+  }
+  if (cli.plan || cli.check) {
+    const doc = {
+      method: 'pypi',
+      plan: true,
+      reinstalls: targets.map((t) => ({ forge: t.name, version: t.receipt.version })),
+      skipped,
+      warnings,
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, 0);
+    note(
+      targets.map((t) => `${t.name}==${t.receipt.version} (reinstall limpo)`).join('\n'),
+      'Plano de reinstall',
+    );
+    return;
+  }
+  const pythons = deps.pythons ?? (await probePythons());
+  const results = [];
+  const state = loadForgeState(home);
+  for (const t of targets) {
+    const spin = spinner();
+    if (!quiet) spin.start(`${t.name}: reinstall ${t.receipt.version}…`);
+    const receipt = await registryInstall(entryFor(t.name, t.receipt), t.receipt.version, {
+      home,
+      cacheDir: registryCacheDir(home),
+      offline: cli.offline,
+      pythons,
+      clean: true,
+      fetchImpl: deps.fetchImpl,
+      run: deps.run,
+    });
+    if ('stage' in receipt) {
+      if (!quiet) spin.stop(`${t.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
+      results.push({ forge: t.name, ok: false, detail: describeInstallError(receipt) });
+      continue;
+    }
+    // Preserva pin e histórico — reinstall não é lifecycle de versão.
+    receipt.pinned = t.receipt.pinned;
+    receipt.history = t.receipt.history;
+    state.forges[t.name] = receipt;
+    if (!quiet) spin.stop(`${t.name}: ${theme.ok('reinstalado')} (${receipt.version})`);
+    results.push({ forge: t.name, ok: true, version: receipt.version, bin: receipt.bin });
+  }
+  saveForgeState(home, state);
+  const doc = {
+    method: 'pypi',
+    reinstalled: results,
+    skipped,
+    warnings,
+    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, results.every((r) => r.ok) ? (unknown.length ? 2 : 0) : 1);
+  if (results.some((r) => !r.ok)) process.exit(1);
+  if (unknown.length) process.exit(2);
+}
+
+/** Rollback: desempilha a versão anterior do receipt.history. */
+export async function runRegistryRollback(
+  cli: CliOptions,
+  names: string[],
+  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
+): Promise<void> {
+  const home = deps.home ?? os.homedir();
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const ignored = ignoredRegistryFlags(cli);
+  const warnings = [
+    ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
+  ];
+  const plan = targets.map((t) => {
+    const prev = t.receipt.history?.at(-1);
+    return {
+      name: t.name,
+      receipt: t.receipt,
+      to: prev?.version,
+      detail: prev ? undefined : S.rollbackNoPrevious,
+    };
+  });
+  const actionable = plan.filter((p) => p.to);
+  if (cli.plan || cli.check) {
+    const doc = {
+      method: 'pypi',
+      plan: true,
+      rollbacks: plan.map((p) => ({
+        forge: p.name,
+        from: p.receipt.version,
+        to: p.to ?? null,
+        status: p.detail ?? 'rollback',
+      })),
+      skipped,
+      warnings,
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, 0);
+    note(
+      plan
+        .map(
+          (p) =>
+            `${p.name}: ${p.receipt.version} → ${p.to ?? '—'}${p.detail ? ` (${p.detail})` : ''}`,
+        )
+        .join('\n'),
+      'Plano de rollback',
+    );
+    return;
+  }
+  if (!actionable.length) {
+    const msg = targets.length
+      ? `${S.rollbackNoPrevious} — ${targets.map((t) => t.name).join(', ')}`
+      : S.errRegistryRollbackNeedsNames;
+    reportTo({ error: msg, warnings, ...(unknown.length ? { unknown } : {}) });
+    if (quiet) emitJson({ error: msg, warnings, unknown }, 1);
+    log.error(msg);
+    process.exit(1);
+    return;
+  }
+  const pythons = deps.pythons ?? (await probePythons());
+  const results = [];
+  const state = loadForgeState(home);
+  for (const p of actionable) {
+    const spin = spinner();
+    if (!quiet) spin.start(`${p.name}: ${p.receipt.version} → ${p.to}…`);
+    const receipt = await registryInstall(entryFor(p.name, p.receipt), p.to, {
+      home,
+      cacheDir: registryCacheDir(home),
+      offline: cli.offline,
+      pythons,
+      clean: true,
+      fetchImpl: deps.fetchImpl,
+      run: deps.run,
+    });
+    if ('stage' in receipt) {
+      if (!quiet) spin.stop(`${p.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
+      results.push({ forge: p.name, ok: false, detail: describeInstallError(receipt) });
+      continue;
+    }
+    // Desempilha o alvo e empilha a versão abandonada — rollback de rollback funciona.
+    const rest = (p.receipt.history ?? []).slice(0, -1);
+    receipt.history = [...rest, { version: p.receipt.version, installedAt: p.receipt.installedAt }];
+    receipt.pinned = p.receipt.pinned;
+    state.forges[p.name] = receipt;
+    if (!quiet) spin.stop(`${p.name}: ${theme.ok(`${p.receipt.version} → ${p.to}`)}`);
+    results.push({ forge: p.name, ok: true, from: p.receipt.version, to: p.to, bin: receipt.bin });
+  }
+  saveForgeState(home, state);
+  const doc = {
+    method: 'pypi',
+    rolledBack: results,
+    skipped,
+    warnings,
+    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, results.every((r) => r.ok) ? (unknown.length ? 2 : 0) : 1);
+  if (results.some((r) => !r.ok)) process.exit(1);
+  if (unknown.length) process.exit(2);
+}
+
+/** pin/unpin — trava a versão atual do receipt no state (update respeita). */
+export async function runRegistryPin(
+  cli: CliOptions,
+  names: string[],
+  pin: boolean,
+  deps: { home?: string } = {},
+): Promise<void> {
+  const home = deps.home ?? os.homedir();
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const ignored = ignoredRegistryFlags(cli);
+  const warnings = [
+    ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
+  ];
+  if (!targets.length) {
+    const msg = pin ? S.errRegistryPinNeedsNames : S.errRegistryUnpinNeedsNames;
+    reportTo({ error: msg, warnings, unknown });
+    if (quiet) emitJson({ error: msg, warnings, unknown }, unknown.length ? 2 : 1);
+    log.error(msg);
+    process.exit(unknown.length ? 2 : 1);
+    return;
+  }
+  const state = loadForgeState(home);
+  const done = [];
+  for (const t of targets) {
+    if (pin) {
+      state.forges[t.name].pinned = t.receipt.version;
+      done.push({ forge: t.name, pinned: t.receipt.version });
+    } else {
+      delete state.forges[t.name].pinned;
+      done.push({ forge: t.name, pinned: null });
+    }
+  }
+  saveForgeState(home, state);
+  const doc = {
+    method: 'pypi',
+    [pin ? 'pinned' : 'unpinned']: done,
+    skipped,
+    warnings,
+    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, unknown.length ? 2 : 0);
+  for (const d of done) {
+    log.success(pin ? `${d.forge}: ${S.pinDone} ${d.pinned}` : `${d.forge}: ${S.unpinDone}`);
+  }
   if (unknown.length) process.exit(2);
 }

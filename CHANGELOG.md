@@ -7,6 +7,29 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Wave 3 — lifecycle registry
+
+- **`update --method registry`**: resolve a mais nova no PyPI, compara
+  com o receipt e reinstala limpo quando há versão nova. `--check`/
+  `--plan` mostram o plano sem mutar; `--ref <ver>` é override pontual
+  (não cria nem remove pin). Versões anteriores são empilhadas em
+  `receipt.history` — insumo do rollback.
+- **`reinstall --method registry`**: reinstala a mesma versão do
+  receipt (reparo de drift — venv apagada mas state presente recria).
+  Preserva `pinned` e `history` — reinstall não é lifecycle de versão.
+- **`rollback --method registry`**: desempilha `history.at(-1)` e
+  empilha a versão abandonada — rollback de rollback retorna à versão
+  original. Sem histórico → recusa honesta (`rollbackNoPrevious`), exit 1.
+- **`pin`/`unpin --method registry`**: trava/remove a versão instalada
+  no state; `update` respeita (`skipped: fixada em <ver>`).
+- **Ghost-forge no lifecycle**: Forja removida do catálogo mas com
+  receipt continua atualizável/reinstalável — `ghostEntry()` deriva
+  dist/bin do receipt e o piso Python do interpretador que a instalou.
+- **Contrato uniforme**: `isSafeRepoName`/`resolveInside` nos mesmos
+  pontos do uninstall; flags git ignoradas avisam também no lifecycle;
+  `update` com todos os alvos não-instalados sai 1 (nada aconteceu);
+  confirmação interativa só em TTY duplo (automação segue com `--yes`).
+
 #### Corrigido após revisão (7ª rodada)
 
 - **Uninstall não-TTY sem `--yes` (crítico)**: `uninstall --method

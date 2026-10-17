@@ -57,7 +57,17 @@ export const S = {
   errRefDirty: 'Working tree com alterações locais — não é seguro trocar de revisão',
   refCheckedOut: 'Revisão',
   errRefNeedsOne: '--ref/--version exigem exatamente uma Forja',
-  errMethodUnsupported: '--method registry só é suportado em install|uninstall',
+  errMethodUnsupported:
+    '--method registry só é suportado em install|uninstall|update|reinstall|rollback|pin|unpin',
+  errRegistryReinstallNeedsNames:
+    'reinstall --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
+  errRegistryRollbackNeedsNames:
+    'rollback --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
+  errRegistryPinNeedsNames:
+    'pin --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
+  errRegistryUnpinNeedsNames:
+    'unpin --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
+  registryPinnedAt: 'fixada em',
   errRegistryNeedsNames:
     'informe as Forjas (ex.: forge-cli install api-forge --method registry) ou --all',
   errRegistryUninstallNeedsNames:
@@ -314,11 +324,14 @@ Uso:
                                 --method registry instala do PyPI em venv isolada
   forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
   forge-cli update [forjas]     Atualiza (pull + setup); --check só verifica
+                                --method registry: mais nova no PyPI; respeita pin; --check plano
   forge-cli versions [forjas]   Lista tags/versões e revisão atual
   forge-cli reinstall <forjas>  Reexecuta o setup mantendo a revisão atual; --clean recria o clone
+                                --method registry: reinstala a mesma versão do receipt (drift)
   forge-cli pin <forja> --version <tag>   Fixa a versão (update/install respeitam)
   forge-cli unpin <forja>       Remove a fixação
   forge-cli rollback <forja>    Volta o checkout ao HEAD anterior registrado
+                                --method registry: desempilha a versão anterior do receipt
   forge-cli uninstall <forjas>  Remove clones limpos (backup de .env/configs; exige --yes)
   forge-cli components [forjas] Mostra o instalador nativo e as flags suportadas por Forja
   forge-cli help                Mostra esta ajuda

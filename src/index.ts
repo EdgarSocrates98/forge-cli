@@ -20,7 +20,15 @@ import {
   runVersionsCommand,
 } from './cmd/query.js';
 import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
-import { runRegistryInstall, runRegistryList, runRegistryUninstall } from './cmd/registry.js';
+import {
+  runRegistryInstall,
+  runRegistryList,
+  runRegistryPin,
+  runRegistryReinstall,
+  runRegistryRollback,
+  runRegistryUninstall,
+  runRegistryUpdate,
+} from './cmd/registry.js';
 import { registryEntry, registryNames } from './registry/catalog.js';
 import {
   runPinCommand,
@@ -125,13 +133,40 @@ async function main(): Promise<void> {
     console.log(usage());
     process.exit(2);
   }
-  if (
-    cli.method === 'registry' &&
-    resolved.command !== 'install' &&
-    resolved.command !== 'uninstall'
-  ) {
+  const REGISTRY_COMMANDS = new Set([
+    'install',
+    'uninstall',
+    'update',
+    'reinstall',
+    'rollback',
+    'pin',
+    'unpin',
+  ]);
+  if (cli.method === 'registry' && !REGISTRY_COMMANDS.has(resolved.command)) {
     log.error(S.errMethodUnsupported);
     process.exit(2);
+  }
+  // Lifecycle registry intercepta antes dos handlers git — update/reinstall/
+  // rollback/pin/unpin com --method registry operam sobre receipts, não clones.
+  if (cli.method === 'registry' && resolved.command === 'update') {
+    await runRegistryUpdate(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'reinstall') {
+    await runRegistryReinstall(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'rollback') {
+    await runRegistryRollback(cli, resolved.names);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'pin') {
+    await runRegistryPin(cli, resolved.names, true);
+    return;
+  }
+  if (cli.method === 'registry' && resolved.command === 'unpin') {
+    await runRegistryPin(cli, resolved.names, false);
+    return;
   }
   // `--method` só significa algo nos fluxos de instalação/lifecycle —
   // em comandos de consulta/hosts/self é avisado, nunca engolido.
