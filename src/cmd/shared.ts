@@ -25,12 +25,13 @@ export async function checkEnvironment(): Promise<void> {
   log.step(`${icons.gear} ${S.preflightTitle}`);
   const checks = await runPreflight();
   for (const check of checks) {
+    const hint = !check.ok && check.hint ? ` ${theme.dim(`→ ${check.hint}`)}` : '';
     if (check.ok) {
       log.success(`${icons.ok} ${check.name} ${theme.dim(`(${check.detail})`)}`);
     } else if (check.severity === 'warn') {
-      log.warn(`${icons.warn} ${check.name} ${theme.dim(`(${check.detail})`)}`);
+      log.warn(`${icons.warn} ${check.name} ${theme.dim(`(${check.detail})`)}${hint}`);
     } else {
-      log.error(`${icons.err} ${check.name} ${theme.dim(`(${check.detail})`)}`);
+      log.error(`${icons.err} ${check.name} ${theme.dim(`(${check.detail})`)}${hint}`);
     }
   }
   if (checks.some((check) => !check.ok && check.severity === 'fatal')) {

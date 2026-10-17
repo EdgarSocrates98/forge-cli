@@ -24,15 +24,30 @@ describe('isNodeSupported', () => {
 });
 
 describe('runPreflight', () => {
-  it('marks git/node/powershell checks as fatal and python as warn', async () => {
+  it('fatal = git/node/powershell; npm/python/pip/path = warn com hint', async () => {
     const checks = await runPreflight('win32');
-    const byName = new Map(checks.map((c) => [c.name, c]));
-    const python = checks.find((c) => c.severity === 'warn');
-    expect(python, 'python check should exist').toBeDefined();
-    expect(python?.name).toContain('Python');
-    for (const [name, check] of byName) {
-      if (!name.includes('Python')) expect(check.severity).toBe('fatal');
+    const fatalNames = new Set(['Git disponível', 'Node.js >= 20', 'powershell.exe disponível']);
+    for (const check of checks) {
+      if (fatalNames.has(check.name)) {
+        expect(check.severity).toBe('fatal');
+      } else {
+        expect(check.severity).toBe('warn');
+      }
     }
+    // bloco estendido: npm, toolchain Python, PATH, OS/arch, instalações
+    const names = checks.map((c) => c.name);
+    for (const required of [
+      'npm disponível',
+      'pip/pipx/uv (pacotes Python)',
+      '~/.forge-cli gravável (shims/PATH)',
+      'SO/arquitetura',
+      'Instalações registry existentes',
+    ]) {
+      expect(names).toContain(required);
+    }
+    // check falho de warn tem dica de remediação
+    const failed = checks.filter((c) => !c.ok);
+    for (const f of failed) expect(f.hint).toBeTruthy();
   });
 
   it('keeps fatal gating separate from warn results', async () => {

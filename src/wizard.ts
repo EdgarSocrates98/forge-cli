@@ -16,10 +16,13 @@ import {
   type SelectableStep,
 } from './planner.js';
 import { runInstallFlow } from './cmd/run.js';
+import { runRegistryInstall } from './cmd/registry.js';
+import { registryEntry } from './registry/catalog.js';
+import { forgeVenv, loadForgeState } from './registry/install.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 import { theme } from './ui/theme.js';
-import { hasGitRepo, resolveTargetDir } from './utils/system.js';
+import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -186,6 +189,29 @@ export async function runWizard(cli: CliOptions): Promise<void> {
   if (isCancel(picked)) bail();
   const repos = catalog.filter((r) => (picked as string[]).includes(r.name));
 
+  // Método — registry-first quando há dist no catálogo: PyPI + venv
+  // isolada (~/.forge-cli) é o caminho recomendado; git clone + setup no
+  // workspace continua disponível. Forjas sem dist caem fora do caminho
+  // registry com aviso honesto — nunca um silêncio que vira surpresa.
+  const distless = repos.filter((r) => !registryEntry(r.name));
+  let method: 'git' | 'registry' = 'git';
+  if (repos.length !== distless.length) {
+    const m = await select({
+      message: S.wizardMethodAsk,
+      options: [
+        { value: 'registry', label: S.wizardMethodRegistry, hint: S.wizardMethodRegistryHint },
+        { value: 'git', label: S.wizardMethodGit, hint: S.wizardMethodGitHint },
+      ],
+      initialValue: 'registry',
+    });
+    if (isCancel(m)) bail();
+    method = m as 'git' | 'registry';
+  }
+  const installRepos = method === 'registry' ? repos.filter((r) => registryEntry(r.name)) : repos;
+  if (method === 'registry' && distless.length) {
+    log.warn(`${S.wizardMethodDistless}: ${distless.map((r) => r.name).join(', ')}`);
+  }
+
   const stepPick = await multiselect({
     message: `${stepTitle(3)} — ${S.wizardPlanSteps}`,
     options: SELECTABLE_STEPS.map((s) => ({
@@ -202,7 +228,7 @@ export async function runWizard(cli: CliOptions): Promise<void> {
   const nativeWanted = steps.some((s) => s !== 'clone');
   let profile: string | undefined;
   let scope: string | undefined;
-  if (nativeWanted && repos.some((r) => r.nativeInstall)) {
+  if (nativeWanted && installRepos.some((r) => r.nativeInstall)) {
     const p = await select({
       message: 'profile',
       options: ['recommended', 'minimal', 'full'].map((v) => ({ value: v, label: v })),
@@ -219,7 +245,46 @@ export async function runWizard(cli: CliOptions): Promise<void> {
     scope = sc as string;
   }
 
-  // Step 4 — review hashed plan
+  // Step 4 — review. No caminho registry o plano honesto é dist + venv +
+  // wheel cache (o hash do plano é do fluxo git — misturar os dois seria
+  // fingir uma evidência que não existe).
+  if (method === 'registry') {
+    const home = cliHome();
+    note(
+      installRepos
+        .map((r) => {
+          const e = registryEntry(r.name)!;
+          return `${r.name} → ${e.dist} ${theme.dim(`(venv: ${forgeVenv(home, r.name)})`)}`;
+        })
+        .join('\n'),
+      `${stepTitle(4)} — ${S.wizardRegistryPlan}`,
+    );
+    const goReg = await confirm({ message: S.confirmRun });
+    if (isCancel(goReg) || !goReg) bail();
+    await runRegistryInstall(
+      {
+        ...cli,
+        yes: true,
+        profile,
+        scope,
+        components:
+          steps.filter((s) => ['skills', 'agents', 'mcp'].includes(s)).join(',') || undefined,
+      },
+      installRepos.map((r) => r.name),
+    );
+    const state = loadForgeState(home);
+    note(
+      installRepos
+        .map((r) => {
+          const rec = state.forges[r.name];
+          return `${r.name}: ${rec ? `${rec.dist}==${rec.version}` : S.statusNotInstalled}`;
+        })
+        .join('\n'),
+      `${stepTitle(6)} / ${stepTitle(7)}`,
+    );
+    return;
+  }
+
   const planForges: PlanForge[] = repos.map((repo) => ({
     forge_id: repo.name,
     repo: repo.name,

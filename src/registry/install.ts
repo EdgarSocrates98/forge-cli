@@ -19,6 +19,14 @@ import path from 'node:path';
 import { execa } from 'execa';
 import { isSafeRepoName, redactSecrets, resolveInside, writeFileAtomic } from '../safety.js';
 import type { RegistryEntry } from './catalog.js';
+import {
+  lockTransitiveCheck,
+  normDist,
+  parseOfflineLock,
+  verifyLockFiles,
+  type LockError,
+  type OfflineLock,
+} from './lock.js';
 import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
   compareVersions,
@@ -65,6 +73,8 @@ export interface RegistryInstallReceipt {
     skipped?: string;
     ignored?: string[];
   };
+  /** Instalação offline travada — arquivo do lock + fecho verificado. */
+  offlineLock?: { file: string; artifacts: number };
 }
 
 export interface ForgeState {
@@ -211,6 +221,12 @@ export interface RegistryInstallDeps {
   /** `--clean`: remove venv/receipt existentes antes de instalar. */
   clean?: boolean;
   /**
+   * `--lock <file>` (só com offline): instalação travada — o fecho
+   * transitivo inteiro é conferido (hash, tags, extras, deps declaradas)
+   * antes do `pip install --no-index`.
+   */
+  lockFile?: string;
+  /**
    * Lifecycle (update/reinstall/rollback): ajusta o receipt — history,
    * pinned — ANTES das escritas atômicas de install.json + state.json.
    * Sem o hook, o chamador mutava o receipt depois da persistência: um
@@ -228,6 +244,7 @@ export type InstallError =
   | { stage: 'offline-missing-artifact'; detail: string }
   | { stage: 'hash-mismatch'; detail: string }
   | { stage: 'already-installed'; detail: string }
+  | { stage: 'lock'; error: LockError }
   | { stage: 'pip'; detail: string }
   | { stage: 'verify'; detail: string };
 
@@ -370,6 +387,53 @@ export async function registryInstall(
   const python = picked.python;
 
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
+
+  // Modo travado (--offline --lock): o lock inteiro é validado ANTES de
+  // qualquer mutação — faltando artefato, hash divergente, extra no cache
+  // ou tag incompatível → recusa pura, sem criar venv nem tocar o disco.
+  let lock: OfflineLock | null = null;
+  if (deps.lockFile !== undefined) {
+    if (!deps.offline) {
+      return {
+        stage: 'lock',
+        error: { kind: 'lock-invalid', detail: '--lock só vale junto de --offline' },
+      };
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(deps.lockFile, 'utf8'));
+    } catch (e) {
+      return {
+        stage: 'lock',
+        error: {
+          kind: 'lock-invalid',
+          detail: `lock ilegível ${deps.lockFile}: ${e instanceof Error ? e.message : e}`,
+        },
+      };
+    }
+    const parsed = parseOfflineLock(raw);
+    if ('kind' in parsed) return { stage: 'lock', error: parsed };
+    if (
+      parsed.forge !== entry.name ||
+      parsed.dist !== entry.dist ||
+      parsed.version !== resolved.version
+    ) {
+      return {
+        stage: 'lock',
+        error: {
+          kind: 'lock-mismatch',
+          detail: `lock cobre ${parsed.dist}==${parsed.version}; pedido foi ${entry.dist}==${resolved.version}`,
+        },
+      };
+    }
+    const fileErr = verifyLockFiles(parsed, wheels, {
+      py: [python.parsed.release[0] ?? 0, python.parsed.release[1] ?? 0],
+      platform,
+    });
+    if (fileErr) return { stage: 'lock', error: fileErr };
+    lock = parsed;
+  }
+
   const forgeDir = path.join(forgesRoot(deps.home), entry.name);
   // `--clean`/lifecycle: a instalação anterior é movida para backup ANTES de
   // qualquer etapa destrutiva — falha restaura o estado anterior em vez de
@@ -411,7 +475,39 @@ export async function registryInstall(
   const distFiles = distArtifactFiles(resolved.files, entry.dist);
   let verifiedHash: string | undefined;
   let verifiedFile: string | undefined;
-  if (deps.offline) {
+  if (lock) {
+    // Fecho inteiro já conferido (verifyLockFiles). O artefato primário vem
+    // do próprio lock — nunca de um arquivo plantado com nome parecido.
+    const primary =
+      lock.artifacts.find(
+        (a) =>
+          normDist(a.name) === normDist(entry.dist) &&
+          a.version === resolved.version &&
+          a.filename.toLowerCase().endsWith('.whl'),
+      ) ??
+      lock.artifacts.find(
+        (a) => normDist(a.name) === normDist(entry.dist) && a.version === resolved.version,
+      );
+    if (!primary) {
+      cleanup();
+      return {
+        stage: 'lock',
+        error: {
+          kind: 'lock-mismatch',
+          detail: `lock ${deps.lockFile} não contém artefato de ${entry.dist}==${resolved.version}`,
+        },
+      };
+    }
+    verifiedHash = primary.sha256;
+    verifiedFile = primary.filename;
+    // Requires-Dist de cada wheel ⊆ nomes do lock — dependência transitiva
+    // nova (lock desatualizado) falha com diagnóstico antes do pip.
+    const depErr = await lockTransitiveCheck(lock, wheels, run, [vpy]);
+    if (depErr) {
+      cleanup();
+      return { stage: 'lock', error: depErr };
+    }
+  } else if (deps.offline) {
     const have = existsSync(wheels) ? readdirSync(wheels) : [];
     if (!distFiles.length || !distFiles.some((f) => have.includes(f.filename))) {
       cleanup();
@@ -479,9 +575,13 @@ export async function registryInstall(
     // Limite conhecido (§11.2): offline, deps transitivas resolvem por
     // nome no --find-links sem pin de hash.
     ...(deps.offline ? ['--no-index', '--find-links', wheels] : []),
-    // Caminho explícito do artefato verificado — pip não resolve por nome,
-    // então um arquivo plantado com a mesma dist==versão nunca é escolhido.
-    path.join(wheels, verifiedFile),
+    // Com lock: o fecho INTEIRO é passado por caminho explícito — o pip não
+    // resolve nada por nome e --no-index bloqueia qualquer queda pra rede.
+    // Sem lock: caminho explícito do artefato da dist verificado — um
+    // arquivo plantado com a mesma dist==versão nunca é escolhido.
+    ...(lock
+      ? lock.artifacts.map((a) => path.join(wheels, a.filename))
+      : [path.join(wheels, verifiedFile)]),
   ];
   const pip = await run(vpy, pipArgs);
   if (pip.exitCode !== 0) {
@@ -531,6 +631,7 @@ export async function registryInstall(
     },
     yanked: resolved.yanked,
     staleCache: resolved.staleCache,
+    offlineLock: lock ? { file: deps.lockFile!, artifacts: lock.artifacts.length } : undefined,
   };
   // Patch do lifecycle (history/pinned) antes das duas escritas atômicas —
   // crash entre install e pós-persistência do chamador não perde histórico.

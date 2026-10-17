@@ -70,6 +70,19 @@ export async function runInstallFlow(
   await checkEnvironment();
 
   const interactive = !isNonInteractive(cli);
+  // --yes nunca pergunta: sem seleção explícita (--all/--only/nomes) é erro
+  // nomeado — um prompt escondido sob --yes seria uma mentira de automação.
+  if (
+    interactive &&
+    cli.yes &&
+    !cli.all &&
+    !(cli.only?.length ?? 0) &&
+    !resolved.names.length &&
+    !cloneOnly
+  ) {
+    log.error(S.errYesNeedsSelection);
+    process.exit(2);
+  }
   const targetDir = interactive
     ? cli.dir
       ? resolveTargetDir(cli.dir)

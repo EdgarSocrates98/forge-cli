@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 import { cancel, intro, log, note, outro } from '@clack/prompts';
 import { loadState } from './artifacts.js';
-import { CliError, isNonInteractive, parseCliArgs, usage, type CliOptions } from './cli-args.js';
+import {
+  CliError,
+  isNonInteractive,
+  parseCliArgs,
+  usage,
+  usageFor,
+  type CliOptions,
+} from './cli-args.js';
 import { resolveCommand } from './commands.js';
 import { collectStatus } from './status.js';
 import { askRepos, askWorkspace } from './prompts.js';
 import { S } from './ui/strings.js';
-import { theme } from './ui/theme.js';
+import { setColorEnabled, theme } from './ui/theme.js';
+import { CLI_NAME, CLI_VERSION } from './version.js';
 import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
-import { applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
+import { ADVANCED_MENU_ITEMS, applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
 import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
@@ -23,6 +31,7 @@ import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
 import {
   runRegistryInstall,
   runRegistryList,
+  runRegistryLock,
   runRegistryPin,
   runRegistryReinstall,
   runRegistryRollback,
@@ -100,18 +109,26 @@ async function main(): Promise<void> {
     console.log(usage());
     process.exit(2);
   }
+  // --no-color/NO_COLOR valem para todo ANSI (banner, theme, clack).
+  if (cli.noColor || 'NO_COLOR' in process.env) setColorEnabled(false);
+  // `forge-cli --version` sozinho: versão do CLI; `--version <x>` segue pin.
+  if (cli.versionFlag) {
+    process.stdout.write(`${CLI_NAME} ${CLI_VERSION}\n`);
+    process.exit(0);
+  }
   const quiet = cli.jsonReport && JSON_QUERY_COMMANDS.has(cli.positionals[0] ?? '');
   if (!quiet) {
     await printBanner();
     intro(theme.accent(S.intro));
   }
   if (cli.help) {
-    console.log(usage());
+    console.log(usageFor(cli.positionals));
     process.exit(0);
   }
   if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
     const next = await applyMenu(cli, {
       ask: () => askMenu({}, menuItemsFor(cli)),
+      askAdvanced: () => askMenu({}, ADVANCED_MENU_ITEMS, S.menuAdvanced),
       workspace: askWorkspace,
       resolveDir: resolveTargetDir,
       pickRepos: async (dir) => {
@@ -245,7 +262,7 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'wizard') {
-    if (isNonInteractive(cli)) {
+    if (isNonInteractive(cli) || cli.yes) {
       log.error(S.errCloneNeedsNames);
       process.exit(2);
     }
@@ -285,6 +302,21 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'registry') {
+    // `forge registry <verbo>`: lock gera o fecho offline; install é
+    // atalho de `install --method registry`; o resto lista catálogo/estado.
+    const [sub, ...subNames] = resolved.names;
+    if (sub === 'lock') {
+      await runRegistryLock(cli, subNames);
+      return;
+    }
+    if (sub === 'install') {
+      if (!subNames.length) {
+        log.error(S.errRegistryNeedsNames);
+        process.exit(2);
+      }
+      await runRegistryInstall(cli, subNames);
+      return;
+    }
     runRegistryList(cli, { names: resolved.names });
     return;
   }
@@ -301,7 +333,7 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'help') {
-    console.log(usage());
+    console.log(usageFor(cli.positionals));
     process.exit(0);
   }
   if (resolved.command === 'components') {

@@ -35,6 +35,7 @@ import {
 } from '../native-install.js';
 import { FORGE_REPOS } from '../constants/repos.js';
 import { resolveRelease, type FetchLike, type ResolveError } from '../registry/pypi.js';
+import { generateOfflineLock, type OfflineLock } from '../registry/lock.js';
 import { compareVersions, parseVersion, type ParsedVersion } from '../registry/versions.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
@@ -91,6 +92,7 @@ function describeInstallError(e: InstallError): string {
   if (e.stage === 'offline-missing-artifact') return `${S.registryOfflineMissing}: ${e.detail}`;
   if (e.stage === 'hash-mismatch') return `${S.registryHashMismatch}: ${e.detail}`;
   if (e.stage === 'already-installed') return e.detail;
+  if (e.stage === 'lock') return `${e.error.kind}: ${e.error.detail}`;
   return `${e.stage}: ${e.detail}`;
 }
 
@@ -409,6 +411,7 @@ export async function runRegistryInstall(
       home,
       cacheDir: registryCacheDir(home),
       offline: cli.offline,
+      lockFile: cli.lockFile,
       pythons,
       clean: cli.clean,
       fetchImpl: deps.fetchImpl,
@@ -470,6 +473,117 @@ export async function runRegistryInstall(
   });
   note(bins.filter(Boolean).join('\n'), 'Para usar, adicione ao PATH ou invoque o caminho');
   outro(`${icons.ok} instalação registry-first concluída`);
+  return results;
+}
+
+/**
+ * `forge-cli registry lock <forja…>` — resolve ONLINE uma vez e gera
+ * `<forja>.offline-lock.json` (--out <arquivo|dir>) com o fecho transitivo
+ * inteiro (name/version/filename/sha256/tags). É o preparo do modo offline:
+ * exige rede justamente por isso — `--offline` aqui seria contradição.
+ */
+export async function runRegistryLock(
+  cli: CliOptions,
+  names: string[],
+  deps: {
+    home?: string;
+    pythons?: ProbedPython[];
+    fetchImpl?: FetchLike;
+    run?: RunLike;
+  } = {},
+): Promise<{ forge: string; ok: boolean; detail: string; file?: string }[]> {
+  const home = deps.home ?? cliHome();
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  if (!names.length) {
+    const msg = S.errRegistryNeedsNames;
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+  }
+  if (cli.offline) {
+    const msg = 'registry lock exige rede — ele gera o fecho que o --offline consome';
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+  }
+  const entries = names.map((n) => ({ name: n, entry: registryEntry(n) }));
+  const unknown = entries.filter((e) => !e.entry);
+  if (unknown.length) {
+    const msg = `${unknown.map((u) => u.name).join(', ')}: sem dist no catálogo registry`;
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+  }
+  const pythons = deps.pythons ?? (await probePythons());
+  if (!pythons.length) {
+    const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 1);
+    log.error(msg);
+    process.exit(1);
+  }
+  const pin = cli.ref?.replace(/^v(?=\d)/, '');
+  const results: { forge: string; ok: boolean; detail: string; file?: string }[] = [];
+  const locks: { forge: string; lock: OfflineLock; file: string }[] = [];
+  for (const { entry } of entries) {
+    const e = entry!;
+    const resolved = await resolveRelease(e.dist, {
+      pin,
+      cacheDir: registryCacheDir(home),
+      fetchImpl: deps.fetchImpl,
+    });
+    if ('kind' in resolved) {
+      results.push({ forge: e.name, ok: false, detail: describeResolveError(resolved) });
+      continue;
+    }
+    const picked = selectInterpreter(e, resolved, pythons);
+    if ('error' in picked) {
+      results.push({ forge: e.name, ok: false, detail: describeResolveError(picked.error) });
+      continue;
+    }
+    const lock = await generateOfflineLock(e, resolved.version, {
+      run: deps.run ?? execaRun,
+      python: picked.python,
+      cacheDir: registryCacheDir(home),
+    });
+    if ('kind' in lock) {
+      results.push({ forge: e.name, ok: false, detail: `${lock.kind}: ${lock.detail}` });
+      continue;
+    }
+    // --out: arquivo quando uma Forja, diretório quando várias; default
+    // `<forja>.offline-lock.json` no cwd.
+    const out = cli.out
+      ? entries.length === 1
+        ? path.resolve(cli.out)
+        : path.join(path.resolve(cli.out), `${e.name}.offline-lock.json`)
+      : path.resolve(`${e.name}.offline-lock.json`);
+    mkdirSync(path.dirname(out), { recursive: true });
+    writeFileAtomic(out, `${JSON.stringify(lock, null, 2)}\n`);
+    locks.push({ forge: e.name, lock, file: out });
+    results.push({
+      forge: e.name,
+      ok: true,
+      file: out,
+      detail: `${e.dist}==${resolved.version} · ${lock.artifacts.length} artefatos`,
+    });
+    if (!quiet)
+      log.info(`${e.name}: lock → ${theme.dim(out)} (${lock.artifacts.length} artefatos)`);
+  }
+  const doc = {
+    locks: locks.map((l) => ({ forge: l.forge, file: l.file, artifacts: l.lock.artifacts.length })),
+    results,
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, results.every((r) => r.ok) ? 0 : 1);
+  for (const r of results) if (!r.ok) log.error(`${r.forge}: ${r.detail}`);
+  if (results.some((r) => !r.ok)) process.exit(1);
+  outro(`${icons.ok} lock(s) offline gerado(s)`);
   return results;
 }
 

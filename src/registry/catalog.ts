@@ -20,6 +20,12 @@ export interface RegistryEntry {
    * `{bin}` = bin principal da venv; `{binDir}/x` = script irmão na venv.
    */
   mcp?: string[];
+  /**
+   * Allowlist explícita de tools MCP seguras para `mcp --verify` chamar —
+   * read-only e sem efeitos. Declarada pelo mantenedor, nunca inferida do
+   * nome da tool. Ausente/vazia → verify para em TOOLS_DISCOVERED.
+   */
+  mcp_safe_tools?: string[];
 }
 
 export const REGISTRY_PACKAGES: RegistryEntry[] = [
@@ -36,6 +42,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'apiforge',
     minPython: '3.12',
     mcp: ['{binDir}/apiforge-mcp'],
+    // Tools documentadas em src/apiforge/mcp (read-only).
+    mcp_safe_tools: ['apiforge_tools', 'apiforge_discover'],
     origin: 'official',
   },
   {
@@ -44,6 +52,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'platformforge',
     minPython: '3.10',
     mcp: ['{binDir}/platformforge-mcp'],
+    // Tools read-only em platformforge/mcp/registry.py.
+    mcp_safe_tools: ['platformforge_inspect', 'platformforge_agents'],
     origin: 'official',
   },
   {
@@ -52,6 +62,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'sparkforge-aws',
     minPython: '3.10',
     mcp: ['{bin}', 'mcp', 'serve'],
+    // Tools read-only em sparkforge_aws/adapters/tools.py.
+    mcp_safe_tools: ['sparkforge_aws_pack_list', 'sparkforge_aws_rules_lookup'],
     origin: 'official',
   },
   {
@@ -60,6 +72,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'sparkforge-azure',
     minPython: '3.10',
     mcp: ['{bin}', 'mcp', 'serve'],
+    // read_only, zero params — docs/reference/mcp-tools.md.
+    mcp_safe_tools: ['sfa_version', 'sfa_agents_list'],
     origin: 'official',
   },
   {

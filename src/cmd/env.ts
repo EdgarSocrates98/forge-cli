@@ -1,5 +1,5 @@
-import { log, note } from '@clack/prompts';
-import { existsSync, readdirSync } from 'node:fs';
+import { isCancel, log, note, text } from '@clack/prompts';
+import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { catalogFor } from './shared.js';
 import type { CliOptions } from '../cli-args.js';
@@ -13,14 +13,16 @@ import {
   type EnvPlan,
 } from '../envintel/migrate.js';
 import type { Finding } from '../envintel/model.js';
+import { formatEntry, parseEnv, serializeEnv } from '../envintel/parse.js';
 import { deriveSchema } from '../envintel/schema.js';
-import { validateEnv } from '../envintel/validate.js';
-import { resolveInside } from '../safety.js';
+import { checkValue, validateEnv } from '../envintel/validate.js';
+import { exitCancelled } from '../prompts.js';
+import { resolveInside, writeFileAtomic } from '../safety.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { resolveTargetDir } from '../utils/system.js';
 
-const VERBS = new Set(['inspect', 'plan', 'init', 'validate', 'migrate', 'doctor']);
+const VERBS = new Set(['inspect', 'plan', 'init', 'validate', 'migrate', 'doctor', 'wizard']);
 
 /** Diretórios sob `dir` que contêm .env ou .env.example. */
 function envCandidates(dir: string): string[] {
@@ -167,6 +169,66 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
   const schema = deriveSchema(repoDir, envKeys);
   const secretKeys = new Set(schema.vars.filter((v) => v.secret).map((v) => v.key));
   const envPath = path.join(repoDir, '.env');
+
+  if (verb === 'wizard') {
+    // Assistente .env: mostra cada var do schema com required/optional,
+    // valor atual (segredos mascarados) e default; valida tipo/formato
+    // por kind; preserva o arquivo existente e grava .env.bak antes.
+    // Intrinsecamente interativo — --json/--yes/pipes viram recusa nomeada.
+    if (json || yes || !process.stdin.isTTY || !process.stdout.isTTY) {
+      log.error(S.envWizardNonInteractive);
+      return 2;
+    }
+    const env = parseEnv(existsSync(envPath) ? readFileSync(envPath, 'utf8') : '');
+    const current = new Map(env.entries.map((e) => [e.key, e]));
+    const updates = new Map<string, string>();
+    for (const spec of schema.vars) {
+      const cur = current.get(spec.key);
+      const shown = cur ? (spec.secret ? S.envSecretHidden : cur.value) : S.envVarMissing;
+      const flag = spec.required ? S.envWizardRequired : S.envWizardOptional;
+      const answer = await text({
+        message: `${spec.key} ${theme.dim(`${flag} · atual: ${shown}${spec.default !== undefined ? ` · default: ${spec.default}` : ''}`)}`,
+        placeholder: cur ? (spec.secret ? S.envWizardKeep : cur.value) : (spec.default ?? ''),
+        ...(cur && !spec.secret ? { initialValue: cur.value } : {}),
+        validate: (v) => {
+          const typed = String(v ?? '').trim();
+          if (!typed) {
+            const effective = cur?.value ?? spec.default ?? '';
+            if (!effective && spec.required) return S.envWizardRequiredMsg;
+            return;
+          }
+          if (!checkValue(spec, typed, { baseDir: repoDir })) {
+            return `${spec.kind}: ${S.envWizardInvalid}`;
+          }
+          return;
+        },
+      });
+      if (isCancel(answer)) exitCancelled();
+      const typed = String(answer ?? '').trim();
+      const effective = typed || (cur?.value ?? spec.default ?? '');
+      if (!effective || effective === cur?.value) continue;
+      updates.set(spec.key, effective);
+    }
+    if (!updates.size) {
+      log.info(S.envWizardNothing);
+      return 0;
+    }
+    // Rewrite preservando linhas/comentários: só as linhas das chaves
+    // alteradas são substituídas; chaves novas vão para o fim.
+    const lines = [...env.lines];
+    for (const e of env.entries) {
+      const next = updates.get(e.key);
+      if (next === undefined) continue;
+      lines[e.line] = formatEntry(e.key, next) + (e.comment ? ` # ${e.comment}` : '');
+      updates.delete(e.key);
+    }
+    for (const [k, v] of updates) lines.push(formatEntry(k, v));
+    const out = serializeEnv({ ...env, lines });
+    if (existsSync(envPath)) copyFileSync(envPath, `${envPath}.bak`);
+    writeFileAtomic(envPath, out.endsWith('\n') ? out : `${out}\n`);
+    log.success(`${icons.ok} ${S.envWizardDone} ${theme.dim(`(${envPath}.bak)`)}`);
+    return 0;
+  }
 
   if (verb === 'plan') {
     const plan = planMigration(repoDir, schema);
