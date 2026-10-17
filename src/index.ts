@@ -20,6 +20,8 @@ import {
   runVersionsCommand,
 } from './cmd/query.js';
 import { runDoctor2Command, runHealCommand } from './cmd/doctor2.js';
+import { runRegistryInstall, runRegistryList, runRegistryUninstall } from './cmd/registry.js';
+import { registryNames } from './registry/catalog.js';
 import {
   runPinCommand,
   runUnpinCommand,
@@ -184,6 +186,10 @@ async function main(): Promise<void> {
     process.exitCode = await runBundleCommand(cli);
     return;
   }
+  if (resolved.command === 'registry') {
+    runRegistryList(cli);
+    return;
+  }
   if (resolved.command === 'learning') {
     process.exitCode = await runLearningCommand(cli);
     return;
@@ -259,6 +265,10 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'uninstall') {
+    if (cli.method === 'registry') {
+      await runRegistryUninstall(cli, resolved.names);
+      return;
+    }
     await runForgeUninstall(cli, resolved.names);
     return;
   }
@@ -277,6 +287,19 @@ async function main(): Promise<void> {
   if (resolved.command === 'reinstall' && !resolved.names.length && !isNonInteractive(cli)) {
     log.error(S.errReinstallNeedsNames);
     process.exit(2);
+  }
+  if (resolved.command === 'install' && cli.method === 'registry') {
+    const names = resolved.names.length
+      ? resolved.names
+      : cli.all
+        ? registryNames()
+        : (cli.only ?? []);
+    if (!names.length) {
+      log.error('informe as Forjas (ex.: forge-cli install api-forge --method registry) ou --all');
+      process.exit(2);
+    }
+    await runRegistryInstall(cli, names);
+    return;
   }
   if (resolved.names.length) cli = { ...cli, only: [...(cli.only ?? []), ...resolved.names] };
   const cloneOnly = resolved.command === 'clone';

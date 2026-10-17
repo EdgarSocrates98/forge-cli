@@ -30,6 +30,7 @@ export type Command =
   | 'ai'
   | 'bundle'
   | 'learning'
+  | 'registry'
   | 'self-install'
   | 'self-update'
   | 'self-uninstall'
@@ -82,6 +83,7 @@ export function resolveCommand(cli: Pick<CliOptions, 'positionals'>): ResolvedCo
   if (head === 'ai') return { command: 'ai', names: rest };
   if (head === 'bundle') return { command: 'bundle', names: rest };
   if (head === 'learning') return { command: 'learning', names: rest };
+  if (head === 'registry') return { command: 'registry', names: rest };
   if (head === 'uninstall') return { command: 'uninstall', names: rest };
   if (REPO_COMMANDS.has(head)) return { command: head as Command, names: rest };
   return { command: 'unknown', names: [], unknown: head };

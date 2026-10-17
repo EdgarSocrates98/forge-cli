@@ -131,3 +131,14 @@ describe('usage', () => {
     }
   });
 });
+
+describe('--method registry', () => {
+  it('aceita git e registry', () => {
+    expect(parseCliArgs(['--method', 'registry']).method).toBe('registry');
+    expect(parseCliArgs(['--method', 'git']).method).toBe('git');
+    expect(parseCliArgs([]).method).toBeUndefined();
+  });
+  it('rejeita método desconhecido', () => {
+    expect(() => parseCliArgs(['--method', 'ftp'])).toThrow(/method inválido/);
+  });
+});

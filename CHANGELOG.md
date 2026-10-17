@@ -5,6 +5,40 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Não lançado]
 
+### Cycle 11 — instalação registry-first (PyPI)
+
+#### Added
+
+- **`install --method registry`**: instala Forjas direto do PyPI sem
+  exigir clone do repositório nem o The Forge instalado. Cada Forja vai
+  para uma venv isolada em `~/.forge-cli/forges/<nome>/`, com
+  `pip install <dist>==<versão>` pinado e verify do console script.
+- **`forge-cli registry`**: lista o catálogo PyPI (7 dists), a versão
+  instalada e o binário de cada Forja; `--json` exporta.
+- **`uninstall --method registry`**: remove a venv e o receipt de uma
+  Forja instalada via registry.
+- **Resolver PyPI** (`src/registry/`): consulta o índice JSON do PyPI,
+  escolhe a estável mais nova (pré-releases ignoradas), honra
+  `--version`/`--ref` como pin e registra `source` no receipt
+  (`pinned|latest-stable|cache`).
+- **Compatibilidade Python pré-install**: `requires_python` do release é
+  avaliado por um subconjunto PEP 440 (`~=`, `==`/`!=` com `.*`, `>=`,
+  `>`, `<=`, `<`) contra os interpretadores detectados — o mais novo que
+  satisfaz a faixa vence, e falta de interpretador compatível é erro
+  honesto antes de qualquer mutação.
+- **Cache offline**: `--offline` resolve apenas pelo cache local
+  (`~/.forge-cli/cache/pypi/`, TTL 1h); falha de rede cai no cache
+  automaticamente quando existe.
+- **Receipts auditáveis**: `install.json` por Forja + `state.json`
+  consolidado registram dist, versão, `requires_python`, interpretador
+  escolhido, digests sha256 dos artefatos e o verify (comando + ok) —
+  incluindo installs que falharam no verify, para diagnóstico.
+
+#### Fixed
+
+- `install` sem nomes no modo registry agora recusa com orientação
+  explícita em vez de cair no fluxo interativo do git.
+
 ### Hardening pós-release
 
 #### Fixed
