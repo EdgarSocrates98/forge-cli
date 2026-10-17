@@ -97,6 +97,29 @@ O forge-cli só delega ao `<cli> install` que a Forja documenta; Forjas sem
 instalador nativo (ex.: forge-portal) recebem um aviso, sem substituto
 silencioso. Veja [docs/capabilities.md](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md).
 
+## Instalação via PyPI (registry-first)
+
+Além do método git (clone + scripts), `install --method registry`
+instala cada Forja direto do PyPI — sem clonar o repositório e sem
+exigir o The Forge. Cada Forja vai para uma venv isolada em
+`~/.forge-cli/forges/<nome>/` com `pip install <dist>==<versão>`
+pinado na estável mais nova (ou `--version`/`--ref` para pinar, uma
+Forja por comando). O interpretador escolhido é o mais novo que
+satisfaz `requires_python` do release; sem compatível, o install é
+recusado antes de qualquer mutação.
+
+- `forge-cli registry` lista o catálogo (7 dists) e o instalado.
+- Receipts em `install.json`/`state.json`: dist, versão, interpretador,
+  digests sha256 e verify — o artefato da dist é conferido byte a byte
+  após o download.
+- `--offline` resolve do cache local (metadados em
+  `~/.forge-cli/cache/pypi/`, wheels em `cache/wheels/<dist>/`);
+  artefato ausente = recusa honesta, nunca instalação fingida.
+- Releases yanked (PEP 592) são puladas na escolha automática; só
+  instalam por pin explícito e ficam marcadas no receipt.
+- `uninstall --method registry` remove venv + receipt com plano e
+  confirmação (`--yes`); `--all`/`--only` resolvem o conjunto instalado.
+
 ## Independência
 
 O forge-cli é uma conveniência opcional: nenhuma Forja depende dele e remover o CLI (`self uninstall`) não afeta Forjas já instaladas. Instalações feitas à mão são reconhecidas (`forge-cli status`) sem precisar reinstalar. Estes cenários estão cobertos em `tests/independence.test.ts`.
@@ -111,6 +134,10 @@ forge-cli status                             # estado local (clonado, versão, a
 forge-cli update [--check]                   # atualiza (ou só verifica) Forjas clonadas
 forge-cli versions api-forge                 # revisão e tags
 forge-cli install api-forge --version 1.2.0  # fixa em tag/sha (checkout destacado)
+forge-cli install api-forge --method registry # instala do PyPI em venv isolada (~/.forge-cli/forges/)
+forge-cli install --all --method registry     # todas as Forjas publicadas via PyPI
+forge-cli registry                            # catálogo PyPI + instaladas (--json estrutura)
+forge-cli uninstall api-forge --method registry --yes  # remove venv + receipt registry
 forge-cli pin|unpin|rollback api-forge       # fixação e retorno ao HEAD anterior
 forge-cli reinstall api-forge [--clean]      # mantém a revisão; --clean reclona com backup
 forge-cli uninstall api-forge [--yes]        # plano + backup de .env/configs

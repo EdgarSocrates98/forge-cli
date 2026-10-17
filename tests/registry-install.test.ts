@@ -1,10 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registryEntry } from '../src/registry/catalog.js';
 import {
   forgeVenv,
+  wheelCacheDir,
   loadForgeState,
   receiptPath,
   registryInstall,
@@ -23,8 +25,8 @@ const PYPI = {
   releases: {
     '0.1.0': [
       {
-        filename: 'd-0.1.0-py3-none-any.whl',
-        url: 'https://f/d-0.1.0.whl',
+        filename: 'apiforge_af-0.1.0-py3-none-any.whl',
+        url: 'https://f/apiforge_af-0.1.0.whl',
         digests: { sha256: 'a'.repeat(64) },
         packagetype: 'bdist_wheel',
       },
@@ -66,9 +68,12 @@ describe('registryInstall', () => {
     expect(calls[0]).toContain('-m');
     expect(calls[0]).toContain('venv');
     expect(calls[0].at(-1)).toBe(venvDir);
+    expect(calls[1]).toContain('download');
     expect(calls[1].slice(-1)).toEqual(['apiforge-af==0.1.0']);
-    expect(calls[2][0]).toBe(res.bin);
-    expect(calls[2][1]).toBe('--help');
+    expect(calls[2]).toContain('install');
+    expect(calls[2]).toContain('apiforge-af==0.1.0');
+    expect(calls[3][0]).toBe(res.bin);
+    expect(calls[3][1]).toBe('--help');
 
     const receipt = JSON.parse(readFileSync(receiptPath(tmp, 'api-forge'), 'utf8'));
     expect(receipt.version).toBe('0.1.0');
@@ -129,7 +134,9 @@ describe('registryInstall', () => {
       cacheDir: path.join(tmp, 'c'),
       pythons: [py('3.12.4')],
       run: async (_c, args) =>
-        args.includes('pip') ? { exitCode: 1, stderr: 'ResolutionImpossible' } : { exitCode: 0 },
+        args.includes('install')
+          ? { exitCode: 1, stderr: 'ResolutionImpossible' }
+          : { exitCode: 0 },
       fetchImpl: fetchOk,
     });
     expect(res).toMatchObject({ stage: 'pip' });
@@ -159,6 +166,127 @@ describe('registryInstall', () => {
       fetchImpl: fetchOk,
     });
     expect(res).toMatchObject({ stage: 'no-python' });
+  });
+});
+
+describe('segurança e edge cases do install', () => {
+  const base = () => ({
+    home: tmp,
+    cacheDir: path.join(tmp, 'c'),
+    pythons: [py('3.12.4')],
+    fetchImpl: fetchOk,
+  });
+
+  it('offline sem artefato em cache → offline-missing-artifact + venv removida', async () => {
+    const metaDir = path.join(tmp, 'c');
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      path.join(metaDir, 'apiforge-af.json'),
+      JSON.stringify({ fetchedAt: Date.now(), payload: PYPI }),
+    );
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      offline: true,
+      run: async () => ({ exitCode: 0 }),
+    });
+    expect(res).toMatchObject({ stage: 'offline-missing-artifact' });
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+  });
+
+  it('offline com artefato → pip recebe --no-index --find-links', async () => {
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, 'apiforge_af-0.1.0-py3-none-any.whl'), 'wb');
+    // resolve offline exige metadata cache também — grava o cache do PyPI
+    const metaDir = path.join(tmp, 'c');
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      path.join(metaDir, 'apiforge-af.json'),
+      JSON.stringify({ fetchedAt: Date.now(), payload: PYPI }),
+    );
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      offline: true,
+      run: runOk(calls),
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    const pipArgs = calls.find((c) => c.includes('install'))!;
+    expect(pipArgs).toContain('--no-index');
+    expect(pipArgs).toContain('--find-links');
+  });
+
+  it('sha256 divergente → hash-mismatch + venv removida', async () => {
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, 'apiforge_af-0.1.0-py3-none-any.whl'), 'tampered');
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      run: async () => ({ exitCode: 0 }),
+    });
+    expect(res).toMatchObject({ stage: 'hash-mismatch' });
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+  });
+
+  it('sha256 correto → verifiedHash gravado no receipt', async () => {
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    const content = 'real-wheel-bytes';
+    writeFileSync(path.join(wheels, 'apiforge_af-0.1.0-py3-none-any.whl'), content);
+    const sha = createHash('sha256').update(content).digest('hex');
+    const payload = JSON.parse(JSON.stringify(PYPI));
+    payload.releases['0.1.0'][0].digests.sha256 = sha;
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      run: async () => ({ exitCode: 0 }),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(res.verifiedHash).toBe(sha);
+  });
+
+  it('falha no pip → venv órfã removida', async () => {
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      run: async (_c, args) =>
+        args.includes('install') ? { exitCode: 1, stderr: 'x' } : { exitCode: 0 },
+    });
+    expect(res).toMatchObject({ stage: 'pip' });
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+  });
+
+  it('specifier fora do subconjunto → specifier-unknown, não incompatible', async () => {
+    const payload = {
+      info: { requires_python: '===3.12' },
+      releases: PYPI.releases,
+    };
+    const res = await registryInstall(ENTRY, undefined, {
+      ...base(),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    expect(res).toMatchObject({ stage: 'resolve', error: { kind: 'specifier-unknown' } });
+  });
+
+  it('release toda yanked: pin explícito instala e marca receipt', async () => {
+    const payload = {
+      info: { requires_python: '>=3.10' },
+      releases: {
+        '0.1.0': [
+          {
+            filename: 'apiforge_af-0.1.0-py3-none-any.whl',
+            url: 'https://f/x.whl',
+            yanked: true,
+          },
+        ],
+      },
+    };
+    const res = await registryInstall(ENTRY, '0.1.0', {
+      ...base(),
+      run: async () => ({ exitCode: 0 }),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(res.yanked).toBe(true);
   });
 });
 

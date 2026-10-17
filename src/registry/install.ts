@@ -4,7 +4,8 @@
  * verify do console script e receipt auditável — tudo com runner/fetch
  * injetáveis para teste determinístico.
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { execa } from 'execa';
 import type { RegistryEntry } from './catalog.js';
@@ -29,6 +30,10 @@ export interface RegistryInstallReceipt {
   installedAt: string;
   verify: { command: string[]; ok: boolean };
   files: { filename: string; sha256?: string; packagetype?: string }[];
+  /** sha256 do artefato da dist conferido byte a byte após o download. */
+  verifiedHash?: string;
+  yanked?: boolean;
+  staleCache?: boolean;
 }
 
 export interface ForgeState {
@@ -52,10 +57,18 @@ export function receiptPath(home: string, name: string): string {
 }
 
 export function loadForgeState(home: string): ForgeState {
+  const file = forgeStatePath(home);
+  if (!existsSync(file)) return { forges: {} };
   try {
-    const raw = JSON.parse(readFileSync(forgeStatePath(home), 'utf8')) as ForgeState;
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as ForgeState;
     return typeof raw.forges === 'object' && raw.forges ? raw : { forges: {} };
   } catch {
+    // estado corrompido não é silenciosamente sobrescrito — preserva evidência
+    try {
+      writeFileSync(`${file}.corrupt`, readFileSync(file), { flag: 'wx' });
+    } catch {
+      // melhor esforço: o erro primário é o parse
+    }
     return { forges: {} };
   }
 }
@@ -63,6 +76,10 @@ export function loadForgeState(home: string): ForgeState {
 function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
   writeFileSync(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+}
+
+export function wheelCacheDir(cacheDir: string, dist: string): string {
+  return path.join(path.dirname(cacheDir), 'wheels', dist);
 }
 
 export function venvBin(venvDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -108,6 +125,9 @@ export type InstallError =
   | { stage: 'resolve'; error: ResolveError }
   | { stage: 'no-python'; detail: string }
   | { stage: 'venv'; detail: string }
+  | { stage: 'download'; detail: string }
+  | { stage: 'offline-missing-artifact'; detail: string }
+  | { stage: 'hash-mismatch'; detail: string }
   | { stage: 'pip'; detail: string }
   | { stage: 'verify'; detail: string };
 
@@ -131,37 +151,116 @@ export async function registryInstall(
   if ('kind' in resolved) return { stage: 'resolve', error: resolved };
 
   // Seleciona o interpretador mais novo que satisfaz requires_python (+ piso do catálogo).
+  // `null` = especificador fora do subconjunto — diagnóstico distinto de incompatível.
   const floor = parseVersion(entry.minPython);
+  let sawUnknownSpec = false;
   const usable = deps.pythons.filter((p) => {
     if (floor && compareVersions(p.parsed, floor) < 0) return false;
     if (!resolved.requiresPython) return true;
-    return satisfiesRequiresPython(resolved.requiresPython, p.parsed) === true;
+    const sat = satisfiesRequiresPython(resolved.requiresPython, p.parsed);
+    if (sat === null) {
+      sawUnknownSpec = true;
+      return false;
+    }
+    return sat;
   });
   if (!usable.length) {
     return {
       stage: 'resolve',
-      error: {
-        kind: 'python-incompatible',
-        dist: entry.dist,
-        version: resolved.version,
-        requires: resolved.requiresPython ?? `>=${entry.minPython}`,
-        have: deps.pythons.map((p) => p.version).join(', '),
-      },
+      error: sawUnknownSpec
+        ? {
+            kind: 'specifier-unknown',
+            dist: entry.dist,
+            version: resolved.version,
+            requires: resolved.requiresPython!,
+          }
+        : {
+            kind: 'python-incompatible',
+            dist: entry.dist,
+            version: resolved.version,
+            requires: resolved.requiresPython ?? `>=${entry.minPython}`,
+            have: deps.pythons.map((p) => p.version).join(', '),
+          },
     };
   }
   const python = usable[0];
 
   const venvDir = forgeVenv(deps.home, entry.name);
+  const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
+  const cleanup = () => rmSync(venvDir, { recursive: true, force: true });
   const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
   if (venv.exitCode !== 0) {
+    cleanup();
     return { stage: 'venv', detail: venv.stderr ?? venv.stdout ?? 'falha ao criar venv' };
   }
 
   const vpy = venvPython(venvDir, platform);
   const spec = `${entry.dist}==${resolved.version}`;
-  const pipArgs = ['-m', 'pip', 'install', '--disable-pip-version-check', spec];
+  mkdirSync(wheels, { recursive: true });
+
+  // Artefatos: online baixa para o wheel cache (popula o modo offline);
+  // offline exige artefatos presentes — nunca finge instalar sem rede.
+  const distFiles = resolved.files.filter((f) =>
+    f.filename.startsWith(entry.dist.replace(/-/g, '_')),
+  );
+  let verifiedHash: string | undefined;
+  if (deps.offline) {
+    const have = existsSync(wheels) ? readdirSync(wheels) : [];
+    if (!distFiles.length || !distFiles.some((f) => have.includes(f.filename))) {
+      cleanup();
+      return {
+        stage: 'offline-missing-artifact',
+        detail: `${spec}: sem wheel/sdist em ${wheels} — instale online uma vez`,
+      };
+    }
+  } else {
+    const dl = await run(vpy, [
+      '-m',
+      'pip',
+      'download',
+      '--disable-pip-version-check',
+      '--dest',
+      wheels,
+      spec,
+    ]);
+    if (dl.exitCode !== 0) {
+      cleanup();
+      return {
+        stage: 'download',
+        detail: (dl.stderr ?? dl.stdout ?? 'falha no pip download').trim(),
+      };
+    }
+    // Integridade do artefato da própria dist contra o digest publicado no PyPI.
+    const have = readdirSync(wheels);
+    for (const f of distFiles) {
+      if (!have.includes(f.filename) || !f.sha256) continue;
+      const digest = createHash('sha256')
+        .update(readFileSync(path.join(wheels, f.filename)))
+        .digest('hex');
+      if (digest !== f.sha256) {
+        cleanup();
+        return {
+          stage: 'hash-mismatch',
+          detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
+        };
+      }
+      verifiedHash = digest;
+    }
+  }
+
+  const pipArgs = [
+    '-m',
+    'pip',
+    'install',
+    '--disable-pip-version-check',
+    '--find-links',
+    wheels,
+    ...(deps.offline ? ['--no-index'] : []),
+    spec,
+  ];
   const pip = await run(vpy, pipArgs);
   if (pip.exitCode !== 0) {
+    cleanup();
     return { stage: 'pip', detail: (pip.stderr ?? pip.stdout ?? 'falha no pip install').trim() };
   }
 
@@ -189,6 +288,9 @@ export async function registryInstall(
       sha256: f.sha256,
       packagetype: f.packagetype,
     })),
+    verifiedHash,
+    yanked: resolved.yanked,
+    staleCache: resolved.staleCache,
   };
 
   mkdirSync(path.dirname(receiptPath(deps.home, entry.name)), { recursive: true });

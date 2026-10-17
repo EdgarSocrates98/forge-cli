@@ -208,3 +208,61 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
     expect(existsSync(dir)).toBe(true);
   });
 });
+
+describe('dispatch --method registry', () => {
+  it('install sem nomes recusa com orientação', async () => {
+    const res = await cli('install', '--method', 'registry', '--yes');
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('--method registry');
+  });
+
+  it('--ref em multi-Forja recusa como no fluxo git', async () => {
+    const res = await cli(
+      'install',
+      'api-forge',
+      'platform-forge',
+      '--method',
+      'registry',
+      '--ref',
+      'v0.1.0',
+      '--yes',
+    );
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('exigem exatamente uma Forja');
+  });
+
+  it.each(['update', 'clone', 'reinstall', 'rollback'])(
+    '%s --method registry é recusado (método errado nunca executa)',
+    async (verb) => {
+      const res = await cli(verb, 'api-forge', '--method', 'registry', '--yes');
+      expect(res.code).toBe(2);
+      expect(res.out).toContain('só é suportado em install|uninstall');
+    },
+  );
+
+  it('uninstall --method registry sem nomes/only/all recusa (não cai no legado)', async () => {
+    const res = await cli('uninstall', '--method', 'registry', '--yes');
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('uninstall --method registry exige nomes');
+    expect(res.out).not.toContain('PATH');
+  });
+
+  it('uninstall --method registry de nome desconhecido → código 2', async () => {
+    const res = await cli('uninstall', 'bogus-name', '--method', 'registry', '--yes');
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('sem dist no catálogo registry');
+  });
+
+  it('uninstall --method registry --yes de não-instalado avisa e sai 0', async () => {
+    const res = await cli('uninstall', 'api-forge', '--method', 'registry', '--yes');
+    expect(res.code).toBe(0);
+    expect(res.out).toContain('não estava instalado via registry');
+  });
+
+  it('registry --json emite JSON parseável (sem banner)', async () => {
+    const res = await cli('registry', '--json');
+    expect(res.code).toBe(0);
+    const doc = JSON.parse(res.out);
+    expect(doc.forges.map((f: { forge: string }) => f.forge)).toContain('api-forge');
+  });
+});

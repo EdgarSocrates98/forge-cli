@@ -57,6 +57,18 @@ export const S = {
   errRefDirty: 'Working tree com alterações locais — não é seguro trocar de revisão',
   refCheckedOut: 'Revisão',
   errRefNeedsOne: '--ref/--version exigem exatamente uma Forja',
+  errMethodUnsupported: '--method registry só é suportado em install|uninstall',
+  errRegistryNeedsNames:
+    'informe as Forjas (ex.: forge-cli install api-forge --method registry) ou --all',
+  errRegistryUninstallNeedsNames:
+    'uninstall --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
+  registryUninstallConfirm: 'remover venvs e receipts das Forjas instaladas via PyPI',
+  registryUninstallNeedsYes: 'Nada foi removido. Reexecute com --yes para confirmar.',
+  registryIgnoredFlags: 'flags ignoradas no método registry',
+  registryStaleCache: 'cache do PyPI expirado — metadados podem estar desatualizados',
+  registryOfflineMissing: 'artefato ausente no cache local — instalação offline impossível',
+  registryHashMismatch: 'digest sha256 diverge do publicado no PyPI — instalação abortada',
+  registryVerifyFailed: '(verify falhou)',
   errRefExclusive: 'Use apenas um entre --ref e --version',
   errRefInvalid: 'Revisão/versão inválida',
   updateCheckTitle: 'Verificação de atualizações',

@@ -172,3 +172,101 @@ describe('resolveRelease', () => {
     expect(res).not.toHaveProperty('kind');
   });
 });
+
+describe('yanked e releases vazios', () => {
+  const YANKED = {
+    info: { requires_python: '>=3.10' },
+    releases: {
+      '0.1.0': [{ filename: 'd-0.1.0.whl', url: 'u1' }],
+      '0.2.0': [{ filename: 'd-0.2.0.whl', url: 'u2', yanked: true }],
+      '0.2.5': [],
+      '0.3.0': [{ filename: 'd-0.3.0.whl', url: 'u3' }],
+    },
+  };
+  const fy: FetchLike = async () => ({ status: 200, body: JSON.stringify(YANKED) });
+
+  it('latest-stable ignora releases yanked e sem arquivos', async () => {
+    const res = await resolveRelease('d', { cacheDir: tmp, fetchImpl: fy });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.version).toBe('0.3.0');
+  });
+
+  it('maior estável toda yanked → cai para a anterior instalável', async () => {
+    const p = {
+      info: {},
+      releases: { '0.1.0': YANKED.releases['0.1.0'], '9.9.9': YANKED.releases['0.2.0'] },
+    };
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(p) }),
+    });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.version).toBe('0.1.0');
+  });
+
+  it('pin em release yanked → instala e marca', async () => {
+    const res = await resolveRelease('d', { pin: '0.2.0', cacheDir: tmp, fetchImpl: fy });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.version).toBe('0.2.0');
+    expect(res.yanked).toBe(true);
+  });
+});
+
+describe('requires_python por arquivo', () => {
+  it('prefere o da wheel ao do sdist/info', async () => {
+    const payload = {
+      info: { requires_python: '>=3.9' },
+      releases: {
+        '0.1.0': [
+          {
+            filename: 'd-0.1.0.tar.gz',
+            url: 'u',
+            packagetype: 'sdist',
+            requires_python: '>=3.10',
+          },
+          {
+            filename: 'd-0.1.0-py3-none-any.whl',
+            url: 'u',
+            packagetype: 'bdist_wheel',
+            requires_python: '>=3.11',
+          },
+        ],
+      },
+    };
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
+    });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.requiresPython).toBe('>=3.11');
+  });
+});
+
+describe('cache expirado', () => {
+  it('fallback com cache expirado marca staleCache', async () => {
+    writeFileSync(
+      pypiCacheFile(tmp, 'd'),
+      JSON.stringify({ fetchedAt: Date.now() - 2 * 60 * 60 * 1000, payload: PAYLOAD }),
+    );
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+    });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.staleCache).toBe(true);
+  });
+
+  it('cache fresco no fallback não marca stale', async () => {
+    await resolveRelease('d', { cacheDir: tmp, fetchImpl: okFetch });
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+    });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.staleCache).toBeUndefined();
+  });
+});

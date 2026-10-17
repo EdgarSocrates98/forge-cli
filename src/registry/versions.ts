@@ -87,6 +87,8 @@ export function parseSpecifier(input: string): Specifier | null {
   if (!version) return null;
   const wildcard = Boolean(m[3]);
   if (wildcard && m[1] !== '==' && m[1] !== '!=') return null;
+  // `~=X` (um componente só) não define fronteira superior — fora do subconjunto.
+  if (m[1] === '~=' && version.release.length < 2) return null;
   return { op: m[1] as SpecOp, version, wildcard };
 }
 

@@ -118,6 +118,16 @@ export async function runStatusCommand(cli: CliOptions, names: string[]): Promis
   const catalog = catalogFor(targetDir);
   const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
   const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
+  const registry = loadForgeState(os.homedir()).forges;
+  for (const i of infos) {
+    const reg = registry[i.name];
+    if (reg && i.phase === 'not-installed') {
+      i.phase = 'installed';
+      i.describe = `pypi ${reg.dist}==${reg.version}${reg.verify.ok ? '' : ' (verify falhou)'}`;
+    } else if (reg) {
+      i.describe = [i.describe, `pypi ${reg.dist}==${reg.version}`].filter(Boolean).join(' + ');
+    }
+  }
   const label: Record<string, string> = {
     'not-installed': S.statusNotInstalled,
     cloned: S.statusCloned,

@@ -14,6 +14,7 @@ export interface ReleaseFile {
   sha256?: string;
   packagetype?: string;
   requiresPython?: string;
+  yanked?: boolean;
 }
 
 export interface ResolvedRelease {
@@ -23,6 +24,10 @@ export interface ResolvedRelease {
   files: ReleaseFile[];
   /** Como a versão foi escolhida — vai para o receipt. */
   source: 'pinned' | 'latest-stable' | 'cache';
+  /** Cache usado além do TTL — metadados podem estar velhos. */
+  staleCache?: boolean;
+  /** Release retirado do índice (PEP 592); só instala por pin explícito. */
+  yanked?: boolean;
 }
 
 export type ResolveError =
@@ -69,6 +74,7 @@ function parseFiles(raw: unknown): ReleaseFile[] {
       sha256: digests ? asString(digests.sha256) : undefined,
       packagetype: asString(rec.packagetype),
       requiresPython: asString(rec.requires_python) ?? undefined,
+      yanked: rec.yanked === true || typeof rec.yanked === 'string' ? true : undefined,
     });
   }
   return out;
@@ -124,6 +130,7 @@ export async function resolveRelease(
   const fetchImpl = opts.fetchImpl ?? defaultFetch;
   let payload: PypiPayload | null;
   let fromCache = false;
+  let staleCache = false;
 
   if (!opts.offline) {
     try {
@@ -140,6 +147,7 @@ export async function resolveRelease(
       if (cached) {
         payload = cached.payload;
         fromCache = true;
+        staleCache = !cached.fresh;
       } else {
         return {
           kind: 'network',
@@ -152,6 +160,7 @@ export async function resolveRelease(
     if (!cached) return { kind: 'offline-miss', dist };
     payload = cached.payload;
     fromCache = true;
+    staleCache = !cached.fresh;
   }
 
   const releases = payload?.releases;
@@ -159,9 +168,14 @@ export async function resolveRelease(
     return { kind: 'malformed', dist, detail: 'resposta sem campo releases' };
   }
 
-  const version = opts.pin ?? latestStable(Object.keys(releases));
+  const installable = Object.keys(releases).filter((v) => {
+    const files = parseFiles(releases[v]);
+    if (!files.length) return false;
+    return files.some((f) => !f.yanked);
+  });
+  const version = opts.pin ?? latestStable(installable);
   if (!version) {
-    return { kind: 'malformed', dist, detail: 'nenhuma versão estável disponível' };
+    return { kind: 'malformed', dist, detail: 'nenhuma versão estável instalável' };
   }
   if (!(version in releases)) {
     return {
@@ -173,10 +187,11 @@ export async function resolveRelease(
   }
 
   const files = parseFiles(releases[version]);
-  // `info.requires_python` é o piso do projeto; os arquivos do release podem
-  // declarar `requires_python` próprio que se sobrepõe.
+  // `requires_python`: prefere a wheel (o que o pip instala) → sdist → info.
   const requiresPython =
-    files.find((f) => f.requiresPython)?.requiresPython ?? asString(payload.info?.requires_python);
+    files.find((f) => f.packagetype === 'bdist_wheel' && f.requiresPython)?.requiresPython ??
+    files.find((f) => f.requiresPython)?.requiresPython ??
+    asString(payload.info?.requires_python);
 
   return {
     dist,
@@ -184,5 +199,7 @@ export async function resolveRelease(
     requiresPython,
     files,
     source: opts.pin ? 'pinned' : fromCache ? 'cache' : 'latest-stable',
+    staleCache: staleCache || undefined,
+    yanked: files.length && files.every((f) => f.yanked) ? true : undefined,
   };
 }

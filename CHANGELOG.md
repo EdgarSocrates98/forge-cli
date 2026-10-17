@@ -7,6 +7,45 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (dispatch + integridade)
+
+- **`--ref`/`--version` em multi-Forja** agora recusa como no fluxo git
+  (`errRefNeedsOne`) — antes aplicava o mesmo pin a todas as Forjas.
+- **`uninstall --method registry`**: dispatch movido para antes do
+  branch legado (sem nomes não executa mais a remoção do PATH),
+  `--all`/`--only` resolvem o conjunto instalado, e a remoção segue a
+  convenção destrutiva do repo — plano visível + confirmação/`--yes`.
+- **`--method registry` em comandos não suportados** (`update`, `clone`,
+  `reinstall`, `rollback`, …) é recusado em vez de cair no fluxo git.
+- **Offline real**: instalação online baixa artefatos para
+  `cache/wheels/<dist>/`; `--offline` instala com
+  `--no-index --find-links` e recusa com o artefato faltante nomeado
+  (nunca finge instalar sem rede).
+- **Integridade**: sha256 do artefato da dist é conferido byte a byte
+  após o download e gravado como `verifiedHash` no receipt; divergência
+  aborta antes do pip.
+- **Yanked/empty releases** não entram na escolha automática
+  (PEP 592); pin explícito instala e marca `yanked` no receipt.
+- **`status`** mostra Forjas instaladas via registry (fase
+  `installed`, `pypi dist==ver`) em vez de `not-installed`.
+- **`registry`** marca `(verify falhou)` em installs que não passaram
+  no verify; `--json` expõe `verifyOk`.
+- **`--json` no install/uninstall registry** emite JSON limpo (banner,
+  spinner e logs suprimidos); flags do fluxo git ignoradas viram aviso
+  explícito (`--dir`, `--profile`, `--scope`, `--components`,
+  `--host`, `--native`, `--skip-verify`, `--timeout`, `--jobs`,
+  `--retry-failed`).
+- **`requires_python` por arquivo**: prefere o da wheel (o que o pip
+  instala) ao do sdist/`info`.
+- **Especificador fora do subconjunto** (`===`, `~=X`, wildcard com
+  operador errado) vira `specifier-unknown`, não `python-incompatible`.
+- **Interpretador pré-release** (`Python 3.14.0a1`) parseia com sufixo.
+- **`state.json` corrompido** é preservado em `.corrupt` antes de ser
+  ignorado — nunca clobber silencioso.
+- **Venv órfã** removida em falha de venv/download/pip.
+- **Pisos do catálogo** corrigidos para o `requires_python` real
+  publicado (`apiforge-af` ≥3.12, doctors ≥3.11).
+
 #### Added
 
 - **`install --method registry`**: instala Forjas direto do PyPI sem
