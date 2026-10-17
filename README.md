@@ -41,23 +41,19 @@ feedback visual em tempo real.
 
 ## Instalação
 
-Clone este repositório e instale as dependências:
+**Usuário final — via npm (recomendado):**
+
+```bash
+npm i -g theforge-cli   # pacote publicado — sem clone necessário
+forge-cli               # TUI guiada
+```
+
+**Contribuidor — via clone:**
 
 ```bash
 git clone https://github.com/EdgarSocrates98/forge-cli.git
 cd forge-cli
 npm install
-```
-
-Para rodar sem compilar:
-
-```bash
-npm run dev
-```
-
-Para compilar e usar como comando global:
-
-```bash
 npm run build
 npm link        # registra o binário `forge-cli`
 forge-cli       # em qualquer diretório
@@ -97,9 +93,12 @@ O forge-cli só delega ao `<cli> install` que a Forja documenta; Forjas sem
 instalador nativo (ex.: forge-portal) recebem um aviso, sem substituto
 silencioso. Veja [docs/capabilities.md](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md).
 
-## Instalação via PyPI (registry-first)
+## Instalação via PyPI (registry-first — método recomendado)
 
-Além do método git (clone + scripts), `install --method registry`
+`forge-cli` sem argumentos abre a TUI guiada com **registry como opção
+recomendada** para as distribuições oficiais. O método git (clone +
+scripts) continua disponível para contribuidores — registry-first, não
+registry-only. `install --method registry`
 instala cada Forja direto do PyPI — sem clonar o repositório e sem
 exigir o The Forge. Cada Forja vai para uma venv isolada em
 `~/.forge-cli/forges/<nome>/` com `pip install <dist>==<versão>`

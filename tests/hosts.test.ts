@@ -604,4 +604,84 @@ describe('runMcpCommand', () => {
     expect(doc.mcp[0].binPresent).toBe(true);
     expect(doc.mcp[0].mcp_command[0]).toContain('apiforge-mcp');
   });
+
+  // --- P1-002: probe de protocolo real --------------------------------------
+  // spark-forge-aws tem template `['{bin}','mcp','serve']` — com bin=node,
+  // `node mcp serve` executa <cwd>/mcp como script (cross-platform).
+  const MCP_FILE = path.join(process.cwd(), 'mcp');
+  const mcpServerScript = (behavior: 'ok' | 'garbage' | 'crash' | 'badinit') => {
+    const src = `import {createInterface} from 'node:readline';const rl=createInterface({input:process.stdin});
+${
+  behavior === 'garbage'
+    ? "console.log('INFO server starting');process.stdin.on('data',()=>{});"
+    : behavior === 'crash'
+      ? 'process.exit(3);'
+      : `rl.on('line',(l)=>{const m=JSON.parse(l);
+if(m.method==='initialize'){process.stdout.write(JSON.stringify(${
+          behavior === 'badinit'
+            ? "{jsonrpc:'2.0',id:m.id,result:{oops:true}}"
+            : "{jsonrpc:'2.0',id:m.id,result:{protocolVersion:'2024-11-05',capabilities:{},serverInfo:{name:'fake',version:'1.0'}}}"
+        })+'\\n');}
+if(m.method==='tools/list'){process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{tools:[{name:'t1'}]}})+'\\n');}
+});`
+}`;
+    writeFileSync(MCP_FILE, src);
+  };
+  const probeOf = async (behavior: 'ok' | 'garbage' | 'crash' | 'badinit') => {
+    mcpServerScript(behavior);
+    const stateDir = path.join(home, '.forge-cli', 'forges');
+    mkdirSync(stateDir, { recursive: true });
+    writeJson(path.join(stateDir, 'state.json'), {
+      forges: { 'spark-forge-aws': { forge: 'spark-forge-aws', bin: process.execPath } },
+    });
+    const chunks: string[] = [];
+    const orig = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((s: string) => (chunks.push(s), true)) as typeof orig;
+    const code = await runMcpCommand(
+      cli({ dir: ws, verify: true, jsonReport: true }),
+      ['spark-forge-aws'],
+      home,
+    ).finally(() => {
+      process.stdout.write = orig;
+      rmSync(MCP_FILE, { force: true });
+    });
+    const doc = JSON.parse(chunks.join('')) as {
+      mcp: {
+        probe?: {
+          ok: boolean;
+          levels: string[];
+          tools: number | null;
+          error: { code: string } | null;
+        };
+      }[];
+    };
+    return { code, probe: doc.mcp[0].probe };
+  };
+
+  it('--verify: handshake real MCP_INITIALIZED + TOOLS_DISCOVERED', async () => {
+    const { code, probe } = await probeOf('ok');
+    expect(code).toBe(0);
+    expect(probe?.ok).toBe(true);
+    expect(probe?.levels).toEqual(['MCP_INITIALIZED', 'TOOLS_DISCOVERED']);
+    expect(probe?.tools).toBe(1);
+  }, 20_000);
+
+  it('--verify: stdout não-JSON ⇒ stdout-non-json, ok:false', async () => {
+    const { code, probe } = await probeOf('garbage');
+    expect(code).toBe(1);
+    expect(probe?.ok).toBe(false);
+    expect(probe?.error?.code).toBe('stdout-non-json');
+  }, 20_000);
+
+  it('--verify: server crash ⇒ server-exit', async () => {
+    const { probe } = await probeOf('crash');
+    expect(probe?.ok).toBe(false);
+    expect(probe?.error?.code).toBe('server-exit');
+  }, 20_000);
+
+  it('--verify: initialize inválido ⇒ initialize-invalid', async () => {
+    const { probe } = await probeOf('badinit');
+    expect(probe?.ok).toBe(false);
+    expect(probe?.error?.code).toBe('initialize-invalid');
+  }, 20_000);
 });
