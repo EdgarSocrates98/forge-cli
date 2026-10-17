@@ -95,7 +95,7 @@ forge-cli install spark-forge-aws --profile recommended --scope project --compon
 
 O forge-cli só delega ao `<cli> install` que a Forja documenta; Forjas sem
 instalador nativo (ex.: forge-portal) recebem um aviso, sem substituto
-silencioso. Veja [docs/capabilities.md](docs/capabilities.md).
+silencioso. Veja [docs/capabilities.md](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md).
 
 ## Independência
 
@@ -235,12 +235,12 @@ factory/             # fluxo spec-driven (Loop Factory)
 
 ## Documentação
 
-- [Arquitetura e decisões de design](docs/arquitetura.md)
-- [Matriz de capacidades das Forjas](docs/capabilities.md)
-- [Solução de problemas](docs/solucao-de-problemas.md)
-- [Como contribuir](CONTRIBUTING.md)
-- [Registro de mudanças](CHANGELOG.md)
+- [Arquitetura e decisões de design](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/arquitetura.md)
+- [Matriz de capacidades das Forjas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md)
+- [Solução de problemas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/solucao-de-problemas.md)
+- [Como contribuir](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/CONTRIBUTING.md)
+- [Registro de mudanças](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/CHANGELOG.md)
 
 ## Licença
 
-[MIT](LICENSE) © 2026 Edgar Sócrates Caria
+[MIT](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/LICENSE) © 2026 Edgar Sócrates Caria
