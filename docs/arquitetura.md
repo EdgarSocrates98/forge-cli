@@ -7,32 +7,34 @@ vive em módulos especializados.**
 
 ## Mapa de módulos
 
-| Módulo                   | Responsabilidade                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `src/index.ts`           | Só despacha: parse de args, menu, resolução do subcomando, SIGINT e erros fatais.                      |
-| `src/cmd/shared.ts`      | Banner, preflight, catálogo efetivo, `--json`, seleção de Forjas por nome.                             |
-| `src/cmd/batch.ts`       | Execução sequencial com spinner/taskLog por Forja.                                                     |
-| `src/cmd/query.ts`       | `doctor`, `list`, `status`, `update --check`, `versions` (com `--json`).                               |
-| `src/cmd/manage.ts`      | `pin`, `unpin`, `rollback`, `uninstall <forjas>`, `self update`, PATH.                                 |
-| `src/cmd/run.ts`         | Fluxo de instalação/clone/update/reinstall e resumo de execução com aprovação.                         |
-| `src/prompts.ts`         | Prompts interativos (diretório, seleção, confirmação) e tratamento de cancelamento via `isCancel()`.   |
-| `src/preflight.ts`       | Verificações de ambiente antes de qualquer prompt: `git`, Node.js >= 20, `powershell.exe` no Windows.  |
-| `src/runner.ts`          | Pipeline por repositório com cronômetro e fases: sincronizar → `.env` → script de instalação.          |
-| `src/env.ts`             | Provisionamento do `.env` (`planEnvFile` decide, `ensureEnvFile` executa).                             |
-| `src/report.ts`          | Badges de status, linha por repositório e relatório consolidado.                                       |
-| `src/ui/theme.ts`        | Paleta de cores (picocolors) e ícones emoji. Único ponto de contato com cores.                         |
-| `src/ui/strings.ts`      | Todas as strings visíveis ao usuário, em PT-BR.                                                        |
-| `src/constants/repos.ts` | Catálogo fixo dos oito repositórios Forge.                                                             |
-| `src/utils/system.ts`    | Primitivas: resolução de caminho, `.git`, seleção de script por SO, `execa`, detalhe de erro.          |
-| `src/commands.ts`        | Resolve o subcomando (`install`, `clone`, `update`, `pin`, `self ...`) a partir dos posicionais.       |
-| `src/menu.ts`            | Menu principal; só aparece com TTY e sem comando/flags de seleção.                                     |
-| `src/safety.ts`          | Nomes/URLs de repositório válidos, bloqueio de symlink/junction, redação de segredos, escrita atômica. |
-| `src/git-revs.ts`        | Tags, checkout destacado por ref/versão, verificação de atualização via fetch.                         |
-| `src/lifecycle.ts`       | Plano e execução de uninstall (com backup) e rollback de checkout.                                     |
-| `src/native-install.ts`  | Monta o `<cli> install` nativo da Forja com as flags que ela documenta.                                |
-| `src/status.ts`          | Fase local (não clonado, clonado, instalado, falha), versão e alterações.                              |
-| `src/self.ts`            | Detecta o método de instalação do CLI e planeja o `self update`.                                       |
-| `src/types.ts`           | Tipos compartilhados (`ForgeRepo`, `RepoResult`, `InstallScript`, `PreflightCheck`).                   |
+| Módulo                   | Responsabilidade                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/index.ts`           | Só despacha: parse de args, menu, resolução do subcomando, SIGINT e erros fatais.                                                                      |
+| `src/cmd/shared.ts`      | Banner, preflight, catálogo efetivo, `--json`, seleção de Forjas por nome.                                                                             |
+| `src/cmd/batch.ts`       | Execução sequencial com spinner/taskLog por Forja.                                                                                                     |
+| `src/cmd/query.ts`       | `doctor`, `list`, `status`, `update --check`, `versions` (com `--json`).                                                                               |
+| `src/cmd/manage.ts`      | `pin`, `unpin`, `rollback`, `uninstall <forjas>`, `self update`, PATH.                                                                                 |
+| `src/cmd/run.ts`         | Fluxo de instalação/clone/update/reinstall e resumo de execução com aprovação.                                                                         |
+| `src/cmd/registry.ts`    | `install/uninstall --method registry` e `registry`: plano, confirmação, `--json`/`--report`, probes.                                                   |
+| `src/registry/`          | Método registry-first: `catalog` (dists PyPI), `pypi` (resolve + cache), `versions` (PEP 440 subset), `install` (venv isolada, sha256, receipt/state). |
+| `src/prompts.ts`         | Prompts interativos (diretório, seleção, confirmação) e tratamento de cancelamento via `isCancel()`.                                                   |
+| `src/preflight.ts`       | Verificações de ambiente antes de qualquer prompt: `git`, Node.js >= 20, `powershell.exe` no Windows.                                                  |
+| `src/runner.ts`          | Pipeline por repositório com cronômetro e fases: sincronizar → `.env` → script de instalação.                                                          |
+| `src/env.ts`             | Provisionamento do `.env` (`planEnvFile` decide, `ensureEnvFile` executa).                                                                             |
+| `src/report.ts`          | Badges de status, linha por repositório e relatório consolidado.                                                                                       |
+| `src/ui/theme.ts`        | Paleta de cores (picocolors) e ícones emoji. Único ponto de contato com cores.                                                                         |
+| `src/ui/strings.ts`      | Todas as strings visíveis ao usuário, em PT-BR.                                                                                                        |
+| `src/constants/repos.ts` | Catálogo fixo dos oito repositórios Forge.                                                                                                             |
+| `src/utils/system.ts`    | Primitivas: resolução de caminho, `.git`, seleção de script por SO, `execa`, detalhe de erro.                                                          |
+| `src/commands.ts`        | Resolve o subcomando (`install`, `clone`, `update`, `pin`, `self ...`) a partir dos posicionais.                                                       |
+| `src/menu.ts`            | Menu principal; só aparece com TTY e sem comando/flags de seleção.                                                                                     |
+| `src/safety.ts`          | Nomes/URLs de repositório válidos, bloqueio de symlink/junction, redação de segredos, escrita atômica.                                                 |
+| `src/git-revs.ts`        | Tags, checkout destacado por ref/versão, verificação de atualização via fetch.                                                                         |
+| `src/lifecycle.ts`       | Plano e execução de uninstall (com backup) e rollback de checkout.                                                                                     |
+| `src/native-install.ts`  | Monta o `<cli> install` nativo da Forja com as flags que ela documenta.                                                                                |
+| `src/status.ts`          | Fase local (não clonado, clonado, instalado, falha), versão e alterações.                                                                              |
+| `src/self.ts`            | Detecta o método de instalação do CLI e planeja o `self update`.                                                                                       |
+| `src/types.ts`           | Tipos compartilhados (`ForgeRepo`, `RepoResult`, `InstallScript`, `PreflightCheck`).                                                                   |
 
 ## Fluxo de execução
 

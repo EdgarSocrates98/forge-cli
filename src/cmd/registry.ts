@@ -5,12 +5,13 @@
  */
 import os from 'node:os';
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { confirm, isCancel } from '@clack/prompts';
 import { log, note, outro, spinner } from '@clack/prompts';
 import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
 import { pythonCandidates } from '../preflight.js';
+import { redactSecrets, writeFileAtomic } from '../safety.js';
 import { registryEntry, REGISTRY_PACKAGES } from '../registry/catalog.js';
 import {
   forgeVenv,
@@ -108,7 +109,8 @@ interface RegistryPlanItem {
 }
 
 // Flags do fluxo git sem efeito no método registry — avisadas, nunca mudas.
-// `--plan`/`--check`/`--clean` são honradas (plan mode / wipe), não avisadas.
+// `--plan`/`--check`/`--clean`/`--report` são honradas (plan mode / wipe /
+// arquivo de relatório), não avisadas.
 const REGISTRY_IGNORED_FLAGS: [keyof CliOptions, string][] = [
   ['dir', '--dir'],
   ['profile', '--profile'],
@@ -125,7 +127,6 @@ const REGISTRY_IGNORED_FLAGS: [keyof CliOptions, string][] = [
   ['gatewayProfile', '--gateway-profile'],
   ['trustCustom', '--trust-custom'],
   ['runAfterSyncFailure', '--run-after-sync-failure'],
-  ['reportPath', '--report'],
   ['onlyChanged', '--only-changed'],
   ['verbose', '--verbose'],
 ];
@@ -142,20 +143,49 @@ export function ignoredRegistryFlags(cli: CliOptions): string[] {
   return out;
 }
 
+/**
+ * Contrato de saída do método registry:
+ * - `--json` (sem --report) → JSON puro no stdout, logs humanos mudos.
+ * - `--report <arq>` → documento no arquivo + saída humana (contrato do
+ *   fluxo git) — a flag é honrada, nunca apenas "avisada como ignorada".
+ */
+function registryQuiet(cli: CliOptions): boolean {
+  return cli.jsonReport && cli.reportPath === undefined;
+}
+
+function writeRegistryReport(reportPath: string, doc: unknown): void {
+  const file = path.resolve(reportPath);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileAtomic(file, redactSecrets(JSON.stringify(doc, null, 2)));
+}
+
 export async function runRegistryInstall(
   cli: CliOptions,
   names: string[],
   deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike } = {},
 ): Promise<RegistryInstallResult[]> {
   const home = deps.home ?? os.homedir();
-  const quiet = cli.jsonReport;
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
   const entries = names.map((n) => ({ name: n, entry: registryEntry(n) }));
   const unknown = entries.filter((e) => !e.entry);
   // Alias de dist (`apiforge-af`) normaliza para o nome da Forja —
   // estado/venv/receipt sempre por `entry.name`.
   for (const e of entries) if (e.entry) e.name = e.entry.name;
+  // Dedupe após normalização: `api-forge apiforge-af` é a mesma Forja —
+  // sem dedupe o segundo alvo falharia com `already-installed` espúrio.
+  const seen = new Set<string>();
+  const deduped = entries.filter((e) => {
+    const key = e.entry?.name ?? e.name;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (unknown.length) {
     const msg = `${unknown.map((u) => u.name).join(', ')}: sem dist no catálogo registry — use o método git`;
+    reportTo({ error: msg });
     if (quiet) emitJson({ error: msg }, 2);
     log.error(msg);
     process.exit(2);
@@ -173,6 +203,7 @@ export async function runRegistryInstall(
   const pythons = deps.pythons ?? (await probePythons());
   if (!pythons.length) {
     const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
+    reportTo({ error: msg, warnings });
     if (quiet) emitJson({ error: msg, warnings }, 1);
     log.error(msg);
     process.exit(1);
@@ -182,7 +213,7 @@ export async function runRegistryInstall(
   // `--plan`/`--check`: resolve e seleciona interpretador sem instalar —
   if (cli.plan || cli.check) {
     const planned: RegistryPlanItem[] = [];
-    for (const { name, entry } of entries) {
+    for (const { name, entry } of deduped) {
       const resolved = await resolveRelease(entry!.dist, {
         pin,
         offline: cli.offline,
@@ -212,11 +243,10 @@ export async function runRegistryInstall(
         yanked: resolved.yanked,
       });
     }
+    const planDoc = { method: 'pypi', plan: true, planned, warnings };
+    reportTo(planDoc);
     if (quiet) {
-      emitJson(
-        { method: 'pypi', plan: true, planned, warnings },
-        planned.every((p) => p.ok) ? 0 : 1,
-      );
+      emitJson(planDoc, planned.every((p) => p.ok) ? 0 : 1);
     }
     note(
       planned
@@ -226,7 +256,9 @@ export async function runRegistryInstall(
             : `${p.forge} → falhou: ${p.detail}`,
         )
         .join('\n'),
-      'Plano (nada foi alterado)',
+      // venv/receipt/state não são escritos; o cache de metadados do
+      // PyPI pode ser atualizado (mesma regra de `update --check`).
+      'Plano (venv e estado não alterados)',
     );
     if (planned.some((p) => !p.ok)) process.exit(1);
     outro(`${icons.ok} plano resolvido — execute sem --plan para instalar`);
@@ -239,7 +271,7 @@ export async function runRegistryInstall(
   }
 
   const results: RegistryInstallResult[] = [];
-  for (const { name, entry } of entries) {
+  for (const { name, entry } of deduped) {
     const spin = spinner();
     if (!quiet) spin.start(`${name}: resolvendo ${entry!.dist}…`);
     const receipt = await registryInstall(entry!, pin, {
@@ -273,8 +305,13 @@ export async function runRegistryInstall(
     });
   }
 
-  if (cli.jsonReport) {
-    emitJson({ method: 'pypi', results, warnings }, results.every((r) => r.ok) ? 0 : 1);
+  const doc = { method: 'pypi', results, warnings };
+  reportTo(doc);
+  if (cli.reportPath !== undefined) {
+    log.info(`${S.reportSaved}: ${theme.dim(path.resolve(cli.reportPath))}`);
+  }
+  if (quiet) {
+    emitJson(doc, results.every((r) => r.ok) ? 0 : 1);
   }
   for (const r of results) {
     if (!r.ok) log.error(`${r.forge}: ${r.detail}`);
@@ -303,7 +340,8 @@ export function runRegistryList(
     const bad = deps.names.filter((n) => !registryEntry(n));
     if (bad.length) {
       const msg = `${bad.join(', ')}: fora do catálogo registry`;
-      if (cli.jsonReport) emitJson({ error: msg }, 2);
+      if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, { error: msg });
+      if (registryQuiet(cli)) emitJson({ error: msg }, 2);
       log.error(msg);
       process.exit(2);
     }
@@ -320,7 +358,8 @@ export function runRegistryList(
       minPython: e.minPython,
     };
   });
-  if (cli.jsonReport) emitJson({ forges: rows });
+  if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, { forges: rows });
+  if (registryQuiet(cli)) emitJson({ forges: rows });
   note(
     rows
       .map(
@@ -349,96 +388,107 @@ export async function runRegistryUninstall(
   deps: { home?: string } = {},
 ): Promise<void> {
   const home = deps.home ?? os.homedir();
-  const installed = Object.keys(loadForgeState(home).forges);
+  const quiet = registryQuiet(cli);
+  const reportTo = (doc: unknown) => {
+    if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
+  };
+  const state = loadForgeState(home).forges;
+  const installed = Object.keys(state);
   const targets = resolveRegistryTargets(cli, names, installed);
   if (!targets.length) {
-    if (cli.jsonReport) emitJson({ error: S.errRegistryUninstallNeedsNames }, 2);
+    reportTo({ error: S.errRegistryUninstallNeedsNames });
+    if (quiet) emitJson({ error: S.errRegistryUninstallNeedsNames }, 2);
     log.error(S.errRegistryUninstallNeedsNames);
     process.exit(2);
   }
-  // Alias de dist aceito: estado e venv vivem por `entry.name`.
-  const plan = targets.map((name) => {
-    const entry = registryEntry(name);
-    return {
-      name: entry?.name ?? name,
-      entry,
-      installed: entry ? installed.includes(entry.name) : false,
-    };
-  });
-  const unknown = plan.filter((p) => !p.entry).map((p) => p.name);
-  const removals = plan.filter((p) => p.entry && p.installed);
-  const skipped = plan.filter((p) => p.entry && !p.installed).map((p) => p.name);
-  const warnings = skipped.map((n) => `${n}: não estava instalado via registry — ignorado`);
-  if (!cli.jsonReport) {
+
+  const ignored = ignoredRegistryFlags(cli);
+  const warnings: string[] = ignored.length
+    ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`]
+    : [];
+  if (warnings.length && !quiet) log.warn(warnings[0]);
+
+  // Alias de dist normalizado; duplicatas nome+alias planejam uma só vez.
+  // Fora do catálogo mas presente no state → ainda desinstalável (uma
+  // entrada removida do catálogo não pode travar a remoção).
+  const plan: { name: string; dist?: string; known: boolean; installed: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const raw of targets) {
+    const entry = registryEntry(raw);
+    const name = entry?.name ?? raw;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const receipt = state[name];
+    plan.push({
+      name,
+      dist: entry?.dist ?? receipt?.dist,
+      known: Boolean(entry ?? receipt),
+      installed: installed.includes(name),
+    });
+  }
+  const unknown = plan.filter((p) => !p.known).map((p) => p.name);
+  const removals = plan.filter((p) => p.installed);
+  const skipped = plan.filter((p) => p.known && !p.installed).map((p) => p.name);
+  warnings.push(...skipped.map((n) => `${n}: não estava instalado via registry — ignorado`));
+  if (!quiet) {
     for (const u of unknown) log.error(`${u}: sem dist no catálogo registry`);
-    for (const w of warnings) log.warn(w);
+    for (const w of warnings.slice(ignored.length ? 1 : 0)) log.warn(w);
   }
   if (!removals.length) {
-    if (cli.jsonReport) {
-      emitJson(
-        {
-          method: 'pypi',
-          removed: [],
-          skipped,
-          warnings,
-          ...(unknown.length
-            ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` }
-            : {}),
-        },
-        unknown.length ? 2 : 0,
-      );
-    }
+    const doc = {
+      method: 'pypi',
+      removed: [],
+      skipped,
+      warnings,
+      ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, unknown.length ? 2 : 0);
     if (unknown.length) process.exit(2);
     log.info('Nada a remover.');
     return;
   }
 
-  if (!cli.jsonReport) {
+  if (!quiet) {
     note(
       removals
-        .map((r) => `${r.name} → ${r.entry!.dist} (venv + receipt em ~/.forge-cli/forges/)`)
+        .map((r) => `${r.name} → ${r.dist ?? '?'} (venv + wheel cache + receipt em ~/.forge-cli/)`)
         .join('\n'),
       S.registryUninstallConfirm,
     );
   }
   if (!cli.yes) {
-    if (cli.jsonReport) {
-      emitJson(
-        {
-          error: S.registryUninstallNeedsYes,
-          planned: removals.map((r) => r.name),
-          skipped,
-          warnings,
-        },
-        2,
-      );
+    const needYesDoc = {
+      error: S.registryUninstallNeedsYes,
+      planned: removals.map((r) => r.name),
+      skipped,
+      warnings,
+    };
+    if (quiet) {
+      emitJson(needYesDoc, 2);
     }
     const answer = await confirm({ message: S.registryUninstallConfirm });
     if (isCancel(answer) || !answer) {
       if (isCancel(answer)) exitCancelled();
+      reportTo(needYesDoc);
       log.warn(S.registryUninstallNeedsYes);
       process.exit(0);
     }
   }
 
   const results = removals.map((r) => {
-    const res = registryUninstall(r.entry!, { home });
-    return { forge: r.name, removed: res.removed };
+    const res = registryUninstall({ name: r.name, dist: r.dist }, { home });
+    return { forge: r.name, removed: res.removed, cacheRemoved: res.cacheRemoved };
   });
-  if (cli.jsonReport) {
-    emitJson(
-      {
-        method: 'pypi',
-        results,
-        skipped,
-        warnings,
-        ...(unknown.length
-          ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` }
-          : {}),
-      },
-      unknown.length ? 2 : 0,
-    );
-  }
+  const doc = {
+    method: 'pypi',
+    results,
+    skipped,
+    warnings,
+    ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+  };
+  reportTo(doc);
+  if (quiet) emitJson(doc, unknown.length ? 2 : 0);
   for (const r of results) {
     if (r.removed) log.success(`${r.forge}: removido`);
   }

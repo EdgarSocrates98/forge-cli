@@ -133,6 +133,23 @@ async function main(): Promise<void> {
     log.error(S.errMethodUnsupported);
     process.exit(2);
   }
+  // `--method` só significa algo nos fluxos de instalação/lifecycle —
+  // em comandos de consulta/hosts/self é avisado, nunca engolido.
+  const METHOD_COMMANDS = new Set([
+    'run',
+    'install',
+    'clone',
+    'uninstall',
+    'update',
+    'reinstall',
+    'pin',
+    'unpin',
+    'rollback',
+    'wizard',
+  ]);
+  if (cli.method === 'git' && !METHOD_COMMANDS.has(resolved.command)) {
+    log.warn(`--method git não tem efeito em "${resolved.command}" — ignorado`);
+  }
   if (resolved.command === 'doctor') {
     process.exitCode = await runDoctor2Command(cli);
     return;

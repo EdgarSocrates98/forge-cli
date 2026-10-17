@@ -17,6 +17,20 @@ Revisões inspecionadas (HEAD de `main` em 2026-10-12):
 | forge-doctor-data | `3ac1cae` |
 | forge-portal      | `d0b6ba9` |
 
+## Métodos de instalação do forge-cli
+
+- **git** (default) — clone + bootstrap `setup.sh`/`setup.ps1` +
+  instalador nativo sob opt-in (`--native`, `--profile`, `--scope`,
+  `--components`). É o fluxo descrito na matriz abaixo.
+- **registry** — `install <forja> --method registry`: resolve a dist no
+  PyPI, cria venv isolada em `~/.forge-cli/forges/<nome>/venv`, baixa a
+  wheel para `~/.forge-cli/cache/wheels/`, confere sha256 contra o
+  digest publicado e instala pelo caminho do artefato verificado.
+  `uninstall --method registry` remove venv + wheel cache + receipt com
+  confirmação; `--plan`, `--offline`, `--clean`, `--version` pinado,
+  `--json` e `--report` são honrados. Não executa o instalador nativo
+  (fase 2) — skills/agents/hosts ficam para o `<cli> install` da Forja.
+
 ## Modelo de instalação em duas fases
 
 1. **Bootstrap** — `setup.sh` / `setup.ps1` (todas as Forjas Python) chamam

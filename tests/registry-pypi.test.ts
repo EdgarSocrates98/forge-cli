@@ -158,6 +158,48 @@ describe('resolveRelease', () => {
     expect(res).toMatchObject({ kind: 'malformed' });
   });
 
+  it('200 malformado NÃO sobrescreve um cache sadio (sem envenenamento)', async () => {
+    await resolveRelease('d', { cacheDir: tmp, fetchImpl: okFetch }); // cache sadio
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify({ info: {} }) }),
+    });
+    // cai no cache em vez de falhar — e o arquivo cacheado ficou intacto
+    expect(res).not.toHaveProperty('kind');
+    if ('kind' in res) return;
+    expect(res.version).toBe('0.2.0');
+    expect(res.source).toBe('cache');
+    const cached = JSON.parse(
+      (await import('node:fs')).readFileSync(pypiCacheFile(tmp, 'd'), 'utf8'),
+    );
+    expect(cached.payload.releases['0.2.0']).toBeTruthy();
+  });
+
+  it('200 malformado sem cache → malformed (não grava lixo no cache)', async () => {
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify({ info: {} }) }),
+    });
+    expect(res).toMatchObject({ kind: 'malformed' });
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(pypiCacheFile(tmp, 'd'))).toBe(false);
+  });
+
+  it('fetchedAt futuro (clock skew) conta como stale, não como fresh', async () => {
+    writeFileSync(
+      pypiCacheFile(tmp, 'd'),
+      JSON.stringify({ fetchedAt: Date.now() + 60 * 60 * 1000, payload: PAYLOAD }),
+    );
+    const res = await resolveRelease('d', {
+      cacheDir: tmp,
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+    });
+    if ('kind' in res) throw new Error('unexpected');
+    expect(res.staleCache).toBe(true);
+  });
+
   it('cache gravado em disco com o payload', async () => {
     await resolveRelease('d', { cacheDir: tmp, fetchImpl: okFetch });
     const cached = JSON.parse(

@@ -31,7 +31,10 @@ export const MENU_ITEMS: { value: MenuAction; label: string; hint?: string }[] =
 
 /** O menu só aparece no modo totalmente interativo: sem comando, flags de seleção ou plano. */
 export function shouldShowMenu(
-  cli: Pick<CliOptions, 'positionals' | 'all' | 'only' | 'retryFailed' | 'plan' | 'help'>,
+  cli: Pick<
+    CliOptions,
+    'positionals' | 'all' | 'only' | 'retryFailed' | 'plan' | 'help' | 'method'
+  >,
   tty: boolean,
 ): boolean {
   return (
@@ -39,6 +42,9 @@ export function shouldShowMenu(
     cli.positionals.length === 0 &&
     !cli.help &&
     !cli.plan &&
+    // `--method registry` ainda não tem fluxo guiado — sem menu, o
+    // dispatcher recusa com errMethodUnsupported em vez de dead-end.
+    cli.method !== 'registry' &&
     !isNonInteractive(cli as CliOptions)
   );
 }
