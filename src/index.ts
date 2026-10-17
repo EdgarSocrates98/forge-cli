@@ -69,6 +69,8 @@ const JSON_QUERY_COMMANDS = new Set([
   'ask',
   'predict',
   'context',
+  'install',
+  'uninstall',
   'registry',
   'ai',
   'bundle',
@@ -260,16 +262,24 @@ async function main(): Promise<void> {
     await runUninstallCommand();
     return;
   }
+  if (
+    cli.method === 'registry' &&
+    resolved.command !== 'install' &&
+    resolved.command !== 'uninstall'
+  ) {
+    log.error(S.errMethodUnsupported);
+    process.exit(2);
+  }
+  if (resolved.command === 'uninstall' && cli.method === 'registry') {
+    await runRegistryUninstall(cli, resolved.names);
+    return;
+  }
   if (resolved.command === 'uninstall' && !resolved.names.length && !isNonInteractive(cli)) {
     log.warn(S.warnLegacyUninstall);
     await runUninstallCommand();
     return;
   }
   if (resolved.command === 'uninstall') {
-    if (cli.method === 'registry') {
-      await runRegistryUninstall(cli, resolved.names);
-      return;
-    }
     await runForgeUninstall(cli, resolved.names);
     return;
   }
@@ -296,7 +306,11 @@ async function main(): Promise<void> {
         ? registryNames()
         : (cli.only ?? []);
     if (!names.length) {
-      log.error('informe as Forjas (ex.: forge-cli install api-forge --method registry) ou --all');
+      log.error(S.errRegistryNeedsNames);
+      process.exit(2);
+    }
+    if (cli.ref && names.length !== 1) {
+      log.error(S.errRefNeedsOne);
       process.exit(2);
     }
     await runRegistryInstall(cli, names);

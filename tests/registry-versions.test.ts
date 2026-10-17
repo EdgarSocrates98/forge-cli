@@ -75,6 +75,10 @@ describe('specifiers', () => {
   it('rejeita wildcard em operadores que não ===/!=', () => {
     expect(parseSpecifier('>=3.11.*')).toBeNull();
   });
+  it('rejeita ~= de componente único (sem fronteira superior)', () => {
+    expect(parseSpecifier('~=3')).toBeNull();
+    expect(satisfiesRequiresPython('~=3', v('3.11'))).toBeNull();
+  });
 });
 
 describe('satisfiesRequiresPython', () => {
