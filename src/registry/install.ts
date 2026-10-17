@@ -96,11 +96,22 @@ export interface RunResult {
   stdout?: string;
   stderr?: string;
 }
-export type RunLike = (cmd: string, args: string[]) => Promise<RunResult>;
+export interface RunOpts {
+  /** Timeout do subprocesso em ms (default 5min — pip pode ser lento). */
+  timeoutMs?: number;
+}
+export type RunLike = (cmd: string, args: string[], opts?: RunOpts) => Promise<RunResult>;
 
-async function execaRun(cmd: string, args: string[]): Promise<RunResult> {
-  const res = await execa(cmd, args, { reject: false });
-  return { exitCode: res.exitCode ?? 1, stdout: res.stdout, stderr: res.stderr };
+async function execaRun(cmd: string, args: string[], opts: RunOpts = {}): Promise<RunResult> {
+  const res = await execa(cmd, args, {
+    reject: false,
+    timeout: opts.timeoutMs ?? 300_000,
+  });
+  return {
+    exitCode: res.exitCode ?? 1,
+    stdout: res.stdout,
+    stderr: res.timedOut ? `timeout após ${opts.timeoutMs ?? 300_000}ms` : res.stderr,
+  };
 }
 
 export interface ProbedInterpreter {
@@ -157,6 +168,8 @@ export function selectInterpreter(
     }
     return sat;
   });
+  // Ordena internamente (mais novo primeiro) — não depende do chamador.
+  usable.sort((a, b) => compareVersions(b.parsed, a.parsed));
   const stable = usable.filter((p) => !isPrerelease(p.parsed));
   const candidates = stable.length ? stable : usable;
   if (!candidates.length) {
@@ -182,10 +195,13 @@ export function selectInterpreter(
 
 /** sha256 do arquivo no wheel cache contra o digest publicado no PyPI. */
 function checkDistHashes(
-  distFiles: { filename: string; sha256?: string }[],
+  distFiles: { filename: string; sha256?: string; packagetype?: string }[],
   wheels: string,
 ): { verifiedHash?: string } | { detail: string } {
   const have = existsSync(wheels) ? readdirSync(wheels) : [];
+  // Verifica TODOS os artefatos da dist presentes no cache (wheel + sdist
+  // quando ambos existem) — não para no primeiro.
+  let verifiedHash: string | undefined;
   for (const f of distFiles) {
     if (!have.includes(f.filename) || !f.sha256) continue;
     const digest = createHash('sha256')
@@ -196,9 +212,9 @@ function checkDistHashes(
         detail: `${f.filename}: sha256 ${digest.slice(0, 12)}… != PyPI ${f.sha256.slice(0, 12)}…`,
       };
     }
-    return { verifiedHash: digest };
+    verifiedHash = f.packagetype === 'bdist_wheel' ? digest : (verifiedHash ?? digest);
   }
-  return {};
+  return { verifiedHash };
 }
 
 /** Arquivos da própria dist (wheel `dist_…` e sdist `dist-…` legado). */
@@ -237,6 +253,13 @@ export async function registryInstall(
   const venvDir = forgeVenv(deps.home, entry.name);
   if (deps.clean) {
     rmSync(path.join(forgesRoot(deps.home), entry.name), { recursive: true, force: true });
+    // state também é limpo — senão uma falha depois deixa versão antiga
+    // registrada sem venv/bin correspondentes.
+    const st = loadForgeState(deps.home);
+    if (st.forges[entry.name]) {
+      delete st.forges[entry.name];
+      saveForgeState(deps.home, st);
+    }
   }
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
   const cleanup = () => rmSync(venvDir, { recursive: true, force: true });

@@ -311,6 +311,19 @@ describe('dispatch --method registry', () => {
     expect(res.out).toContain('sem dist no catálogo registry');
   });
 
+  it('registry <dist-name> filtra pelo nome canônico', async () => {
+    const res = await cli('registry', 'apiforge-af', '--json');
+    expect(res.code).toBe(0);
+    const doc = JSON.parse(res.stdout);
+    expect(doc.forges).toEqual([expect.objectContaining({ forge: 'api-forge' })]);
+  });
+
+  it('uninstall --method registry de alias de dist resolve o nome canônico', async () => {
+    const res = await cli('uninstall', 'apiforge-af', '--method', 'registry', '--yes');
+    expect(res.code).toBe(0);
+    expect(res.out).toContain('api-forge: não estava instalado via registry');
+  });
+
   it('uninstall --method registry --yes de não-instalado avisa e sai 0', async () => {
     const res = await cli('uninstall', 'api-forge', '--method', 'registry', '--yes');
     expect(res.code).toBe(0);

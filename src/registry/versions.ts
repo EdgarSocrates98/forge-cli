@@ -62,7 +62,8 @@ export function compareVersions(a: ParsedVersion, b: ParsedVersion): number {
     const pre = a.pre!.n - b.pre!.n;
     if (pre !== 0) return pre;
   }
-  if (aPhase === 3) {
+  // `post` também existe dentro de pre-releases: XaN.postM > XaN.
+  if (aPhase === 1 || aPhase === 3) {
     const post = (a.post ?? 0) - (b.post ?? 0);
     if (post !== 0) return post;
   }

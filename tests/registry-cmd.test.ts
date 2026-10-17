@@ -121,6 +121,27 @@ describe('runRegistryInstall --plan', () => {
     expect(existsSync(forgeStatePath(tmp))).toBe(false);
     expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
   });
+
+  it('alias de dist (apiforge-af) normaliza para o nome da Forja', async () => {
+    const res = await runRegistryInstall(cli({ plan: true }), ['apiforge-af'], {
+      home: tmp,
+      pythons: [{ exe: ['python3'], version: '3.12.4', parsed: parseVersion('3.12.4')! }],
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(PYPI) }),
+    });
+    expect(res).toEqual([
+      expect.objectContaining({ forge: 'api-forge', ok: true, version: '0.1.0' }),
+    ]);
+  });
+
+  it('--version v0.1.0 aceita prefixo v (PyPI usa chave sem v)', async () => {
+    const res = await runRegistryInstall(cli({ plan: true, ref: 'v0.1.0' }), ['api-forge'], {
+      home: tmp,
+      pythons: [{ exe: ['python3'], version: '3.12.4', parsed: parseVersion('3.12.4')! }],
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(PYPI) }),
+    });
+    expect(res[0].ok).toBe(true);
+    expect(res[0].version).toBe('0.1.0');
+  });
 });
 
 describe('probePythons', () => {

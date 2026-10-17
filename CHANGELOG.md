@@ -7,6 +7,23 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (3ª rodada)
+
+- **PEP 440**: `XaN.postM` agora compara `post` dentro da fase de
+  pre-release — antes `1.0a1.post1` empatava com `1.0a1` e `!=`
+  avaliava errado.
+- **Alias de dist normalizado**: `registry apiforge-af` filtra a linha
+  certa e `uninstall --method registry apiforge-af` resolve o estado
+  pelo nome canônico — antes passavam validação e produziam saída
+  vazia/`não instalado` espúrio.
+- **`--clean` limpa o `state.json`** junto com venv/receipt — falha
+  posterior não deixa versão antiga registrada sem artefatos.
+- **subprocessos com timeout** (venv/download/pip/verify, 5 min
+  default) — antes só o fetch era limitado.
+- `selectInterpreter` ordena internamente (não depende do chamador);
+  `checkDistHashes` verifica **todos** os artefatos presentes;
+  `--version vX.Y.Z` aceita prefixo `v` no método registry.
+
 #### Corrigido após revisão (dispatch + integridade, 2ª rodada)
 
 - **`--plan`/`--dry-run`/`--check` honrados no registry**: resolvem e
