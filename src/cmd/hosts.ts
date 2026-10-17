@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import { log, note } from '@clack/prompts';
@@ -17,7 +16,7 @@ import { readForgeManifest } from '../manifest.js';
 import { isSafeRepoName, resolveInside } from '../safety.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { commandOutput, resolveTargetDir } from '../utils/system.js';
+import { cliHome, commandOutput, resolveTargetDir } from '../utils/system.js';
 
 // ---------------------------------------------------------------------------
 // `forge-cli hosts <verbo>` — §2.5. Retorna exit code (0 ok / 1 falha / 2 uso)
@@ -65,7 +64,7 @@ function planLines(plan: HostPlan): string {
 function forgeDescriptor(
   targetDir: string,
   name: string,
-  home = os.homedir(),
+  home = cliHome(),
 ): { forge_id: string; mcp_command?: string[] } {
   const dir = resolveInside(targetDir, name);
   const manifest = dir ? readForgeManifest(dir) : null;
@@ -204,7 +203,7 @@ export async function runHostsCommand(
 export async function runMcpCommand(
   cli: CliOptions,
   args: string[],
-  home = os.homedir(),
+  home = cliHome(),
 ): Promise<number> {
   const json = cli.jsonReport;
   const verify = cli.verify;

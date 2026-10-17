@@ -6,12 +6,12 @@ leitores são somente-leitura e nunca inventam campos.
 
 ## Arquivos
 
-| Arquivo | Conteúdo | Escrita |
-|---|---|---|
-| `~/.forge-cli/forges/state.json` | Índice agregado `{ "forges": { <nome>: <receipt> } }` | atômica (`writeFileAtomic`) |
-| `~/.forge-cli/forges/<nome>/receipt.json` | Receipt por Forja | atômica |
-| `~/.forge-cli/forges/<nome>/install.json` | Metadados da instalação ativa | atômica |
-| `~/.forge-cli/forges/state.json.corrupt` | Backup quando o state não parseia | rename |
+| Arquivo                                   | Conteúdo                                              | Escrita                     |
+| ----------------------------------------- | ----------------------------------------------------- | --------------------------- |
+| `~/.forge-cli/forges/state.json`          | Índice agregado `{ "forges": { <nome>: <receipt> } }` | atômica (`writeFileAtomic`) |
+| `~/.forge-cli/forges/<nome>/receipt.json` | Receipt por Forja                                     | atômica                     |
+| `~/.forge-cli/forges/<nome>/install.json` | Metadados da instalação ativa                         | atômica                     |
+| `~/.forge-cli/forges/state.json.corrupt`  | Backup quando o state não parseia                     | rename                      |
 
 `~` = `os.homedir()` do processo CLI (override de testes: `home` explícito
 nas APIs; o portal honra `FORGE_HOME_OVERRIDE`).
@@ -34,25 +34,25 @@ nas APIs; o portal honra `FORGE_HOME_OVERRIDE`).
 
 ## Receipt (por Forja)
 
-| Campo | Tipo | Semântica |
-|---|---|---|
-| `forge` | string | nome da Forja |
-| `method` | `"registry"` | método de instalação |
-| `dist` | string | distribuição PyPI instalada |
-| `version` | string | versão resolvida (PEP 440) |
-| `requiresPython` | string? | spec do release (PyPI) |
-| `python` | string | interpretador usado na venv |
-| `source` | string | `pypi` ou `offline-cache` |
-| `venv` | string | path absoluto da venv |
-| `bin` | string | path absoluto do console script |
-| `installedAt` | string | ISO 8601 |
-| `verifiedHash` | string | `sha256:<hex>` do artefato instalado |
-| `verify.ok` | bool | pós-install `<bin> --help` passou |
-| `files` | string[] | artefatos gravados (bounded) |
-| `yanked` | bool | release marcada yanked no PyPI |
-| `staleCache` | bool | metadados vieram de cache expirado |
-| `pinned` | string? | pin ativo (`pin --method registry`) |
-| `history` | `{version, installedAt}[]`? | versões anteriores (rollback) |
+| Campo            | Tipo                        | Semântica                            |
+| ---------------- | --------------------------- | ------------------------------------ |
+| `forge`          | string                      | nome da Forja                        |
+| `method`         | `"registry"`                | método de instalação                 |
+| `dist`           | string                      | distribuição PyPI instalada          |
+| `version`        | string                      | versão resolvida (PEP 440)           |
+| `requiresPython` | string?                     | spec do release (PyPI)               |
+| `python`         | string                      | interpretador usado na venv          |
+| `source`         | string                      | `pypi` ou `offline-cache`            |
+| `venv`           | string                      | path absoluto da venv                |
+| `bin`            | string                      | path absoluto do console script      |
+| `installedAt`    | string                      | ISO 8601                             |
+| `verifiedHash`   | string                      | `sha256:<hex>` do artefato instalado |
+| `verify.ok`      | bool                        | pós-install `<bin> --help` passou    |
+| `files`          | string[]                    | artefatos gravados (bounded)         |
+| `yanked`         | bool                        | release marcada yanked no PyPI       |
+| `staleCache`     | bool                        | metadados vieram de cache expirado   |
+| `pinned`         | string?                     | pin ativo (`pin --method registry`)  |
+| `history`        | `{version, installedAt}[]`? | versões anteriores (rollback)        |
 
 Campos novos podem aparecer em versões futuras do CLI — leitores devem
 tolerar campos desconhecidos e tratar campos conhecidos ausentes como

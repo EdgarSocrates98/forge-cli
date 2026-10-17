@@ -1,11 +1,20 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registryEntry } from '../src/registry/catalog.js';
 import {
   forgeVenv,
+  forgesRoot,
   wheelCacheDir,
   wheelCacheForHome,
   loadForgeState,
@@ -104,8 +113,20 @@ describe('registryInstall', () => {
     const receipt = JSON.parse(readFileSync(receiptPath(tmp, 'api-forge'), 'utf8'));
     expect(receipt.version).toBe('0.1.0');
     expect(receipt.files[0].sha256).toBe(WHEEL_SHA);
+    // provenance: via de resolução + artefato + URL publicada no índice
+    expect(receipt.provenance).toEqual({
+      registry: 'pypi.org',
+      file: WHEEL_NAME,
+      url: 'https://f/apiforge_af-0.1.0.whl',
+      resolvedVia: 'pypi',
+    });
     const state = loadForgeState(tmp);
     expect(state.forges['api-forge'].dist).toBe('apiforge-af');
+    // state dir é privado (POSIX) — chmod 0700, ignorado no Windows
+    if (process.platform !== 'win32') {
+      const mode = statSync(forgesRoot(tmp)).mode & 0o777;
+      expect(mode).toBe(0o700);
+    }
   });
 
   it('escolhe o interpretador mais novo que satisfaz requires_python', async () => {

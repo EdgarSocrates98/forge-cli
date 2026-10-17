@@ -155,6 +155,32 @@ async function defaultFetch(url: string): Promise<{ status: number; body: string
   return { status: res.status, body: new TextDecoder().decode(Buffer.concat(chunks)) };
 }
 
+/** Status que merece retry — 429 e 5xx são transitórios; 404/4xx são definitivos. */
+const RETRYABLE = (status: number): boolean => status === 429 || status >= 500;
+
+/**
+ * Fetch com backoff exponencial (250ms → 500ms → desiste). Erros de rede e
+ * respostas transitórias retentam; 404 e respostas bem-formadas retornam
+ * imediato — retry nunca mascara um "não existe".
+ */
+export async function fetchWithRetry(
+  fetchImpl: FetchLike,
+  url: string,
+): Promise<{ status: number; body: string }> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetchImpl(url);
+      if (!RETRYABLE(res.status) || attempt === 2) return res;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+  }
+  throw lastError;
+}
+
 export async function resolveRelease(
   dist: string,
   opts: ResolveOptions,
@@ -166,7 +192,7 @@ export async function resolveRelease(
 
   if (!opts.offline) {
     try {
-      const res = await fetchImpl(`${PYPI_JSON}/${encodeURIComponent(dist)}/json`);
+      const res = await fetchWithRetry(fetchImpl, `${PYPI_JSON}/${encodeURIComponent(dist)}/json`);
       if (res.status === 404) return { kind: 'not-found', dist };
       if (res.status !== 200) {
         const cached = readCache(opts.cacheDir, dist);

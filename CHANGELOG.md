@@ -7,6 +7,31 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Wave 7 — performance (números medidos, não inventados)
+
+- `scripts/bench.mjs`: mede startup (`--help`), `status`, `registry`,
+  resolve `--plan` (rede), install frio, reinstall e `update --check`
+  (cache). Mediana de N runs (`--runs`), JSON
+  `forge-cli/BenchReport/v1` em stdout, `FORGE_CLI_HOME` hermético.
+- Medido local (Node 24, Linux, 3 runs): `--help` ~259ms,
+  `status` ~72ms, `registry` ~67ms, `resolve --plan` ~290ms (PyPI
+  online), install frio ~3.2s e reinstall ~3.5s (venv+pip dominam —
+  fora do nosso controle), `update --check` com cache ~217ms.
+- **`FORGE_CLI_HOME`**: novo env override para o home de estado
+  (`~/.forge-cli`) — bench/testes/containers rodam isolados sem tocar
+  o estado real. Não afeta detecção de hosts (esses ficam no home real).
+
+#### Wave 8 — supply chain / hardening
+
+- **Retry com backoff no PyPI**: `fetchWithRetry` — 429/5xx e erros de
+  rede retentam 2x (250ms→500ms); 404 e respostas definitivas retornam
+  imediato. Retry nunca mascara "não existe".
+- **`receipt.provenance`**: `{registry:'pypi.org', file, url,
+resolvedVia:'pypi'|'offline-cache'}` — proveniência auditável do
+  artefato instalado junto ao `verifiedHash`.
+- **Permissões do state dir**: `~/.forge-cli` e `forges/` recebem
+  `chmod 0700` no POSIX (Windows: ACL do perfil, chmod é no-op).
+
 #### Wave 4 — hosts/MCP registry-aware
 
 - **`forge-cli mcp [forja…]`**: resolve o argv MCP por Forja e reporta
@@ -25,7 +50,6 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `forge.json` (api-forge `apiforge-mcp`, platform-forge
   `platformforge-mcp`, doctors `[bin] mcp`, spark-forge `[bin] mcp serve`).
 - `CliOptions.verify` + flag `--verify` registrada (parser é strict).
-
 
 #### Wave 3 — lifecycle registry
 

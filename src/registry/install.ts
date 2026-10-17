@@ -6,6 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -44,6 +45,13 @@ export interface RegistryInstallReceipt {
   verifiedHash?: string;
   yanked?: boolean;
   staleCache?: boolean;
+  /** Proveniência do artefato instalado — URL publicada no índice + via de resolução. */
+  provenance?: {
+    registry: 'pypi.org';
+    file?: string;
+    url?: string;
+    resolvedVia: 'pypi' | 'offline-cache';
+  };
   /** Versão travada por `pin --method registry` — update a respeita. */
   pinned?: string;
   /** Versões anteriores (mais antiga → mais recente) — alimenta `rollback`. */
@@ -122,6 +130,16 @@ export function ghostEntry(name: string, receipt: RegistryInstallReceipt): Regis
 
 export function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
+  // Receipts carregam paths internos + hashes — o dir de estado é privado
+  // ao usuário (POSIX; Windows usa ACL do perfil — chmod é no-op honesto).
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(forgesRoot(home), 0o700);
+      chmodSync(path.dirname(forgesRoot(home)), 0o700);
+    } catch {
+      // fs sem chmod (ex.: alguns mounts) — não bloqueia o write
+    }
+  }
   // Escrita atômica (convenção do codebase) — kill no meio não corrompe.
   writeFileAtomic(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`);
 }
@@ -487,6 +505,12 @@ export async function registryInstall(
       packagetype: f.packagetype,
     })),
     verifiedHash,
+    provenance: {
+      registry: 'pypi.org',
+      file: verifiedFile,
+      url: resolved.files.find((f) => f.filename === verifiedFile)?.url,
+      resolvedVia: deps.offline ? 'offline-cache' : 'pypi',
+    },
     yanked: resolved.yanked,
     staleCache: resolved.staleCache,
   };

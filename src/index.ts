@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import os from 'node:os';
 import { cancel, intro, log, note, outro } from '@clack/prompts';
 import { loadState } from './artifacts.js';
 import { CliError, isNonInteractive, parseCliArgs, usage, type CliOptions } from './cli-args.js';
@@ -8,7 +7,7 @@ import { collectStatus } from './status.js';
 import { askRepos, askWorkspace } from './prompts.js';
 import { S } from './ui/strings.js';
 import { theme } from './ui/theme.js';
-import { hasGitRepo, resolveTargetDir } from './utils/system.js';
+import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
 import { applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
@@ -138,7 +137,7 @@ async function main(): Promise<void> {
         return picked as string[];
       },
       pickRegistryInstalled: async () => {
-        const installed = Object.keys(loadForgeState(os.homedir()).forges);
+        const installed = Object.keys(loadForgeState(cliHome()).forges);
         if (!installed.length) {
           log.warn('Nenhuma Forja instalada via registry ainda — instale primeiro.');
           return [];

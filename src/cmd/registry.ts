@@ -3,7 +3,6 @@
  * Resolve names → catálogo, escolhe o melhor interpretador que satisfaz
  * `requires_python`, cria venv isolada por Forja e grava receipt.
  */
-import os from 'node:os';
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { confirm, isCancel } from '@clack/prompts';
@@ -39,7 +38,7 @@ import { resolveRelease, type FetchLike, type ResolveError } from '../registry/p
 import { compareVersions, parseVersion, type ParsedVersion } from '../registry/versions.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { commandOutput } from '../utils/system.js';
+import { cliHome, commandOutput } from '../utils/system.js';
 import { emitJson } from './shared.js';
 
 export interface ProbedPython {
@@ -95,7 +94,7 @@ function describeInstallError(e: InstallError): string {
   return `${e.stage}: ${e.detail}`;
 }
 
-export function registryCacheDir(home = os.homedir()): string {
+export function registryCacheDir(home = cliHome()): string {
   return path.join(home, '.forge-cli', 'cache', 'pypi');
 }
 
@@ -254,7 +253,7 @@ export async function runRegistryInstall(
   names: string[],
   deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
 ): Promise<RegistryInstallResult[]> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
@@ -477,7 +476,7 @@ export function runRegistryList(
   cli: CliOptions,
   deps: { home?: string; names?: string[] } = {},
 ): void {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const state = loadForgeState(home);
   // Aceita nome da Forja ou da dist; normaliza para `entry.name`.
   const wanted = deps.names?.length
@@ -536,7 +535,7 @@ export async function runRegistryUninstall(
   names: string[],
   deps: { home?: string; run?: RunLike } = {},
 ): Promise<void> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
@@ -762,7 +761,7 @@ async function runRegistryLifecycle(
   names: string[],
   deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike },
 ): Promise<void> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
@@ -958,7 +957,7 @@ export async function runRegistryReinstall(
   names: string[],
   deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
 ): Promise<void> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
@@ -1050,7 +1049,7 @@ export async function runRegistryRollback(
   names: string[],
   deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
 ): Promise<void> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
@@ -1156,7 +1155,7 @@ export async function runRegistryPin(
   pin: boolean,
   deps: { home?: string } = {},
 ): Promise<void> {
-  const home = deps.home ?? os.homedir();
+  const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
