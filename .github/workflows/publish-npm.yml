@@ -5,6 +5,10 @@ name: publish-npm
 #   owner/repo: EdgarSocrates98/forge-cli · workflow: publish-npm.yml
 #   environment: npm (mesmo nome do GitHub Environment, com aprovação)
 # Disparo: gh workflow run publish-npm -f version=<x.y.z> [-f tag=v<x.y.z>]
+#
+# Binding anti-TOCTOU: o validate produz o tarball via `npm pack` e sobe como
+# artefato imutável; o publish baixa ESSE tarball e publica o .tgz — nunca
+# rebuilda. Decisão documentada em docs/releasing/npm-trusted-publishing.md.
 on:
   workflow_dispatch:
     inputs:
@@ -20,6 +24,11 @@ on:
 permissions:
   contents: read
 
+# Inputs chegam aos steps via env — nunca `${{ inputs.* }}` inline em run:.
+env:
+  RELEASE_VERSION: ${{ inputs.version }}
+  RELEASE_TAG: ${{ inputs.tag }}
+
 concurrency:
   group: npm-release-${{ inputs.version }}
   cancel-in-progress: false
@@ -34,6 +43,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24.x
+      - name: Branch gate — dispatch só vale a partir da main
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_NAME" != "main" ]; then
+            echo "::error::ref=$REF_NAME — publish só pode ser disparado na main"
+            exit 1
+          fi
       - name: Verify npm runtime (>=11.5.1 para OIDC)
         run: |
           node --version
@@ -47,14 +64,24 @@ jobs:
           npm run format:check
           npm test
           npm run build
-      - name: npm pack integrity (artifact que será publicado)
-        run: npm pack --dry-run --json > /tmp/pack.json && node -e "const p=require('/tmp/pack.json')[0]; if(!p.files.length) throw new Error('pacote vazio'); console.log(p.filename, p.size+'B')"
       - name: Release gate
         id: gate
         run: |
-          OUT=$(node scripts/release/verify-version.mjs "${{ inputs.version }}" ${tag:+'--tag'} ${{ inputs.tag }} 2>/dev/null || true)
-          echo "$OUT"
-          echo "$OUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d); if(!j.ok){console.error(j.code+': '+j.detail);process.exit(2)} console.log('sha='+j.sha)})" >> "$GITHUB_OUTPUT"
+          ARGS=("$RELEASE_VERSION")
+          [ -n "$RELEASE_TAG" ] && ARGS+=(--tag "$RELEASE_TAG")
+          node scripts/release/verify-version.mjs "${ARGS[@]}" | tee /tmp/gate.json
+          node -e "const j=require('/tmp/gate.json'); if(!j.ok){console.error(j.code+': '+j.detail);process.exit(2)} console.log('sha='+j.sha)" >> "$GITHUB_OUTPUT"
+      - name: npm pack — tarball imutável que será publicado (sem rebuild)
+        run: |
+          npm pack --json > /tmp/pack.json
+          node -e "const p=require('/tmp/pack.json')[0]; if(!p.files.length) throw new Error('pacote vazio'); console.log(p.filename, p.size+'B', p.integrity)"
+      - name: Upload do tarball validado (binding validate→publish)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-tarball
+          path: '*.tgz'
+          retention-days: 1
+          if-no-files-found: error
 
   publish:
     needs: validate
@@ -63,6 +90,8 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC — só no job de publicação
+    env:
+      EXPECT_SHA: ${{ needs.validate.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -71,18 +100,36 @@ jobs:
         with:
           node-version: 24.x
           registry-url: https://registry.npmjs.org
-      - run: npm ci --no-audit --no-fund
-      - run: npm run build
-      - name: Publish com provenance (OIDC auto-detectado pelo npm>=11.5.1)
-        run: npm publish --provenance --access public
-      - name: Post-publish verify (registry + provenance + smoke)
+      - name: SHA binding re-check (HEAD do checkout == SHA validado)
         run: |
+          # --tag já foi validada no job validate; aqui o que importa é o SHA.
+          node scripts/release/verify-version.mjs "$RELEASE_VERSION" --expect-sha "$EXPECT_SHA"
+      - name: Download do tarball validado
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarball
+      - name: Artifact gate — exatamente o tarball da versão pedida
+        run: |
+          TARBALL="theforge-cli-$RELEASE_VERSION.tgz"
+          [ "$(ls -1 ./*.tgz | wc -l)" -eq 1 ] || { echo 'esperado exatamente 1 .tgz'; ls -la; exit 1; }
+          [ -f "$TARBALL" ] || { echo "artefato inesperado: queria $TARBALL"; ls -la ./*.tgz; exit 1; }
+      - name: Publish com provenance (OIDC auto-detectado pelo npm>=11.5.1)
+        run: npm publish "theforge-cli-$RELEASE_VERSION.tgz" --provenance --access public
+      - name: Post-publish verify (registry + provenance + integrity + smoke)
+        run: |
+          TARBALL="theforge-cli-$RELEASE_VERSION.tgz"
           # propagação do registry pode levar alguns minutos — poll com backoff
           for i in $(seq 1 18); do
-            npm view theforge-cli@${{ inputs.version }} version --registry https://registry.npmjs.org 2>/dev/null | grep -qx "${{ inputs.version }}" && break
+            npm view "theforge-cli@$RELEASE_VERSION" version --registry https://registry.npmjs.org 2>/dev/null | grep -qx "$RELEASE_VERSION" && break
             [ "$i" = 18 ] && { echo 'versão não encontrada no registry'; exit 1; }
             sleep 10
           done
-          npm view theforge-cli@${{ inputs.version }} dist.attestations --json --registry https://registry.npmjs.org || echo 'attestations: indisponível nesta conta'
-          cd "$(mktemp -d)" && npm init -y >/dev/null && npm install theforge-cli@${{ inputs.version }} --no-audit --no-fund >/dev/null
+          # attestation (provenance) é obrigatória — ausência é falha, nunca warning
+          npm view "theforge-cli@$RELEASE_VERSION" dist.attestations --json --registry https://registry.npmjs.org | tee /tmp/att.json
+          node -e "const a=require('/tmp/att.json'); const n=Array.isArray(a)?a.length:(a?1:0); if(!n){console.error('attestation ausente — provenance não registrada');process.exit(1)}"
+          # o tarball publicado é byte-a-byte o artefato validado (integrity npm = sha512 ssri)
+          REMOTE=$(npm view "theforge-cli@$RELEASE_VERSION" dist.integrity --registry https://registry.npmjs.org)
+          LOCAL=$(node -e "const c=require('crypto'),fs=require('fs');console.log('sha512-'+c.createHash('sha512').update(fs.readFileSync('$TARBALL')).digest('base64'))")
+          [ "$REMOTE" = "$LOCAL" ] || { echo "integrity diverge: registry=$REMOTE local=$LOCAL"; exit 1; }
+          cd "$(mktemp -d)" && npm init -y >/dev/null && npm install "theforge-cli@$RELEASE_VERSION" --no-audit --no-fund >/dev/null
           npx theforge-cli --help >/dev/null && echo 'smoke: --help OK'

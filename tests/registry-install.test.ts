@@ -310,12 +310,13 @@ describe('segurança e edge cases do install', () => {
     expect(existsSync(path.join(forgeVenv(tmp, 'api-forge'), 'stale'))).toBe(false);
   });
 
-  it('--clean + falha posterior → state não aponta versão órfã', async () => {
+  it('--clean + falha posterior → instalação anterior restaurada (backup/restore)', async () => {
     // instalação prévia bem-sucedida grava state
     const ok = await registryInstall(ENTRY, undefined, { ...base(), run: runOk([]) });
     expect(ok).not.toHaveProperty('stage');
     expect(loadForgeState(tmp).forges['api-forge']).toBeTruthy();
-    // --clean wipeia dir+state; pip falha depois → state fica vazio
+    // --clean preserva a instalação anterior até a nova estar pronta:
+    // pip falha depois → venv+receipt antigos voltam, state não aponta órfã.
     const res = await registryInstall(ENTRY, undefined, {
       ...base(),
       clean: true,
@@ -324,8 +325,12 @@ describe('segurança e edge cases do install', () => {
       ),
     });
     expect(res).toMatchObject({ stage: 'pip' });
-    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
-    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+    expect(loadForgeState(tmp).forges['api-forge']?.version).toBe('0.1.0');
+    // dir da Forja restaurado com o receipt anterior — nada de half-state
+    expect(existsSync(receiptPath(tmp, 'api-forge'))).toBe(true);
+    expect(
+      existsSync(`${path.join(tmp, '.forge-cli', 'forges', 'api-forge')}.restore-${process.pid}`),
+    ).toBe(false);
   });
 
   it('sha256 divergente → hash-mismatch + venv removida', async () => {

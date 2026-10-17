@@ -891,7 +891,6 @@ async function runRegistryLifecycle(
 
   const pythons = deps.pythons ?? (await probePythons());
   const results = [];
-  const state = loadForgeState(home);
   for (const i of actionable) {
     const spin = spinner();
     if (!quiet) spin.start(`${i.name}: ${i.from} → ${i.to}…`);
@@ -903,6 +902,17 @@ async function runRegistryLifecycle(
       clean: true,
       fetchImpl: deps.fetchImpl,
       run: deps.run,
+      receiptPatch: (r) => {
+        // histórico: versão anterior entra no topo — rollback desempilha.
+        // No patch (antes das escritas atômicas) um crash pós-pip não
+        // perde o histórico nem deixa install.json divergente do state.
+        r.history = [
+          ...(i.receipt.history ?? []),
+          { version: i.from, installedAt: i.receipt.installedAt },
+        ];
+        // `--ref` é override pontual — não cria nem remove pin.
+        r.pinned = i.receipt.pinned;
+      },
     });
     if ('stage' in receipt) {
       if (!quiet) spin.stop(`${i.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
@@ -915,23 +925,15 @@ async function runRegistryLifecycle(
       });
       continue;
     }
-    // histórico: versão anterior entra no topo — rollback desempilha.
-    const prev = state.forges[i.name];
-    receipt.history = [
-      ...(i.receipt.history ?? []),
-      { version: i.from, installedAt: i.receipt.installedAt },
-    ];
-    // `--ref` é override pontual — não cria nem remove pin.
-    receipt.pinned = prev?.pinned;
     receipt.native = await delegateNative(cli, i.entry, receipt, 'update', deps.run);
     if (receipt.native?.skipped) warnings.push(`${i.name}: ${receipt.native.skipped}`);
     if (receipt.native?.ran && receipt.native.exitCode !== 0)
       warnings.push(`${i.name}: instalador nativo saiu ${receipt.native.exitCode}`);
-    state.forges[i.name] = receipt;
+    // `native` chega depois do install — repersiste receipt + state juntos.
+    if (receipt.native) persistReceipt(home, receipt);
     if (!quiet) spin.stop(`${i.name}: ${theme.ok(`${i.from} → ${i.to}`)}`);
     results.push({ forge: i.name, ok: true, from: i.from, to: i.to, bin: receipt.bin });
   }
-  saveForgeState(home, state);
   const doc = {
     method: 'pypi',
     updated: results,
@@ -996,7 +998,6 @@ export async function runRegistryReinstall(
   }
   const pythons = deps.pythons ?? (await probePythons());
   const results = [];
-  const state = loadForgeState(home);
   for (const t of targets) {
     const spin = spinner();
     if (!quiet) spin.start(`${t.name}: reinstall ${t.receipt.version}…`);
@@ -1008,15 +1009,17 @@ export async function runRegistryReinstall(
       clean: true,
       fetchImpl: deps.fetchImpl,
       run: deps.run,
+      receiptPatch: (r) => {
+        // Preserva pin e histórico — reinstall não é lifecycle de versão.
+        r.pinned = t.receipt.pinned;
+        r.history = t.receipt.history;
+      },
     });
     if ('stage' in receipt) {
       if (!quiet) spin.stop(`${t.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
       results.push({ forge: t.name, ok: false, detail: describeInstallError(receipt) });
       continue;
     }
-    // Preserva pin e histórico — reinstall não é lifecycle de versão.
-    receipt.pinned = t.receipt.pinned;
-    receipt.history = t.receipt.history;
     receipt.native = await delegateNative(
       cli,
       entryFor(t.name, t.receipt),
@@ -1027,11 +1030,10 @@ export async function runRegistryReinstall(
     if (receipt.native?.skipped) warnings.push(`${t.name}: ${receipt.native.skipped}`);
     if (receipt.native?.ran && receipt.native.exitCode !== 0)
       warnings.push(`${t.name}: instalador nativo saiu ${receipt.native.exitCode}`);
-    state.forges[t.name] = receipt;
+    if (receipt.native) persistReceipt(home, receipt);
     if (!quiet) spin.stop(`${t.name}: ${theme.ok('reinstalado')} (${receipt.version})`);
     results.push({ forge: t.name, ok: true, version: receipt.version, bin: receipt.bin });
   }
-  saveForgeState(home, state);
   const doc = {
     method: 'pypi',
     reinstalled: results,
@@ -1110,7 +1112,6 @@ export async function runRegistryRollback(
   }
   const pythons = deps.pythons ?? (await probePythons());
   const results = [];
-  const state = loadForgeState(home);
   for (const p of actionable) {
     const spin = spinner();
     if (!quiet) spin.start(`${p.name}: ${p.receipt.version} → ${p.to}…`);
@@ -1122,21 +1123,24 @@ export async function runRegistryRollback(
       clean: true,
       fetchImpl: deps.fetchImpl,
       run: deps.run,
+      receiptPatch: (r) => {
+        // Desempilha o alvo e empilha a versão abandonada — rollback de
+        // rollback funciona. No patch, history/pinned entram nas escritas
+        // atômicas do próprio install: um crash pós-pip não deixa
+        // state/install.json sem o histórico restaurado.
+        const rest = (p.receipt.history ?? []).slice(0, -1);
+        r.history = [...rest, { version: p.receipt.version, installedAt: p.receipt.installedAt }];
+        r.pinned = p.receipt.pinned;
+      },
     });
     if ('stage' in receipt) {
       if (!quiet) spin.stop(`${p.name}: ${theme.err('falhou')} (${describeInstallError(receipt)})`);
       results.push({ forge: p.name, ok: false, detail: describeInstallError(receipt) });
       continue;
     }
-    // Desempilha o alvo e empilha a versão abandonada — rollback de rollback funciona.
-    const rest = (p.receipt.history ?? []).slice(0, -1);
-    receipt.history = [...rest, { version: p.receipt.version, installedAt: p.receipt.installedAt }];
-    receipt.pinned = p.receipt.pinned;
-    state.forges[p.name] = receipt;
     if (!quiet) spin.stop(`${p.name}: ${theme.ok(`${p.receipt.version} → ${p.to}`)}`);
     results.push({ forge: p.name, ok: true, from: p.receipt.version, to: p.to, bin: receipt.bin });
   }
-  saveForgeState(home, state);
   const doc = {
     method: 'pypi',
     rolledBack: results,

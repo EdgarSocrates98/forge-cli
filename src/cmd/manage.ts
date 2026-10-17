@@ -84,16 +84,23 @@ export async function runForgeUninstall(cli: CliOptions, names: string[]): Promi
   note(lines.join('\n'), S.uninstallPlanTitle);
   const ready = plans.filter((p) => p.plan.kind === 'ready');
   const refused = plans.some((p) => p.plan.kind === 'refused');
-  if (!ready.length) process.exit(refused ? 1 : 0);
+  if (!ready.length) {
+    process.exit(refused ? 1 : 0);
+    return;
+  }
   if (!cli.yes) {
     if (!(process.stdin.isTTY && process.stdout.isTTY)) {
       log.info(S.uninstallNeedsYes);
       process.exit(0);
+      // `return` defensivo: exit real termina aqui, mas um exit interceptado
+      // (testes, hooks) não pode continuar até confirm()/remoção.
+      return;
     }
     const proceed = await confirm({ message: S.askConfirmUninstall, initialValue: false });
     if (isCancel(proceed) || !proceed) {
       log.info(S.uninstallNeedsYes);
       process.exit(0);
+      return;
     }
   }
   let refusedNative = false;

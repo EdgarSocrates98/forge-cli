@@ -4,7 +4,7 @@ import { runDoctor2, renderDoctorReport } from '../doctor2/index.js';
 import type { DoctorCheck } from '../doctor2/model.js';
 import { healReceiptPath, planRepairs, runHealFlow } from '../heal/index.js';
 import type { RepairPlan } from '../heal/index.js';
-import { resolveTargetDir } from '../utils/system.js';
+import { cliHome, resolveTargetDir } from '../utils/system.js';
 import { emitJson } from './shared.js';
 import { S } from '../ui/strings.js';
 import { theme } from '../ui/theme.js';
@@ -59,7 +59,7 @@ function printReceipt(receipt: Awaited<ReturnType<typeof runHealFlow>>, file: st
  */
 export async function runHealCommand(cli: CliOptions): Promise<number> {
   const root = resolveTargetDir(cli.dir);
-  const report = await runDoctor2(root);
+  const report = await runDoctor2(root, { home: cliHome() });
   const findings = repairable(report.checks);
   if (!findings.length) {
     if (cli.jsonReport) emitJson({ findings: 0, receipt: null });
@@ -109,7 +109,7 @@ export async function runHealCommand(cli: CliOptions): Promise<number> {
 /** `forge doctor` — Doctor 2.0 report; `--fix` chains into the heal flow. */
 export async function runDoctor2Command(cli: CliOptions): Promise<number> {
   const root = resolveTargetDir(cli.dir);
-  const report = await runDoctor2(root);
+  const report = await runDoctor2(root, { home: cliHome() });
   if (cli.jsonReport) {
     emitJson(report, report.checks.some((c) => c.result === 'fail') ? 1 : 0);
   }

@@ -8,10 +8,9 @@ import { listLine, renderReport } from '../report.js';
 import type { RepoResult } from '../types.js';
 import { S } from '../ui/strings.js';
 import { icons, kindIcon, theme } from '../ui/theme.js';
-import { currentHead, hasGitRepo, resolveTargetDir } from '../utils/system.js';
+import { cliHome, currentHead, hasGitRepo, resolveTargetDir } from '../utils/system.js';
 import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
-import os from 'node:os';
 import { existsSync } from 'node:fs';
 import { loadForgeState, type RegistryInstallReceipt } from '../registry/install.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
@@ -89,7 +88,7 @@ export async function runDoctorCommand(cli: CliOptions, names: string[] = []): P
 export async function runListCommand(cli: CliOptions): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
   const state = loadState(targetDir);
-  const registry = loadForgeState(os.homedir()).forges;
+  const registry = loadForgeState(cliHome()).forges;
   const body = catalogFor(targetDir)
     .map((repo) => {
       const line = listLine(repo, state?.repos[repo.name]);
@@ -149,7 +148,7 @@ export async function runStatusCommand(cli: CliOptions, names: string[]): Promis
   const catalog = catalogFor(targetDir);
   const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
   const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
-  mergeRegistryPhase(infos, loadForgeState(os.homedir()).forges);
+  mergeRegistryPhase(infos, loadForgeState(cliHome()).forges);
   const label: Record<string, string> = {
     'not-installed': S.statusNotInstalled,
     cloned: S.statusCloned,

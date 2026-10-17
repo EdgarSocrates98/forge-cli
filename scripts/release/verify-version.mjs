@@ -1,35 +1,57 @@
 #!/usr/bin/env node
 /**
  * Release gate — valida que a versão pedida é publicável, sem mutar nada.
- *   node scripts/release/verify-version.mjs <version> [--tag vX.Y.Z]
+ *   node scripts/release/verify-version.mjs <version> [--tag vX.Y.Z] [--expect-sha <sha>]
  *
  * Recusas nomeadas (exit 2):
- *  - mismatch package.json × input
- *  - versão já existe no npm (idempotência: nunca sobrescreve)
- *  - tag declarada não aponta para HEAD aprovado (--tag fornecido)
- *  - metadata suja: repository.url ausente, license ausente
+ *  - version-invalid: input fora do SemVer estrito (semver.org, sem leading zeros)
+ *  - version-mismatch: package.json.version ≠ input
+ *  - lock-missing / lock-mismatch: package-lock ausente ou version divergente
+ *  - repo-url / license-missing / files-empty: metadata suja
+ *  - tag-missing / tag-mismatch: tag declarada inexistente ou fora de HEAD
+ *  - sha-mismatch: HEAD ≠ --expect-sha (re-check anti-TOCTOU no job publish)
+ *  - version-exists: versão já publicada (idempotência: nunca sobrescreve)
  * Saída JSON em stdout para o workflow.
  */
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const version = process.argv[2];
-const tagIdx = process.argv.indexOf('--tag');
-const tagArg = tagIdx >= 0 ? process.argv[tagIdx + 1] || null : null;
+const flagValue = (flag) => {
+  const i = process.argv.indexOf(flag);
+  const v = i >= 0 ? process.argv[i + 1] : undefined;
+  // `--tag` sem valor (ou seguido de outra flag) conta como ausente.
+  return v && !v.startsWith('--') ? v : null;
+};
+const tagArg = flagValue('--tag');
+const expectSha = flagValue('--expect-sha');
 const fail = (code, detail) => {
   process.stdout.write(`${JSON.stringify({ ok: false, code, detail })}\n`);
   process.exit(2);
 };
 
-if (!version || !/^\d+\.\d+\.\d+(-[a-z0-9.-]+)?$/.test(version)) {
-  fail('version-invalid', `formato inválido: ${version}`);
+// SemVer estrito (semver.org): sem leading zeros, pre-release/build opcionais.
+const SEMVER =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/;
+if (!version || !SEMVER.test(version)) {
+  fail('version-invalid', `formato inválido (SemVer estrito): ${version}`);
 }
+const head = () => execSync('git rev-parse HEAD', { cwd: root, encoding: 'utf8' }).trim();
+
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 if (pkg.version !== version) {
   fail('version-mismatch', `package.json=${pkg.version} input=${version}`);
+}
+// package-lock deve acompanhar o bump — lock divergente = release inconsistente.
+const lockPath = path.join(root, 'package-lock.json');
+if (!existsSync(lockPath)) fail('lock-missing', 'package-lock.json ausente');
+const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+const lockRoot = lock.packages?.['']?.version;
+if (lock.version !== version || lockRoot !== version) {
+  fail('lock-mismatch', `package-lock version=${lock.version} root=${lockRoot} ≠ ${version}`);
 }
 if (!pkg.repository?.url?.includes('github.com'))
   fail('repo-url', 'repository.url ausente/inválida');
@@ -45,8 +67,16 @@ if (tagArg) {
   } catch {
     fail('tag-missing', `tag ${expected} inexistente`);
   }
-  const head = execSync('git rev-parse HEAD', { cwd: root, encoding: 'utf8' }).trim();
-  if (tagSha !== head) fail('tag-mismatch', `${expected}→${tagSha} HEAD=${head}`);
+  const h = head();
+  if (tagSha !== h) fail('tag-mismatch', `${expected}→${tagSha} HEAD=${h}`);
+}
+
+// SHA binding: o job publish re-executa o gate no checkout pinado — se o
+// HEAD resolvido divergir do SHA validado, algo trocou o ref entre os jobs.
+if (expectSha) {
+  if (!/^[0-9a-f]{40}$/.test(expectSha)) fail('sha-invalid', `--expect-sha: ${expectSha}`);
+  const h = head();
+  if (h !== expectSha) fail('sha-mismatch', `HEAD=${h} ≠ validado=${expectSha}`);
 }
 
 // versão já publicada? 404 = disponível (ok); 200 = recusa
@@ -65,6 +95,4 @@ try {
 }
 if (status === 200) fail('version-exists', `${pkg.name}@${version} já publicada`);
 
-process.stdout.write(
-  `${JSON.stringify({ ok: true, name: pkg.name, version, sha: execSync('git rev-parse HEAD', { cwd: root, encoding: 'utf8' }).trim() })}\n`,
-);
+process.stdout.write(`${JSON.stringify({ ok: true, name: pkg.name, version, sha: head() })}\n`);

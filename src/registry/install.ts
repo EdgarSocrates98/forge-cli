@@ -210,6 +210,14 @@ export interface RegistryInstallDeps {
   now?: () => string;
   /** `--clean`: remove venv/receipt existentes antes de instalar. */
   clean?: boolean;
+  /**
+   * Lifecycle (update/reinstall/rollback): ajusta o receipt — history,
+   * pinned — ANTES das escritas atômicas de install.json + state.json.
+   * Sem o hook, o chamador mutava o receipt depois da persistência: um
+   * crash nesse intervalo perdia o histórico e deixava install.json
+   * divergente do state para sempre.
+   */
+  receiptPatch?: (receipt: RegistryInstallReceipt) => void;
 }
 
 export type InstallError =
@@ -361,24 +369,28 @@ export async function registryInstall(
   if ('error' in picked) return { stage: 'resolve', error: picked.error };
   const python = picked.python;
 
-  if (deps.clean) {
-    rmSync(path.join(forgesRoot(deps.home), entry.name), { recursive: true, force: true });
-    // state também é limpo — senão uma falha depois deixa versão antiga
-    // registrada sem venv/bin correspondentes.
-    const st = loadForgeState(deps.home);
-    if (st.forges[entry.name]) {
-      delete st.forges[entry.name];
-      saveForgeState(deps.home, st);
-    }
-  }
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
   const forgeDir = path.join(forgesRoot(deps.home), entry.name);
+  // `--clean`/lifecycle: a instalação anterior é movida para backup ANTES de
+  // qualquer etapa destrutiva — falha restaura o estado anterior em vez de
+  // deixar a Forja sem install (venv + receipt voltam inteiros pelo rename).
+  let backupDir: string | null = null;
+  if (deps.clean && existsSync(forgeDir)) {
+    backupDir = `${forgeDir}.restore-${process.pid}`;
+    renameSync(forgeDir, backupDir);
+  }
   // venv é o único conteúdo criado nesta tentativa — se o dir da Forja
   // ficou vazio após remover a venv, remove o dir também (sem órfãos).
+  // Com backup pendente, a restauração devolve a instalação anterior.
   const cleanup = () => {
     rmSync(venvDir, { recursive: true, force: true });
     if (existsSync(forgeDir) && !readdirSync(forgeDir).length) {
       rmSync(forgeDir, { recursive: true, force: true });
+    }
+    if (backupDir) {
+      rmSync(forgeDir, { recursive: true, force: true });
+      renameSync(backupDir, forgeDir);
+      backupDir = null;
     }
   };
   const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
@@ -479,6 +491,12 @@ export async function registryInstall(
       detail: redactSecrets((pip.stderr ?? pip.stdout ?? 'falha no pip install').trim()),
     };
   }
+  // Ponto de não retorno: pip install ok ⇒ nova instalação venceu — o backup
+  // da instalação anterior (--clean/lifecycle) é descartado.
+  if (backupDir) {
+    rmSync(backupDir, { recursive: true, force: true });
+    backupDir = null;
+  }
 
   const binPath = path.join(
     venvBin(venvDir, platform),
@@ -514,6 +532,9 @@ export async function registryInstall(
     yanked: resolved.yanked,
     staleCache: resolved.staleCache,
   };
+  // Patch do lifecycle (history/pinned) antes das duas escritas atômicas —
+  // crash entre install e pós-persistência do chamador não perde histórico.
+  deps.receiptPatch?.(receipt);
 
   mkdirSync(path.dirname(receiptPath(deps.home, entry.name)), { recursive: true });
   writeFileAtomic(receiptPath(deps.home, entry.name), `${JSON.stringify(receipt, null, 2)}\n`);
