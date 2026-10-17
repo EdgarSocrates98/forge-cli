@@ -296,6 +296,150 @@ describe('hosts sem superfície documentada', () => {
   });
 });
 
+describe('cursor — merge-json em ~/.cursor/mcp.json', () => {
+  const cursorJson = () => path.join(home, '.cursor', 'mcp.json');
+
+  it('detect: absent → installed → configured → integrated', async () => {
+    let d = await adapter('cursor').detect(home);
+    expect(d.state).toBe('absent');
+    expect(d.auth).toBe('absent');
+
+    d = await adapter('cursor', probe({ 'cursor --version': 'cursor 0.48.0' })).detect(home);
+    expect(d.state).toBe('installed');
+    expect(d.version).toBe('0.48.0');
+    expect(d.auth).toBe('unknown'); // sem probe de auth documentado
+
+    mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    d = await adapter('cursor').detect(home);
+    expect(d.state).toBe('configured');
+
+    mkdirSync(path.dirname(cursorJson()), { recursive: true });
+    writeJson(cursorJson(), { mcpServers: { other: { command: 'x', args: [] } } });
+    d = await adapter('cursor').detect(home);
+    expect(d.state).toBe('integrated');
+  });
+
+  it('plan null sem mcp_command; merge-json com preview e sem copyable', async () => {
+    const cursor = adapter('cursor');
+    expect(await cursor.planIntegration({ forge_id: 'x' }, ws, home)).toBeNull();
+    const plan = (await cursor.planIntegration(FORGE, ws, home))!;
+    expect(plan.actions[0].kind).toBe('merge-json');
+    expect(plan.actions[0].target).toBe(cursorJson());
+    expect(plan.actions[0].preview).toContain('"mcpServers"');
+    expect(plan.copyable_command).toBeUndefined(); // cursor não documenta CLI de registro
+  });
+
+  it('já integrado ⇒ plano manual, nada a escrever', async () => {
+    mkdirSync(path.dirname(cursorJson()), { recursive: true });
+    writeJson(cursorJson(), { mcpServers: { apiforge: { command: 'old', args: [] } } });
+    const plan = (await adapter('cursor').planIntegration(FORGE, ws, home))!;
+    expect(plan.actions.every((a) => a.kind === 'manual')).toBe(true);
+    expect(plan.actions[0].reason).toBe('integração já presente');
+  });
+
+  it('apply faz merge preservando chaves, cria backup e valida', async () => {
+    mkdirSync(path.dirname(cursorJson()), { recursive: true });
+    writeJson(cursorJson(), { ui: { theme: 'dark' } });
+    const cursor = adapter('cursor');
+    const plan = (await cursor.planIntegration(FORGE, ws, home))!;
+    const result = await cursor.applyIntegration(plan, { home });
+    expect(result.ok).toBe(true);
+    const merged = JSON.parse(readFileSync(cursorJson(), 'utf8')) as {
+      ui: { theme: string };
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    expect(merged.ui.theme).toBe('dark');
+    expect(merged.mcpServers.apiforge).toEqual({ command: 'apiforge', args: ['mcp', 'serve'] });
+    expect(result.backup).toBeTruthy();
+    const v = await cursor.validateIntegration('apiforge', home);
+    expect(v.ok).toBe(true);
+  });
+
+  it('alvo inválido ⇒ reason target-json-invalid e apply recusa sem clobber', async () => {
+    mkdirSync(path.dirname(cursorJson()), { recursive: true });
+    writeFileSync(cursorJson(), 'not-json{', 'utf8');
+    const plan = (await adapter('cursor').planIntegration(FORGE, ws, home))!;
+    expect(plan.actions[0].reason).toBe('target-json-invalid');
+    const result = await adapter('cursor').applyIntegration(plan, { home });
+    expect(result.ok).toBe(false);
+    expect(readFileSync(cursorJson(), 'utf8')).toBe('not-json{');
+  });
+
+  it('dryRun não escreve; validate falha honesta sem arquivo', async () => {
+    const cursor = adapter('cursor');
+    const plan = (await cursor.planIntegration(FORGE, ws, home))!;
+    const result = await cursor.applyIntegration(plan, { home, dryRun: true });
+    expect(result.ok).toBe(true);
+    expect(result.applied).toEqual([]);
+    expect(existsSync(cursorJson())).toBe(false);
+    const v = await cursor.validateIntegration('apiforge', home);
+    expect(v.ok).toBe(false);
+    expect(v.checks[0].result).toBe('fail');
+  });
+});
+
+describe('copilot — superfície gated por mcp-config.json existente', () => {
+  const copilotJson = () => path.join(home, '.copilot', 'mcp-config.json');
+
+  it('detect via fallback gh copilot + .config/gh', async () => {
+    let d = await adapter('copilot').detect(home);
+    expect(d.state).toBe('absent');
+    // extensão do gh CLI vale como evidência de instalação
+    d = await adapter('copilot', probe({ 'gh copilot --help': 'usage: gh copilot' })).detect(home);
+    expect(d.state).toBe('installed');
+    mkdirSync(path.join(home, '.config', 'gh'), { recursive: true });
+    d = await adapter('copilot').detect(home);
+    expect(d.state).toBe('configured');
+  });
+
+  it('já integrado ⇒ plano manual; apply faz merge no arquivo existente', async () => {
+    mkdirSync(path.dirname(copilotJson()), { recursive: true });
+    writeJson(copilotJson(), { mcpServers: { apiforge: { command: 'old', args: [] } } });
+    const copilot = adapter('copilot');
+    const plan = (await copilot.planIntegration(FORGE, ws, home))!;
+    expect(plan.actions[0].kind).toBe('manual');
+
+    writeJson(copilotJson(), { mcpServers: {}, otherKey: true });
+    const plan2 = (await copilot.planIntegration(FORGE, ws, home))!;
+    const result = await copilot.applyIntegration(plan2, { home });
+    expect(result.ok).toBe(true);
+    const merged = JSON.parse(readFileSync(copilotJson(), 'utf8')) as {
+      otherKey: boolean;
+      mcpServers: Record<string, { command: string }>;
+    };
+    expect(merged.otherKey).toBe(true);
+    expect(merged.mcpServers.apiforge.command).toBe('apiforge');
+  });
+});
+
+describe('devin — honesto sem superfície de integração', () => {
+  it('detect: absent → installed → configured via .config/devin', async () => {
+    let d = await adapter('devin').detect(home);
+    expect(d.state).toBe('absent');
+    d = await adapter('devin', probe({ 'devin --version': 'devin 1.4.0' })).detect(home);
+    expect(d.state).toBe('installed');
+    expect(d.version).toBe('1.4.0');
+    mkdirSync(path.join(home, '.config', 'devin'), { recursive: true });
+    d = await adapter('devin').detect(home);
+    expect(d.state).toBe('configured');
+  });
+
+  it('apply/validate recusam com hostUnsupported, nunca falso sucesso', async () => {
+    const devin = adapter('devin');
+    const plan = await devin.planIntegration(FORGE, ws, home);
+    expect(plan).toBeNull();
+    const applied = await devin.applyIntegration(
+      { host: 'devin', forge_id: 'x', actions: [], reversible: true },
+      { home },
+    );
+    expect(applied.ok).toBe(false);
+    expect(applied.detail).toBe('host sem integração documentada');
+    const v = await devin.validateIntegration('apiforge', home);
+    expect(v.ok).toBe(false);
+    expect(v.checks[0].result).toBe('skipped');
+  });
+});
+
 describe('runHostsCommand', () => {
   it('register sem --yes ⇒ 0 e nada escrito', async () => {
     seedForge();

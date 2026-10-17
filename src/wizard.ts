@@ -73,7 +73,7 @@ export function renderOperationPlan(plan: OperationPlan): string {
   return lines.join('\n');
 }
 
-function planActionsFor(
+export function planActionsFor(
   repo: ForgeRepo,
   targetDir: string,
   steps: readonly SelectableStep[],

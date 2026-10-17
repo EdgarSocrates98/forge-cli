@@ -179,6 +179,28 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
     expect(doc.manifest === null || typeof doc.manifest.sha256 === 'string').toBe(true);
   });
 
+  it('update --check reporta no-upstream honesto para clone sem remote', async () => {
+    const dir = path.join(ws, 'api-forge');
+    mkdirSync(dir, { recursive: true });
+    const git = (...a: string[]) => execFileSync('git', ['-C', dir, ...a], { stdio: 'ignore' });
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    writeFileSync(path.join(dir, '.gitignore'), '.env\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'init');
+
+    const res = await cli('update', '--check', '--json', '--dir', ws);
+    const doc = JSON.parse(res.out);
+    const row = doc.repos.find((r: { name: string }) => r.name === 'api-forge');
+    expect(row.failure).toBe('no-upstream');
+    expect(res.code).toBe(0); // não conta como pendência de update
+
+    const text = await cli('update', '--check', '--dir', ws);
+    expect(text.out).toContain('sem upstream configurado');
+    expect(text.out).not.toContain('(unknown)');
+  });
+
   it('uninstall --native sem a operação nativa preserva o clone', async () => {
     const dir = fakeClone('forge-portal', 'https://github.com/EdgarSocrates98/forge-portal');
     const res = await cli('uninstall', 'forge-portal', '--native', '--yes', '--dir', ws);

@@ -82,3 +82,80 @@ describe('loadConfig', () => {
     expect(loadConfig(dir)).toEqual({ config: {} });
   });
 });
+
+describe('loadConfig — bloco ai (§6.3 opt-in)', () => {
+  it('parses all ai keys within bounds', () => {
+    const dir = tmpDir();
+    writeConfig(dir, {
+      ai: {
+        enabled: true,
+        command: ['bridge', '--local'],
+        maxContextBytes: 4096,
+        timeoutMs: 5000,
+        cacheTtlMs: 60000,
+      },
+    });
+    expect(loadConfig(dir)).toEqual({
+      config: {
+        ai: {
+          enabled: true,
+          command: ['bridge', '--local'],
+          maxContextBytes: 4096,
+          timeoutMs: 5000,
+          cacheTtlMs: 60000,
+        },
+      },
+    });
+  });
+
+  it('accepts partial ai config — only valid keys kept', () => {
+    const dir = tmpDir();
+    writeConfig(dir, { ai: { enabled: false, unknownKnob: 'x' } });
+    expect(loadConfig(dir)).toEqual({ config: { ai: { enabled: false } } });
+  });
+
+  it('drops out-of-bounds and wrong-typed ai values', () => {
+    const dir = tmpDir();
+    writeConfig(dir, {
+      ai: {
+        enabled: 'yes', // não-booleano
+        command: [], // vazio
+        maxContextBytes: 100, // < 512
+        timeoutMs: 999999, // > 300000
+        cacheTtlMs: -1, // < 0
+      },
+    });
+    expect(loadConfig(dir)).toEqual({ config: {} });
+  });
+
+  it('boundary values accepted: 512 bytes, 1000ms, 0 ttl, ceiling values', () => {
+    const dir = tmpDir();
+    writeConfig(dir, {
+      ai: { maxContextBytes: 512, timeoutMs: 1000, cacheTtlMs: 0 },
+    });
+    expect(loadConfig(dir)).toEqual({
+      config: { ai: { maxContextBytes: 512, timeoutMs: 1000, cacheTtlMs: 0 } },
+    });
+    const dir2 = tmpDir();
+    writeConfig(dir2, {
+      ai: { maxContextBytes: 262144, timeoutMs: 300000, cacheTtlMs: 86400000 },
+    });
+    expect(loadConfig(dir2)).toEqual({
+      config: { ai: { maxContextBytes: 262144, timeoutMs: 300000, cacheTtlMs: 86400000 } },
+    });
+  });
+
+  it('non-integer and non-string-array command are dropped', () => {
+    const dir = tmpDir();
+    writeConfig(dir, {
+      ai: { command: ['ok', '', 'x'], timeoutMs: 1000.5 },
+    });
+    expect(loadConfig(dir)).toEqual({ config: {} });
+  });
+
+  it('ai as array/scalar is ignored, not an error', () => {
+    const dir = tmpDir();
+    writeConfig(dir, { ai: ['not', 'object'], json: true });
+    expect(loadConfig(dir)).toEqual({ config: { json: true } });
+  });
+});

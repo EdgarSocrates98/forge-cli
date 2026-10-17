@@ -61,6 +61,7 @@ export const S = {
   errRefInvalid: 'Revisão/versão inválida',
   updateCheckTitle: 'Verificação de atualizações',
   updateCheckFailed: 'não foi possível verificar',
+  updateNoUpstream: 'sem upstream configurado',
   updateCommitsBehind: 'commit(s) disponíveis',
   updateUpToDate: 'atualizado',
   updateNothing: 'Nenhuma Forja clonada neste diretório — nada para atualizar',
