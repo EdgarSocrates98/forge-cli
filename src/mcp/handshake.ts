@@ -282,6 +282,13 @@ export function probeMcpServer(argv: string[], opts: ProbeOptions = {}): Promise
       });
     });
 
+    const send = (frame: Record<string, unknown>): void => {
+      try {
+        child.stdin!.write(`${JSON.stringify(frame)}\n`);
+      } catch {
+        /* EPIPE: child já morreu — o handler 'exit' produz o erro nomeado */
+      }
+    };
     const request = (method: string, params: Record<string, unknown>, id: number) =>
       new Promise<Record<string, unknown>>((ok, bad) => {
         pending.set(id, ok);
@@ -290,10 +297,9 @@ export function probeMcpServer(argv: string[], opts: ProbeOptions = {}): Promise
           bad(new Error(`${method}: timeout por etapa`));
         }, stepMs);
         stepTimer.unref();
-        child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+        send({ jsonrpc: '2.0', id, method, params });
       });
-    const notify = (method: string) =>
-      child.stdin!.write(`${JSON.stringify({ jsonrpc: '2.0', method })}\n`);
+    const notify = (method: string) => send({ jsonrpc: '2.0', method });
 
     const fail = (code: string, detail: string) =>
       finish({ ...err(code, detail), levels, protocolVersion, serverInfo, tools, calledTool });
