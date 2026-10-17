@@ -7,6 +7,44 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Cycle 11 — instalação registry-first (PyPI)
 
+#### Corrigido após revisão (5ª rodada)
+
+- **Dedupe pós-normalização**: `install api-forge apiforge-af` (nome +
+  alias) não falha mais com `already-installed` espúrio; uninstall
+  planeja uma única remoção.
+- **`status` honesto sob drift**: receipt registry com venv/bin ausente
+  vira `drifted` + "(bin ausente)" (antes marcava `installed` só pelo
+  state). `forge-cli registry` e `status` agora concordam.
+- **`--report` honrado**: escreve o documento JSON no arquivo (mesmo
+  contrato do fluxo git) em vez de só desviar o modo de saída;
+  `--json` sozinho continua emitindo no stdout.
+- **Flags ignoradas no uninstall**: `--dir`/`--profile`/etc. agora
+  avisam no uninstall também (antes só no install).
+- **Uninstall completo**: remove venv + `cache/wheels/<dist>` + state —
+  reclaim de disco; Forja fora do catálogo mas presente no state
+  continua desinstalável (entrada removida do catálogo não trava).
+- **Escritas atômicas**: `state.json` e `install.json` usam
+  `writeFileAtomic` (convenção do codebase) — kill no meio não corrompe.
+- **Sem dir órfão**: falha de install remove `forges/<nome>/` vazio.
+- **`--find-links` só no offline**: online as deps resolvem no índice —
+  wheel cache não compete desnecessariamente. Limite documentado:
+  offline, deps transitivas resolvem por nome sem pin de hash.
+- **Cache não envenenável**: payload 200 sem `releases` não sobrescreve
+  cache sadio — cai no cache ou falha `malformed`.
+- **Menu sem dead-end**: `--method registry` sozinho não abre o menu
+  interativo (que só roteava o fluxo git) — recusa limpa no dispatcher.
+- **`--method git` em comandos alheios**: agora avisa em vez de engolir
+  (ex.: `status --method git`).
+- **pip sem prompts**: `--no-input` em download/install; timeout do
+  subprocesso preserva o stderr real; payload PyPI tem cap de 16 MiB;
+  `available` do `version-not-found` vem ordenado.
+- **Banner do plano honesto**: "venv e estado não alterados" (o cache
+  de metadados pode ser atualizado — mesmo modelo de `update --check`).
+- Docs: `arquitetura.md` e `capabilities.md` descrevem o método
+  registry; decisões registradas como diferidas — `--python`
+  selecionável (§4.7), pipx/uv (§4.6), canal rc/beta (§4.1), lock de
+  state.json entre processos concorrentes.
+
 #### Corrigido após revisão (4ª rodada)
 
 - **Membership own-property**: `--version toString` (ou qualquer membro

@@ -7,6 +7,7 @@ import { registryEntry } from '../src/registry/catalog.js';
 import {
   forgeVenv,
   wheelCacheDir,
+  wheelCacheForHome,
   loadForgeState,
   receiptPath,
   registryInstall,
@@ -89,9 +90,14 @@ describe('registryInstall', () => {
     expect(calls[0]).toContain('venv');
     expect(calls[0].at(-1)).toBe(venvDir);
     expect(calls[1]).toContain('download');
+    expect(calls[1]).toContain('--no-input');
     expect(calls[1].slice(-1)).toEqual(['apiforge-af==0.1.0']);
     expect(calls[2]).toContain('install');
+    expect(calls[2]).toContain('--no-input');
     expect(calls[2].at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl$/);
+    // online o índice resolve as deps — wheel cache não compete (--find-links só offline)
+    expect(calls[2]).not.toContain('--find-links');
+    expect(calls[2]).not.toContain('--no-index');
     expect(calls[3][0]).toBe(res.bin);
     expect(calls[3][1]).toBe('--help');
 
@@ -339,6 +345,8 @@ describe('segurança e edge cases do install', () => {
     });
     expect(res).toMatchObject({ stage: 'pip' });
     expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+    // sem dir órfão da Forja — venv era o único conteúdo desta tentativa
+    expect(existsSync(path.join(tmp, '.forge-cli', 'forges', 'api-forge'))).toBe(false);
   });
 
   it('specifier fora do subconjunto → specifier-unknown, não incompatible', async () => {
@@ -453,6 +461,15 @@ describe('registryUninstall', () => {
     expect(res.receiptRemoved).toBe(true);
     expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
     expect(existsSync(path.join(tmp, '.forge-cli', 'forges', 'api-forge'))).toBe(false);
+  });
+
+  it('remove também o wheel cache da dist (reclaim de disco)', () => {
+    const wheels = wheelCacheForHome(tmp, 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, 'x.whl'), 'w');
+    const res = registryUninstall({ name: 'api-forge', dist: 'apiforge-af' }, { home: tmp });
+    expect(res.cacheRemoved).toBe(true);
+    expect(existsSync(wheels)).toBe(false);
   });
 
   it('idempotente quando não instalado', () => {

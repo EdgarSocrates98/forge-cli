@@ -6,7 +6,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { latestStable, parseVersion } from './versions.js';
+import { compareVersions, latestStable, parseVersion } from './versions.js';
 
 export interface ReleaseFile {
   filename: string;
@@ -117,12 +117,19 @@ export interface ResolveOptions {
   fetchImpl?: FetchLike;
 }
 
+/** Payload PyPI é pequeno — cap defensivo contra resposta inflada. */
+const MAX_PAYLOAD_BYTES = 16 * 1024 * 1024;
+
 async function defaultFetch(url: string): Promise<{ status: number; body: string }> {
   const res = await fetch(url, {
     headers: { accept: 'application/json' },
     signal: AbortSignal.timeout(15_000),
   });
-  return { status: res.status, body: await res.text() };
+  const body = await res.text();
+  if (body.length > MAX_PAYLOAD_BYTES) {
+    throw new Error(`payload excede ${MAX_PAYLOAD_BYTES} bytes`);
+  }
+  return { status: res.status, body };
 }
 
 export async function resolveRelease(
@@ -149,8 +156,21 @@ export async function resolveRelease(
         }
       } else {
         const parsed = JSON.parse(res.body) as PypiPayload;
-        writeCache(opts.cacheDir, dist, parsed);
-        payload = parsed;
+        // Valida ANTES de cachear — um 200 malformado não pode
+        // envenenar o cache local que sustenta o modo offline.
+        if (typeof parsed?.releases !== 'object' || !parsed.releases) {
+          const cached = readCache(opts.cacheDir, dist);
+          if (cached) {
+            payload = cached.payload;
+            fromCache = true;
+            staleCache = !cached.fresh;
+          } else {
+            return { kind: 'malformed', dist, detail: 'resposta sem campo releases' };
+          }
+        } else {
+          writeCache(opts.cacheDir, dist, parsed);
+          payload = parsed;
+        }
       }
     } catch (error) {
       const cached = readCache(opts.cacheDir, dist);
@@ -194,7 +214,9 @@ export async function resolveRelease(
       kind: 'version-not-found',
       dist,
       requested: version,
-      available: Object.keys(releases).filter((v) => parseVersion(v)),
+      available: Object.keys(releases)
+        .filter((v) => parseVersion(v))
+        .sort((a, b) => compareVersions(parseVersion(a)!, parseVersion(b)!)),
     };
   }
 

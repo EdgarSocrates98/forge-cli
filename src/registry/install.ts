@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { execa } from 'execa';
+import { writeFileAtomic } from '../safety.js';
 import type { RegistryEntry } from './catalog.js';
 import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
@@ -76,11 +77,17 @@ export function loadForgeState(home: string): ForgeState {
 
 function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
-  writeFileSync(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  // Escrita atômica (convenção do codebase) — kill no meio não corrompe.
+  writeFileAtomic(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 export function wheelCacheDir(cacheDir: string, dist: string): string {
   return path.join(path.dirname(cacheDir), 'wheels', dist);
+}
+
+/** Wheel cache da dist derivado do home — usado no uninstall. */
+export function wheelCacheForHome(home: string, dist: string): string {
+  return path.join(home, '.forge-cli', 'cache', 'wheels', dist);
 }
 
 export function venvBin(venvDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -110,7 +117,10 @@ async function execaRun(cmd: string, args: string[], opts: RunOpts = {}): Promis
   return {
     exitCode: res.exitCode ?? 1,
     stdout: res.stdout,
-    stderr: res.timedOut ? `timeout após ${opts.timeoutMs ?? 300_000}ms` : res.stderr,
+    // Timeout preserva o stderr real quando o processo já escreveu algo.
+    stderr: res.timedOut
+      ? `timeout após ${opts.timeoutMs ?? 300_000}ms${res.stderr ? `: ${res.stderr}` : ''}`
+      : res.stderr,
   };
 }
 
@@ -277,7 +287,15 @@ export async function registryInstall(
     }
   }
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
-  const cleanup = () => rmSync(venvDir, { recursive: true, force: true });
+  const forgeDir = path.join(forgesRoot(deps.home), entry.name);
+  // venv é o único conteúdo criado nesta tentativa — se o dir da Forja
+  // ficou vazio após remover a venv, remove o dir também (sem órfãos).
+  const cleanup = () => {
+    rmSync(venvDir, { recursive: true, force: true });
+    if (existsSync(forgeDir) && !readdirSync(forgeDir).length) {
+      rmSync(forgeDir, { recursive: true, force: true });
+    }
+  };
   const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
   if (venv.exitCode !== 0) {
     cleanup();
@@ -316,6 +334,7 @@ export async function registryInstall(
       'pip',
       'download',
       '--disable-pip-version-check',
+      '--no-input',
       '--dest',
       wheels,
       spec,
@@ -352,9 +371,12 @@ export async function registryInstall(
     'pip',
     'install',
     '--disable-pip-version-check',
-    '--find-links',
-    wheels,
-    ...(deps.offline ? ['--no-index'] : []),
+    '--no-input',
+    // `--find-links` só no offline: online as dependências resolvem no
+    // índice, não em wheels cacheadas potencialmente velhas/adulteradas.
+    // Limite conhecido (§11.2): offline, deps transitivas resolvem por
+    // nome no --find-links sem pin de hash.
+    ...(deps.offline ? ['--no-index', '--find-links', wheels] : []),
     // Caminho explícito do artefato verificado — pip não resolve por nome,
     // então um arquivo plantado com a mesma dist==versão nunca é escolhido.
     path.join(wheels, verifiedFile),
@@ -395,11 +417,7 @@ export async function registryInstall(
   };
 
   mkdirSync(path.dirname(receiptPath(deps.home, entry.name)), { recursive: true });
-  writeFileSync(
-    receiptPath(deps.home, entry.name),
-    `${JSON.stringify(receipt, null, 2)}\n`,
-    'utf8',
-  );
+  writeFileAtomic(receiptPath(deps.home, entry.name), `${JSON.stringify(receipt, null, 2)}\n`);
   const state = loadForgeState(deps.home);
   state.forges[entry.name] = receipt;
   saveForgeState(deps.home, state);
@@ -416,15 +434,21 @@ export interface RegistryUninstallDeps {
 }
 
 export function registryUninstall(
-  entry: RegistryEntry,
+  target: { name: string; dist?: string },
   deps: RegistryUninstallDeps,
-): { removed: boolean; receiptRemoved: boolean } {
-  const dir = path.join(forgesRoot(deps.home), entry.name);
+): { removed: boolean; receiptRemoved: boolean; cacheRemoved: boolean } {
+  const dir = path.join(forgesRoot(deps.home), target.name);
   const removed = existsSync(dir);
   if (removed) rmSync(dir, { recursive: true, force: true });
+  // Wheel cache também sai — sem reclaim de disco o cache acumularia
+  // artefatos de Forjas desinstaladas. Fora do catálogo (dist ausente)
+  // só venv+state são removidos.
+  const wheels = target.dist ? wheelCacheForHome(deps.home, target.dist) : null;
+  const cacheRemoved = wheels !== null && existsSync(wheels);
+  if (wheels) rmSync(wheels, { recursive: true, force: true });
   const state = loadForgeState(deps.home);
-  const hadReceipt = Boolean(state.forges[entry.name]);
-  delete state.forges[entry.name];
+  const hadReceipt = Boolean(state.forges[target.name]);
+  delete state.forges[target.name];
   saveForgeState(deps.home, state);
-  return { removed, receiptRemoved: hadReceipt };
+  return { removed, receiptRemoved: hadReceipt, cacheRemoved };
 }

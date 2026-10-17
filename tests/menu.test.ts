@@ -24,6 +24,10 @@ describe('shouldShowMenu', () => {
       expect(shouldShowMenu(parseCliArgs(argv), true)).toBe(false);
     }
   });
+
+  it('não aparece com --method registry (menu não sabe rotear — evita dead-end)', () => {
+    expect(shouldShowMenu(parseCliArgs(['--method', 'registry']), true)).toBe(false);
+  });
 });
 
 describe('ações do menu', () => {

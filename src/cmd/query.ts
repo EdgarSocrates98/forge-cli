@@ -12,7 +12,8 @@ import { currentHead, hasGitRepo, resolveTargetDir } from '../utils/system.js';
 import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
 import os from 'node:os';
-import { loadForgeState } from '../registry/install.js';
+import { existsSync } from 'node:fs';
+import { loadForgeState, type RegistryInstallReceipt } from '../registry/install.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
 import { processBatch } from './batch.js';
 import {
@@ -113,21 +114,38 @@ export async function runListCommand(cli: CliOptions): Promise<void> {
   process.exit(0);
 }
 
-export async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void> {
-  const targetDir = resolveTargetDir(cli.dir);
-  const catalog = catalogFor(targetDir);
-  const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
-  const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
-  const registry = loadForgeState(os.homedir()).forges;
+/**
+ * Mescla o estado registry no status git. Receipt com bin ausente é
+ * drift (venv apagada depois da instalação), não "installed" — o mesmo
+ * existsSync que `forge-cli registry` usa, para os dois comandos
+ * concordarem.
+ */
+export function mergeRegistryPhase(
+  infos: { name: string; phase: string; describe?: string }[],
+  registry: Record<string, RegistryInstallReceipt>,
+): void {
   for (const i of infos) {
     const reg = registry[i.name];
-    if (reg && i.phase === 'not-installed') {
+    if (reg && !existsSync(reg.bin)) {
+      if (i.phase === 'not-installed' || i.phase === 'installed') i.phase = 'drifted';
+      i.describe = [i.describe, `pypi ${reg.dist}==${reg.version} (bin ausente)`]
+        .filter(Boolean)
+        .join(' + ');
+    } else if (reg && i.phase === 'not-installed') {
       i.phase = 'installed';
       i.describe = `pypi ${reg.dist}==${reg.version}${reg.verify.ok ? '' : ' (verify falhou)'}`;
     } else if (reg) {
       i.describe = [i.describe, `pypi ${reg.dist}==${reg.version}`].filter(Boolean).join(' + ');
     }
   }
+}
+
+export async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void> {
+  const targetDir = resolveTargetDir(cli.dir);
+  const catalog = catalogFor(targetDir);
+  const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
+  const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
+  mergeRegistryPhase(infos, loadForgeState(os.homedir()).forges);
   const label: Record<string, string> = {
     'not-installed': S.statusNotInstalled,
     cloned: S.statusCloned,
