@@ -3,7 +3,7 @@
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-## [Não lançado]
+## [0.2.0] - 2026-10-17
 
 ### Cycle 11.1 — hardening de produção, MCP real e Trusted Publishing
 
