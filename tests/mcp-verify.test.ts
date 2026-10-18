@@ -168,3 +168,15 @@ describe('deriveMinimalInput — derivação de input mínimo', () => {
     expect(d).toEqual({ kind: 'underivable', field: 'conf' });
   });
 });
+
+describe('catálogo — allowlist por Forja', () => {
+  it('toda Forja com mcp declarado tem mcp_safe_tools explícita', async () => {
+    const { REGISTRY_PACKAGES } = await import('../src/registry/catalog.js');
+    for (const e of REGISTRY_PACKAGES) {
+      if (e.mcp?.length) {
+        expect(e.mcp_safe_tools, `${e.name} sem allowlist`).toBeDefined();
+        expect(e.mcp_safe_tools!.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
