@@ -6,6 +6,7 @@ formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [0.2.1] - 2026-10-18
 
 ### Fixed
+
 - Plan purity `--plan` em todas as superfícies registry
 - Probe de hosts com timeout (FORGE_CLI_PROBE_TIMEOUT_MS)
 - Install `[mcp]` extras + pin/update por evidência real
