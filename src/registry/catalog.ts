@@ -26,6 +26,14 @@ export interface RegistryEntry {
    * nome da tool. Ausente/vazia → verify para em TOOLS_DISCOVERED.
    */
   mcp_safe_tools?: string[];
+  /**
+   * Extras PEP 508 pedidos no install/lock/resolve (`dist[extra]`). Só
+   * entram extras que existem no `[project.optional-dependencies]` da
+   * dist — verificados no pyproject do sibling, nunca inferidos de `mcp`.
+   * Receipt/state continuam com `dist` limpa (extras são do pedido, não
+   * da identidade da distribuição).
+   */
+  extras?: string[];
 }
 
 export const REGISTRY_PACKAGES: RegistryEntry[] = [
@@ -42,6 +50,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'apiforge',
     minPython: '3.12',
     mcp: ['{binDir}/apiforge-mcp'],
+    // pyproject do sibling: mcp = ["mcp>=2.2,<3"]
+    extras: ['mcp'],
     // Tools documentadas em src/apiforge/mcp (read-only).
     mcp_safe_tools: ['apiforge_tools', 'apiforge_discover'],
     origin: 'official',
@@ -52,6 +62,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'platformforge',
     minPython: '3.10',
     mcp: ['{binDir}/platformforge-mcp'],
+    // pyproject do sibling: mcp = ["mcp>=2.2,<3"]
+    extras: ['mcp'],
     // Tools read-only em platformforge/mcp/registry.py.
     mcp_safe_tools: ['platformforge_inspect', 'platformforge_agents'],
     origin: 'official',
@@ -62,6 +74,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'sparkforge-aws',
     minPython: '3.10',
     mcp: ['{bin}', 'mcp', 'serve'],
+    // pyproject do sibling: extra mcp (deps do servidor MCP)
+    extras: ['mcp'],
     // Tools read-only em sparkforge_aws/adapters/tools.py.
     mcp_safe_tools: ['sparkforge_aws_pack_list', 'sparkforge_aws_rules_lookup'],
     origin: 'official',
@@ -72,6 +86,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'sparkforge-azure',
     minPython: '3.10',
     mcp: ['{bin}', 'mcp', 'serve'],
+    // pyproject do sibling: mcp = ["mcp>=2,<3"]
+    extras: ['mcp'],
     // read_only, zero params — docs/reference/mcp-tools.md.
     mcp_safe_tools: ['sfa_version', 'sfa_agents_list'],
     origin: 'official',
@@ -94,6 +110,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     mcp: ['{bin}', 'mcp'],
     // Zero-arg read-only lambdas — src/forge_doctor_api/handoff/mcp_server.py.
     mcp_safe_tools: ['doctor.get_capabilities', 'doctor.get_handoff'],
+    // pyproject do sibling: mcp = ["mcp>=2.0,<3"]
+    extras: ['mcp'],
     origin: 'official',
   },
 ];

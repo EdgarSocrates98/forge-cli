@@ -42,8 +42,12 @@ const AUTH_LABEL: Record<HostDetection['auth'], string> = {
 };
 
 function hostLine(d: HostDetection): string {
-  if (!d.found) return `${d.host} — ${theme.dim(S.hostAbsent)}`;
-  const ver = d.version ?? S.hostVersionUnknown;
+  if (!d.found) {
+    // detail preenchido (ex.: probe timeout) ⇒ "não detectado" é
+    // inconclusivo, não uma ausência provada — reporta a causa.
+    return `${d.host} — ${theme.dim(d.detail ?? S.hostAbsent)}`;
+  }
+  const ver = d.version ?? d.detail ?? S.hostVersionUnknown;
   return `${d.host} — ${STATE_LABEL[d.state]} ${theme.dim(`· ${ver} · ${AUTH_LABEL[d.auth]}`)}`;
 }
 

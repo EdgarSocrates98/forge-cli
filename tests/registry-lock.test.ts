@@ -59,6 +59,8 @@ const lockFixture = (artifacts?: OfflineLock['artifacts']): OfflineLock => ({
   format: 'forge-cli-offline-lock/1',
   forge: 'api-forge',
   dist: 'apiforge-af',
+  // api-forge declara extras:['mcp'] — o lock honesto cobre o pedido inteiro
+  extras: ['mcp'],
   version: '0.1.0',
   python: '3.12.4',
   platform: 'linux',
@@ -112,7 +114,17 @@ describe('parseOfflineLock', () => {
     expect(parseOfflineLock({ ...lockFixture(), artifacts: [{ name: 'x' }] })).toMatchObject({
       kind: 'lock-invalid',
     });
+    // extras fora do contrato (não-array de strings) → lock-invalid
+    expect(parseOfflineLock({ ...lockFixture(), extras: 'mcp' })).toMatchObject({
+      kind: 'lock-invalid',
+    });
+    expect(parseOfflineLock({ ...lockFixture(), extras: ['mcp', 1] })).toMatchObject({
+      kind: 'lock-invalid',
+    });
     expect(parseOfflineLock(lockFixture())).toMatchObject({ format: 'forge-cli-offline-lock/1' });
+    expect(parseOfflineLock({ ...lockFixture(), extras: undefined })).toMatchObject({
+      format: 'forge-cli-offline-lock/1',
+    });
   });
 });
 
@@ -187,7 +199,9 @@ describe('generateOfflineLock — pip download --report', () => {
     const cacheDir = path.join(tmp, 'c');
     const wheels = wheelCacheDir(cacheDir, 'apiforge-af');
     mkdirSync(wheels, { recursive: true });
+    let specArg: string | undefined;
     const run: RunLike = async (_cmd, args) => {
+      specArg = args.at(-1);
       const di = args.indexOf('--dest');
       const ri = args.indexOf('--report');
       writeFileSync(path.join(args[di + 1], WHEEL_A), BYTES_A);
@@ -224,6 +238,10 @@ describe('generateOfflineLock — pip download --report', () => {
     });
     expect(lock).toMatchObject({ format: 'forge-cli-offline-lock/1' });
     if ('kind' in lock) return;
+    // api-forge declara extras:['mcp'] — o download pede o spec PEP 508
+    // completo e o lock declara o que o fecho cobre (E2E 11.2.1).
+    expect(specArg).toBe('apiforge-af[mcp]==0.1.0');
+    expect(lock.extras).toEqual(['mcp']);
     expect(lock.artifacts).toHaveLength(2);
     expect(lock.artifacts[0].filename).toBe(WHEEL_A);
     expect(lock.artifacts[0].sha256).toBe(sha(BYTES_A));
@@ -279,6 +297,20 @@ describe('registryInstall --offline --lock — fecho travado', () => {
     const pipArgs = calls.find((c) => c.includes('install') && c.includes('pip'))!;
     expect(pipArgs).toContain('--no-index');
     expect(pipArgs.filter((a) => a.endsWith('.whl'))).toHaveLength(2);
+  });
+
+  it('lock sem extras + entry com extras → lock-mismatch (nunca sub-instala)', async () => {
+    // Lock legado gerado para `apiforge-af` nua: não cobre as deps do
+    // extra mcp — instalar com ele deixaria o MCP quebrado de novo.
+    const lock = { ...lockFixture(), extras: undefined };
+    const deps = base(lock);
+    const res = await registryInstall(ENTRY, undefined, { ...deps, run: runRequires([]) });
+    expect(res).toMatchObject({ stage: 'lock', error: { kind: 'lock-mismatch' } });
+    if ('stage' in res && res.stage === 'lock' && res.error.kind === 'lock-mismatch') {
+      expect(res.error.detail).toContain('[mcp]');
+      expect(res.error.detail).toContain('pedido foi apiforge-af[mcp]==0.1.0');
+    }
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
   });
 
   it('artefato faltante → stage lock/lock-missing-artifact, sem venv', async () => {

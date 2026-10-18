@@ -41,6 +41,8 @@ export interface RegistryInstallReceipt {
   forge: string;
   method: 'pypi';
   dist: string;
+  /** Extras PEP 508 pedidos junto da dist (`dist[extra]`) — proveniência. */
+  extras?: string[];
   version: string;
   requiresPython?: string;
   python: string;
@@ -133,6 +135,9 @@ export function ghostEntry(name: string, receipt: RegistryInstallReceipt): Regis
     bin: path.basename(receipt.bin).replace(/\.exe$/i, ''),
     minPython: receipt.python.split('.').slice(0, 2).join('.'),
     origin: 'official',
+    // Extras instalados junto — reinstall/update/rollback do ghost pedem o
+    // mesmo `dist[extra]` do receipt em vez de regredir para a dist nua.
+    ...(receipt.extras?.length ? { extras: receipt.extras } : {}),
   };
 }
 
@@ -174,6 +179,26 @@ export function saveForgeState(home: string, state: ForgeState): void {
 
 export function wheelCacheDir(cacheDir: string, dist: string): string {
   return path.join(path.dirname(cacheDir), 'wheels', dist);
+}
+
+/** Extras PEP 508 normalizados (dedup + sort) — contrato do spec e do lock. */
+export function entryExtras(entry: RegistryEntry): string[] {
+  return [...new Set(entry.extras ?? [])].sort();
+}
+
+/** Sufixo `[extra,…]` do requerimento PEP 508 — '' quando sem extras. */
+export function extrasSuffix(entry: RegistryEntry): string {
+  const ex = entryExtras(entry);
+  return ex.length ? `[${ex.join(',')}]` : '';
+}
+
+/**
+ * `dist[extras]==version` — o que o pip resolve/baixa de fato. A dist nua
+ * não puxa deps de extras (E2E 11.2.1: `sparkforge-aws` instalado sem
+ * `[mcp]` deixou o servidor MCP sem as dependências).
+ */
+export function pipSpec(entry: RegistryEntry, version: string): string {
+  return `${entry.dist}${extrasSuffix(entry)}==${version}`;
 }
 
 /** Wheel cache da dist derivado do home — usado no uninstall. */
@@ -663,16 +688,22 @@ export async function registryInstall(
     }
     const parsed = parseOfflineLock(raw);
     if ('kind' in parsed) return { stage: 'lock', error: parsed };
+    // Extras são parte do contrato do lock: um lock gerado para `dist` nua
+    // não cobre as deps de `dist[mcp]` — recusa nomeada, nunca sub-instala.
+    const lockExtras = [...(parsed.extras ?? [])].sort();
+    const wantExtras = entryExtras(entry);
     if (
       parsed.forge !== entry.name ||
       parsed.dist !== entry.dist ||
-      parsed.version !== resolved.version
+      parsed.version !== resolved.version ||
+      lockExtras.join(',') !== wantExtras.join(',')
     ) {
+      const covered = `${parsed.dist}${lockExtras.length ? `[${lockExtras.join(',')}]` : ''}`;
       return {
         stage: 'lock',
         error: {
           kind: 'lock-mismatch',
-          detail: `lock cobre ${parsed.dist}==${parsed.version}; pedido foi ${entry.dist}==${resolved.version}`,
+          detail: `lock cobre ${covered}==${parsed.version}; pedido foi ${pipSpec(entry, resolved.version)}`,
         },
       };
     }
@@ -730,7 +761,7 @@ export async function registryInstall(
     }
 
     const vpy = venvPython(venvDir, platform);
-    const spec = `${entry.dist}==${resolved.version}`;
+    const spec = pipSpec(entry, resolved.version);
     mkdirSync(wheels, { recursive: true });
 
     // Artefatos: online baixa para o wheel cache (popula o modo offline);
@@ -843,8 +874,12 @@ export async function registryInstall(
       // Sem lock: caminho explícito do artefato da dist verificado — um
       // arquivo plantado com a mesma dist==versão nunca é escolhido.
       ...(lock
-        ? lock.artifacts.map((a) => path.join(wheels, a.filename))
-        : [path.join(wheels, verifiedFile)]),
+        ? // Lock já enumera o fecho inteiro — inclusive as deps dos extras
+          // declarados — então os artefatos entram por caminho puro.
+          lock.artifacts.map((a) => path.join(wheels, a.filename))
+        : // `[extras]` no caminho do artefato: pip instala a wheel verificada
+          // E resolve as deps do extra no índice/--find-links (PEP 508).
+          [`${path.join(wheels, verifiedFile)}${extrasSuffix(entry)}`]),
     ];
     const pip = await run(vpy, pipArgs);
     if (pip.exitCode !== 0) {
@@ -871,6 +906,7 @@ export async function registryInstall(
       forge: entry.name,
       method: 'pypi',
       dist: entry.dist,
+      ...(entryExtras(entry).length ? { extras: entryExtras(entry) } : {}),
       version: resolved.version,
       requiresPython: resolved.requiresPython,
       python: python.version,

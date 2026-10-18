@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CliOptions } from '../src/cli-args.js';
+import { pinMethodFor } from '../src/cmd/manage.js';
 import {
   runRegistryInstall,
   runRegistryPin,
@@ -174,6 +175,95 @@ describe('update --method registry', () => {
     expect(state.history).toBeUndefined();
   });
 
+  // E2E 11.2.1: `update --check --method registry` sem nomes reportava
+  // "nenhuma Forja instalada" mesmo com receipts — leitura pura deve
+  // cobrir TODAS as instaladas (contrato do update --check git).
+  it('--check sem nomes cobre TODAS as instaladas — nunca mensagem falsa', async () => {
+    seed('0.1.0');
+    mkdirSync(forgeVenv(tmp, 'platform-forge'), { recursive: true });
+    const st = loadForgeState(tmp);
+    st.forges['platform-forge'] = {
+      ...st.forges['api-forge'],
+      forge: 'platform-forge',
+      dist: 'platformforge',
+      bin: path.join(forgeVenv(tmp, 'platform-forge'), 'bin', 'platformforge'),
+    };
+    writeFileSync(forgeStatePath(tmp), JSON.stringify(st));
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((c: unknown) => {
+      chunks.push(String(c));
+      return true;
+    }) as never);
+    const codes = exitCodes();
+    await runRegistryUpdate(cli({ check: true, jsonReport: true }), [], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+    });
+    const doc = JSON.parse(chunks[0]);
+    expect(doc.method).toBe('pypi');
+    expect(doc.updates.map((u: { forge: string }) => u.forge).sort()).toEqual([
+      'api-forge',
+      'platform-forge',
+    ]);
+    expect(codes).not.toContain(2);
+  });
+
+  it('--check sem nenhuma instalada → updates vazio, exit 0 (check não é erro)', async () => {
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((c: unknown) => {
+      chunks.push(String(c));
+      return true;
+    }) as never);
+    const codes = exitCodes();
+    await runRegistryUpdate(cli({ check: true, jsonReport: true }), [], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+    });
+    const doc = JSON.parse(chunks[0]);
+    expect(doc.updates).toEqual([]);
+    expect(codes).toEqual([0]);
+  });
+
+  it('update sem --check e sem seleção → erro nomeado que diz como selecionar', async () => {
+    seed('0.1.0');
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((c: unknown) => {
+      chunks.push(String(c));
+      return true;
+    }) as never);
+    const codes = exitCodes();
+    await runRegistryUpdate(cli({ jsonReport: true }), [], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+    });
+    const doc = JSON.parse(chunks[0]);
+    expect(doc.error).toContain('update --method registry exige nomes');
+    expect(doc.error).not.toContain('nenhuma Forja instalada');
+    expect(codes).toContain(2);
+    // nada foi mutado — update exige seleção explícita
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.1.0');
+  });
+
+  it('update sem nenhuma instalada → mensagem de registry vazio honesta', async () => {
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((c: unknown) => {
+      chunks.push(String(c));
+      return true;
+    }) as never);
+    const codes = exitCodes();
+    await runRegistryUpdate(cli({ jsonReport: true }), [], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+    });
+    const doc = JSON.parse(chunks[0]);
+    expect(doc.error).toContain('nenhuma Forja instalada via registry');
+    expect(codes).toContain(2);
+  });
+
   it('não instalado → skipped; desconhecido → exit 2', async () => {
     const codes = exitCodes();
     await runRegistryUpdate(cli(), ['platform-forge', 'bogus'], {
@@ -281,6 +371,60 @@ describe('pin/unpin --method registry', () => {
     const codes = exitCodes();
     await runRegistryPin(cli(), ['bogus'], true, { home: tmp });
     expect(codes).toContain(2);
+  });
+
+  it('--version divergente da instalada → recusa honesta, receipt intacto', async () => {
+    seed('0.1.0');
+    const codes = exitCodes();
+    await runRegistryPin(cli({ ref: '9.9.9' }), ['api-forge'], true, { home: tmp });
+    expect(codes).toContain(1);
+    // pin registry fixa a versão INSTALADA — 9.9.9 não pode ser escrito
+    expect(loadForgeState(tmp).forges['api-forge'].pinned).toBeUndefined();
+  });
+
+  it('--version igual à instalada (prefixo v) → pin normal', async () => {
+    seed('0.1.0');
+    await runRegistryPin(cli({ ref: 'v0.1.0' }), ['api-forge'], true, { home: tmp });
+    expect(loadForgeState(tmp).forges['api-forge'].pinned).toBe('0.1.0');
+  });
+});
+
+// E2E 11.2.1: `forge pin <f>` sem --method escrevia estado git mesmo com
+// a Forja instalada via registry. A rota decide pela instalação REAL —
+// receipt + clone são a evidência, nunca o catálogo.
+describe('pinMethodFor — rota pin/unpin sem --method', () => {
+  const ws = () => path.join(tmp, 'ws');
+
+  it('só receipt registry → registry', () => {
+    seed('0.1.0');
+    expect(pinMethodFor(['api-forge'], cli({ dir: ws() }), tmp)).toBe('registry');
+  });
+
+  it('só clone git → git (pin segue escrevendo estado git)', () => {
+    mkdirSync(path.join(ws(), 'api-forge', '.git'), { recursive: true });
+    expect(pinMethodFor(['api-forge'], cli({ dir: ws() }), tmp)).toBe('git');
+  });
+
+  it('receipt + clone → ambiguous (só --method resolve)', () => {
+    seed('0.1.0');
+    mkdirSync(path.join(ws(), 'api-forge', '.git'), { recursive: true });
+    expect(pinMethodFor(['api-forge'], cli({ dir: ws() }), tmp)).toBe('ambiguous');
+  });
+
+  it('alias de dist resolve o nome canônico antes de inspecionar o state', () => {
+    seed('0.1.0');
+    expect(pinMethodFor(['apiforge-af'], cli({ dir: ws() }), tmp)).toBe('registry');
+  });
+
+  it('dir inexistente no clone + receipt → registry', () => {
+    seed('0.1.0');
+    mkdirSync(path.join(ws(), 'api-forge'), { recursive: true }); // sem .git
+    expect(pinMethodFor(['api-forge'], cli({ dir: ws() }), tmp)).toBe('registry');
+  });
+
+  it('0 ou >1 nomes → defer (pickOne decide o erro)', () => {
+    expect(pinMethodFor([], cli({ dir: ws() }), tmp)).toBe('defer');
+    expect(pinMethodFor(['api-forge', 'platform-forge'], cli({ dir: ws() }), tmp)).toBe('defer');
   });
 });
 

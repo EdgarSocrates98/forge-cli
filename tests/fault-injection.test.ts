@@ -119,10 +119,15 @@ const exitCodes = () => {
   return codes;
 };
 
-/** Nome da wheel fake para um spec `dist==ver` (normalização PEP 427). */
+/**
+ * Nome da wheel fake para um spec `dist[extras]==ver` (PEP 427): o pip
+ * nomeia o arquivo pela DIST — extras do requerimento nunca entram no
+ * filename da wheel baixada.
+ */
 const wheelNameFor = (spec: string): string => {
   const [dist, ver] = spec.split('==');
-  return `${dist.replace(/[-_.]/g, '_')}-${ver}-py3-none-any.whl`;
+  const base = dist.replace(/\[.*?\]/g, '');
+  return `${base.replace(/[-_.]/g, '_')}-${ver}-py3-none-any.whl`;
 };
 
 /**

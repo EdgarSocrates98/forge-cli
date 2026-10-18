@@ -130,6 +130,55 @@ describe('detect — estados nunca pulados', () => {
   });
 });
 
+// E2E 11.2.1: `cursor --version` shim Electron pendurado — timeout é
+// INCONCLUSIVO, nunca "ausente" nem versão/auth inventadas.
+describe('detect — probe sem resposta (timeout), nunca ausência provada', () => {
+  const timeoutProbe: HostProbe = {
+    output: async () => {
+      throw new Error('probe legado não deve ser chamada quando detailed existe');
+    },
+    detailed: async () => ({ out: null, timedOut: true }),
+  };
+
+  it('shim travado + sem config → absent + detail de timeout (honesto)', async () => {
+    const d = await adapter('cursor', timeoutProbe).detect(home);
+    expect(d.state).toBe('absent');
+    expect(d.found).toBe(false);
+    expect(d.detail).toBe('probe sem resposta (timeout)');
+  });
+
+  it('shim travado + config presente → configured; versão/auth não inventadas', async () => {
+    mkdirSync(path.join(home, '.cursor'), { recursive: true });
+    const d = await adapter('cursor', timeoutProbe).detect(home);
+    expect(d.found).toBe(true);
+    expect(d.state).toBe('configured');
+    expect(d.version).toBeNull();
+    expect(d.auth).toBe('unknown'); // cursor não tem probe de auth documentado
+    expect(d.detail).toBe('probe sem resposta (timeout)');
+  });
+
+  it('versão ok + probe de auth travado → auth unknown, detail de timeout', async () => {
+    const p: HostProbe = {
+      output: async () => null,
+      detailed: async (command, args) =>
+        [command, ...args].join(' ') === 'codex --version'
+          ? { out: 'codex 0.1.0', timedOut: false }
+          : { out: null, timedOut: true }, // `codex login status` pendurado
+    };
+    const d = await adapter('codex', p).detect(home);
+    expect(d.state).toBe('installed');
+    expect(d.version).toBe('0.1.0');
+    expect(d.auth).toBe('unknown'); // nunca verified nem absent por timeout
+    expect(d.detail).toBe('probe sem resposta (timeout)');
+  });
+
+  it('probe legado sem detailed → comportamento antigo, sem distinção', async () => {
+    const d = await adapter('cursor', { output: async () => null }).detect(home);
+    expect(d.state).toBe('absent');
+    expect(d.detail).toBeUndefined();
+  });
+});
+
 describe('plan/apply — claude (merge-json)', () => {
   it('duplicado: mcpServers já tem a chave ⇒ plano manual, nada escrito', async () => {
     const original = { mcpServers: { apiforge: { command: 'old', args: [] } } };

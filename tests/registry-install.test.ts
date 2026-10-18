@@ -13,14 +13,18 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registryEntry } from '../src/registry/catalog.js';
 import {
+  extrasSuffix,
   forgeVenv,
   forgesRoot,
+  ghostEntry,
   wheelCacheDir,
   wheelCacheForHome,
   loadForgeState,
+  pipSpec,
   receiptPath,
   registryInstall,
   registryUninstall,
+  type RegistryInstallReceipt,
   type RunLike,
   type RunResult,
 } from '../src/registry/install.js';
@@ -100,10 +104,11 @@ describe('registryInstall', () => {
     expect(calls[0].at(-1)).toBe(venvDir);
     expect(calls[1]).toContain('download');
     expect(calls[1]).toContain('--no-input');
-    expect(calls[1].slice(-1)).toEqual(['apiforge-af==0.1.0']);
+    // api-forge declara extras:['mcp'] — o pedido é o spec PEP 508 completo
+    expect(calls[1].slice(-1)).toEqual(['apiforge-af[mcp]==0.1.0']);
     expect(calls[2]).toContain('install');
     expect(calls[2]).toContain('--no-input');
-    expect(calls[2].at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl$/);
+    expect(calls[2].at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl\[mcp\]$/);
     // online o índice resolve as deps — wheel cache não compete (--find-links só offline)
     expect(calls[2]).not.toContain('--find-links');
     expect(calls[2]).not.toContain('--no-index');
@@ -425,7 +430,8 @@ describe('segurança e edge cases do install', () => {
     expect(res).not.toHaveProperty('stage');
     const pipCall = calls.find((c) => c.includes('install'))!;
     // instala pelo caminho da wheel verificada — nunca pelo nome/spec
-    expect(pipCall.at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl$/);
+    // ([mcp] é o sufixo de extras, não resolução por nome)
+    expect(pipCall.at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl\[mcp\]$/);
     expect(pipCall.at(-1)).not.toContain('cp312');
   });
 
@@ -451,6 +457,99 @@ describe('segurança e edge cases do install', () => {
     });
     if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
     expect(res.yanked).toBe(true);
+  });
+});
+
+// E2E 11.2.1: `sparkforge-aws` instalado sem `[mcp]` deixou o servidor
+// MCP sem dependências. O pedido é `dist[extra]==v`; receipt/state/dist
+// continuam com o nome limpo da distribuição.
+describe('extras PEP 508 — [mcp] no pedido, dist limpa na identidade', () => {
+  const receiptStub = (over: Partial<RegistryInstallReceipt>): RegistryInstallReceipt => ({
+    forge: 'ghost-x',
+    method: 'pypi',
+    dist: 'apiforge-af',
+    version: '0.1.0',
+    python: '3.12.4',
+    source: 'latest-stable',
+    venv: '/v',
+    bin: '/v/bin/apiforge',
+    installedAt: 'x',
+    verify: { command: [], ok: true },
+    files: [],
+    ...over,
+  });
+
+  it('pipSpec/extrasSuffix montam o requerimento; entry sem extras → sufixo vazio', () => {
+    expect(pipSpec(ENTRY, '0.1.0')).toBe('apiforge-af[mcp]==0.1.0');
+    const bare = { ...ENTRY, extras: undefined };
+    expect(extrasSuffix(bare)).toBe('');
+    expect(pipSpec(bare, '0.1.0')).toBe('apiforge-af==0.1.0');
+    // dedup + ordenação — contrato estável para spec e lock
+    expect(pipSpec({ ...ENTRY, extras: ['mcp', 'mcp', 'a'] }, '1')).toBe('apiforge-af[a,mcp]==1');
+  });
+
+  it('catálogo: só extras verificados no pyproject do sibling', () => {
+    for (const name of [
+      'api-forge',
+      'platform-forge',
+      'spark-forge-aws',
+      'spark-forge-azure',
+      'forge-doctor-api',
+    ]) {
+      expect(registryEntry(name)!.extras).toEqual(['mcp']);
+    }
+    // forge-doctor-data tem servidor MCP mas NÃO declara extra `mcp` no
+    // pyproject (watch/lsp/schemas/sql) — extra nunca é inventado de `mcp`.
+    expect(registryEntry('forge-doctor-data')!.extras).toBeUndefined();
+    expect(registryEntry('the-forge')!.extras).toBeUndefined();
+  });
+
+  it('install grava extras no receipt e mantém dist/forge limpos', async () => {
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      fetchImpl: fetchOk,
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(res.extras).toEqual(['mcp']);
+    expect(res.dist).toBe('apiforge-af'); // identidade nunca é dist[extra]
+    const receipt = JSON.parse(readFileSync(receiptPath(tmp, 'api-forge'), 'utf8'));
+    expect(receipt.extras).toEqual(['mcp']);
+    expect(receipt.dist).toBe('apiforge-af');
+    const state = loadForgeState(tmp);
+    expect(state.forges['api-forge'].extras).toEqual(['mcp']);
+    expect(state.forges['api-forge'].dist).toBe('apiforge-af');
+  });
+
+  it('offline pede o caminho[mcp] — deps do extra resolvem no --find-links', async () => {
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, WHEEL_NAME), WHEEL_BYTES);
+    mkdirSync(path.join(tmp, 'c'), { recursive: true });
+    writeFileSync(
+      path.join(tmp, 'c', 'apiforge-af.json'),
+      JSON.stringify({ fetchedAt: Date.now(), payload: PYPI }),
+    );
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      offline: true,
+      pythons: [py('3.12.4')],
+      run: runOk(calls),
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    const pipCall = calls.find((c) => c.includes('install'))!;
+    expect(pipCall).toContain('--no-index');
+    expect(pipCall).toContain('--find-links');
+    expect(pipCall.at(-1)).toMatch(/apiforge_af-0\.1\.0-py3-none-any\.whl\[mcp\]$/);
+  });
+
+  it('ghostEntry propaga extras do receipt — lifecycle do ghost pede dist[mcp]', () => {
+    expect(ghostEntry('ghost-x', receiptStub({ extras: ['mcp'] })).extras).toEqual(['mcp']);
+    expect(ghostEntry('ghost-x', receiptStub({})).extras).toBeUndefined();
   });
 });
 

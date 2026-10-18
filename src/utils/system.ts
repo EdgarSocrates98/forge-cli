@@ -63,14 +63,30 @@ export function withCmdExt(bin: string, platform: NodeJS.Platform = process.plat
   return platform === 'win32' && /^(npm|npx|pnpm|yarn)$/i.test(bin) ? `${bin}.cmd` : bin;
 }
 
+/**
+ * Teto de um probe externo de ambiente (versão/auth/toolchain). Um shim
+ * que nunca responde — `cursor --version` Electron girando por >4min no
+ * E2E do ciclo 11.2.1 — não pode travar doctor/hosts-list/preflight.
+ * `FORGE_CLI_PROBE_TIMEOUT_MS` (inteiro >0, ms) sobrescreve o default.
+ */
+export const DEFAULT_PROBE_TIMEOUT_MS = 15_000;
+
+export function probeTimeoutMs(): number {
+  const raw = Number(process.env.FORGE_CLI_PROBE_TIMEOUT_MS ?? '');
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_PROBE_TIMEOUT_MS;
+}
+
 export async function commandWorks(
   command: string,
   args: string[],
-  timeoutMs = 15_000,
+  opts: { timeoutMs?: number } = {},
 ): Promise<boolean> {
   try {
-    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
-    return !result.timedOut && result.exitCode === 0;
+    const result = await execa(command, args, {
+      reject: false,
+      timeout: opts.timeoutMs ?? probeTimeoutMs(),
+    });
+    return result.exitCode === 0;
   } catch {
     return false;
   }
@@ -87,16 +103,45 @@ export async function resolvePython(): Promise<string[] | null> {
 export async function commandOutput(
   command: string,
   args: string[],
-  timeoutMs = 15_000,
+  opts: { timeoutMs?: number } = {},
 ): Promise<string | null> {
   try {
     // Sem timeout um shim de host pode girar para sempre (host Electron
     // travado manteve `doctor`/`hosts list` bloqueados >4 min — E2E-A).
-    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
-    if (result.timedOut || result.exitCode !== 0) return null;
+    const result = await execa(command, args, {
+      reject: false,
+      timeout: opts.timeoutMs ?? probeTimeoutMs(),
+    });
+    if (result.exitCode !== 0) return null;
     return (result.stdout || result.stderr || '').trim() || 'ok';
   } catch {
     return null;
+  }
+}
+
+/** Resultado detalhado de um probe — distingue timeout de sem-saída. */
+export interface CommandProbeResult {
+  output: string | null;
+  /**
+   * true = processo morto por timeout — INCONCLUSIVO, nunca "ausente":
+   * um shim que não responde não é evidência de que o host não existe.
+   */
+  timedOut: boolean;
+}
+
+export async function commandProbe(
+  command: string,
+  args: string[],
+  opts: { timeoutMs?: number } = {},
+): Promise<CommandProbeResult> {
+  const timeoutMs = opts.timeoutMs ?? probeTimeoutMs();
+  try {
+    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
+    if (result.timedOut) return { output: null, timedOut: true };
+    if (result.exitCode !== 0) return { output: null, timedOut: false };
+    return { output: (result.stdout || result.stderr || '').trim() || 'ok', timedOut: false };
+  } catch {
+    return { output: null, timedOut: false };
   }
 }
 

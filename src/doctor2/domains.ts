@@ -764,7 +764,7 @@ export async function hostsChecks(ctx: DoctorCtx): Promise<DoctorCheck[]> {
           result: 'skip',
           severity: 'info',
           diagnosis: `host ${adapter.id} não detectado`,
-          evidence: ['state=absent', 'nenhum binário ou config encontrado'],
+          evidence: ['state=absent', d.detail ?? 'nenhum binário ou config encontrado'],
           reversible: null,
         }),
       );
@@ -773,6 +773,7 @@ export async function hostsChecks(ctx: DoctorCtx): Promise<DoctorCheck[]> {
     const evidence = [
       `state=${d.state}`,
       `version=${d.version ?? 'desconhecida'}`,
+      ...(d.detail ? [`probe=${d.detail}`] : []),
       ...d.configPaths.map((p) => `config=${p}`),
     ];
     if (d.auth === 'verified') {

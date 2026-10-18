@@ -344,3 +344,79 @@ describe('dispatch --method registry', () => {
     expect(doc.forges.map((f: { forge: string }) => f.forge)).toContain('api-forge');
   });
 });
+
+// E2E 11.2.1: `pin <f>` sem --method escrevia estado git mesmo com a
+// Forja instalada via registry — o pin segue a instalação real ou recusa.
+describe('pin/unpin sem --method — rota pela instalação real (E2E 11.2.1)', () => {
+  const registryStatePath = () => path.join(home, '.forge-cli', 'forges', 'state.json');
+  const registryState = () => JSON.parse(readFileSync(registryStatePath(), 'utf8'));
+  const wsStatePath = () => path.join(ws, '.forge-cli', 'state.json');
+  const seedRegistry = () => {
+    const forges = path.join(home, '.forge-cli', 'forges');
+    mkdirSync(forges, { recursive: true });
+    writeFileSync(
+      registryStatePath(),
+      JSON.stringify({
+        forges: {
+          'api-forge': {
+            forge: 'api-forge',
+            method: 'pypi',
+            dist: 'apiforge-af',
+            version: '0.1.0',
+            python: '3.12.4',
+            source: 'latest-stable',
+            venv: path.join(forges, 'api-forge', 'venv'),
+            bin: path.join(forges, 'api-forge', 'venv', 'bin', 'apiforge'),
+            installedAt: '2026-01-01T00:00:00Z',
+            verify: { command: [], ok: true },
+            files: [],
+          },
+        },
+      }),
+    );
+  };
+
+  it('pin em Forja só-registry aplica ao receipt — nunca cria estado git', async () => {
+    seedRegistry();
+    const res = await cli('pin', 'api-forge', '--dir', ws);
+    expect(res.code).toBe(0);
+    expect(res.out).toContain('registry');
+    expect(registryState().forges['api-forge'].pinned).toBe('0.1.0');
+    // o workspace jamais ganha .forge-cli/state.json com pin git implícito
+    expect(existsSync(wsStatePath())).toBe(false);
+  });
+
+  it('unpin em Forja só-registry remove o pin do receipt', async () => {
+    seedRegistry();
+    expect((await cli('pin', 'api-forge', '--dir', ws)).code).toBe(0);
+    expect(registryState().forges['api-forge'].pinned).toBe('0.1.0');
+    const res = await cli('unpin', 'api-forge', '--dir', ws);
+    expect(res.code).toBe(0);
+    expect(registryState().forges['api-forge'].pinned).toBeUndefined();
+    expect(existsSync(wsStatePath())).toBe(false);
+  });
+
+  it('git + registry → recusa ambígua nomeada; nada é escrito', async () => {
+    seedRegistry();
+    fakeClone('api-forge', 'https://github.com/EdgarSocrates98/api-forge');
+    const res = await cli('pin', 'api-forge', '--version', 'v1.0.0', '--dir', ws);
+    expect(res.code).toBe(2);
+    expect(res.out).toContain('--method git|registry');
+    expect(registryState().forges['api-forge'].pinned).toBeUndefined();
+    expect(existsSync(wsStatePath())).toBe(false);
+  });
+
+  it('só-git preserva o pin git no estado do workspace', async () => {
+    fakeClone('api-forge', 'https://github.com/EdgarSocrates98/api-forge');
+    const res = await cli('pin', 'api-forge', '--version', 'v1.0.0', '--dir', ws);
+    expect(res.code).toBe(0);
+    expect(JSON.parse(readFileSync(wsStatePath(), 'utf8')).pins['api-forge']).toBe('v1.0.0');
+  });
+
+  it('--method registry explícito segue direto no receipt', async () => {
+    seedRegistry();
+    const res = await cli('pin', 'api-forge', '--method', 'registry', '--dir', ws);
+    expect(res.code).toBe(0);
+    expect(registryState().forges['api-forge'].pinned).toBe('0.1.0');
+  });
+});

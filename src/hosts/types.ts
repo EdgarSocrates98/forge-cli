@@ -4,7 +4,7 @@ import path from 'node:path';
 import { artifactsRoot } from '../artifacts.js';
 import { writeFileAtomic } from '../safety.js';
 import { S } from '../ui/strings.js';
-import { commandOutput, commandWorks, withCmdExt } from '../utils/system.js';
+import { commandOutput, commandProbe, commandWorks, withCmdExt } from '../utils/system.js';
 
 // ---------------------------------------------------------------------------
 // §2.5 — contrato dos adaptadores de hosts de IA.
@@ -76,13 +76,29 @@ export interface HostAdapter {
 // arquivos do §2.5 sem criar módulo extra nem ciclo de imports com index.ts).
 // ---------------------------------------------------------------------------
 
+/** Resultado de um probe com a distinção timeout×sem-saída preservada. */
+export interface HostProbeResult {
+  out: string | null;
+  /** true = subprocesso morto por timeout — inconclusivo, nunca 'ausente'. */
+  timedOut: boolean;
+}
+
 /** Probe de comando injetável — testes substituem sem tocar em CLIs reais. */
 export interface HostProbe {
   output(command: string, args: string[]): Promise<string | null>;
+  /**
+   * Probe detalhado; ausente ⇒ detectHost usa `output` e nunca distingue
+   * timeout (comportamento legado de probes simples em testes).
+   */
+  detailed?(command: string, args: string[]): Promise<HostProbeResult>;
 }
 
 export const defaultProbe: HostProbe = {
   output: (command, args) => commandOutput(command, args),
+  detailed: async (command, args) => {
+    const r = await commandProbe(command, args);
+    return { out: r.output, timedOut: r.timedOut };
+  },
 };
 
 export function hostHome(home?: string): string {
@@ -120,13 +136,24 @@ export interface DetectSpec {
  * probe nunca é promovida a 'verified'.
  */
 export async function detectHost(home: string, spec: DetectSpec): Promise<HostDetection> {
+  const runProbe = async (argv: readonly string[]): Promise<HostProbeResult> =>
+    spec.probe.detailed
+      ? spec.probe.detailed(argv[0], argv.slice(1))
+      : { out: await spec.probe.output(argv[0], argv.slice(1)), timedOut: false };
   let binary = false;
   let version: string | null = null;
+  let timedOut = false;
   for (const argv of spec.versionArgv) {
-    const out = await spec.probe.output(argv[0], argv.slice(1));
-    if (out !== null) {
+    const res = await runProbe(argv);
+    if (res.timedOut) {
+      // Shim travado (Electron spinning) — inconclusivo; tenta o próximo
+      // candidato e preserva o sinal para o detail final.
+      timedOut = true;
+      continue;
+    }
+    if (res.out !== null) {
       binary = true;
-      version = parseVersionOutput(out);
+      version = parseVersionOutput(res.out);
       break;
     }
   }
@@ -139,16 +166,27 @@ export async function detectHost(home: string, spec: DetectSpec): Promise<HostDe
       version: null,
       configPaths,
       auth: 'absent',
+      // timeout != ausente: o probe não respondeu, o host não foi provado.
+      ...(timedOut ? { detail: S.hostProbeTimeout } : {}),
     };
   }
   let state: HostState = configPaths.length ? 'configured' : 'installed';
   let auth: HostDetection['auth'] = 'unknown';
   if (spec.authArgv) {
-    const out = await spec.probe.output(spec.authArgv[0], spec.authArgv.slice(1));
-    auth = out !== null ? 'verified' : 'absent';
-    if (auth === 'verified') state = 'authenticated';
+    const res = await runProbe(spec.authArgv);
+    if (res.timedOut)
+      timedOut = true; // auth inconclusiva → fica 'unknown'
+    else {
+      auth = res.out !== null ? 'verified' : 'absent';
+      if (auth === 'verified') state = 'authenticated';
+    }
   }
   if (spec.hasIntegration?.(home)) state = 'integrated';
+  const detail = timedOut
+    ? S.hostProbeTimeout
+    : binary && version === null
+      ? S.hostVersionUnknown
+      : undefined;
   return {
     host: spec.id,
     state,
@@ -156,7 +194,7 @@ export async function detectHost(home: string, spec: DetectSpec): Promise<HostDe
     version,
     configPaths,
     auth,
-    ...(binary && version === null ? { detail: S.hostVersionUnknown } : {}),
+    ...(detail ? { detail } : {}),
   };
 }
 
