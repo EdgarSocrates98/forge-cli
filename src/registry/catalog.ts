@@ -82,6 +82,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'forge-doctor-data',
     minPython: '3.11',
     mcp: ['{bin}', 'mcp'],
+    // Read-only, all-args-optional — src/forge_doctor_data/integrations/mcp_server.py.
+    mcp_safe_tools: ['get_host_status', 'get_portfolio_summary'],
     origin: 'official',
   },
   {
@@ -90,6 +92,8 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     bin: 'forge-doctor-api',
     minPython: '3.11',
     mcp: ['{bin}', 'mcp'],
+    // Zero-arg read-only lambdas — src/forge_doctor_api/handoff/mcp_server.py.
+    mcp_safe_tools: ['doctor.get_capabilities', 'doctor.get_handoff'],
     origin: 'official',
   },
 ];
