@@ -13,6 +13,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -113,12 +114,9 @@ export function loadForgeState(home: string): ForgeState {
     }
     return { ...raw, forges };
   } catch {
-    // estado corrompido não é silenciosamente sobrescrito — preserva evidência
-    try {
-      writeFileSync(`${file}.corrupt`, readFileSync(file), { flag: 'wx' });
-    } catch {
-      // melhor esforço: o erro primário é o parse
-    }
+    // Leitura é pura: NUNCA grava aqui — um load em --plan/--check não pode
+    // produzir mutação. O arquivo corrompido já é a evidência; a quarentena
+    // `.corrupt` acontece em saveForgeState, antes de sobrescrevê-lo.
     return { forges: {} };
   }
 }
@@ -138,6 +136,24 @@ export function ghostEntry(name: string, receipt: RegistryInstallReceipt): Regis
   };
 }
 
+/**
+ * Quarentena de state corrompido: preserva `<file>.corrupt` ANTES da
+ * sobrescrita — nunca no load (read-only). `.corrupt` é uma cópia da
+ * evidência que a escrita nova apagaria; `flag: 'wx'` não regrava.
+ */
+function quarantineCorruptState(file: string): void {
+  if (!existsSync(file)) return;
+  try {
+    JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    try {
+      writeFileSync(`${file}.corrupt`, readFileSync(file), { flag: 'wx' });
+    } catch {
+      // melhor esforço: o erro primário é a escrita do state
+    }
+  }
+}
+
 export function saveForgeState(home: string, state: ForgeState): void {
   mkdirSync(forgesRoot(home), { recursive: true });
   // Receipts carregam paths internos + hashes — o dir de estado é privado
@@ -150,8 +166,10 @@ export function saveForgeState(home: string, state: ForgeState): void {
       // fs sem chmod (ex.: alguns mounts) — não bloqueia o write
     }
   }
+  const file = forgeStatePath(home);
+  quarantineCorruptState(file);
   // Escrita atômica (convenção do codebase) — kill no meio não corrompe.
-  writeFileAtomic(forgeStatePath(home), `${JSON.stringify(state, null, 2)}\n`);
+  writeFileAtomic(file, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 export function wheelCacheDir(cacheDir: string, dist: string): string {
@@ -169,6 +187,218 @@ export function venvBin(venvDir: string, platform: NodeJS.Platform = process.pla
 
 export function venvPython(venvDir: string, platform: NodeJS.Platform = process.platform): string {
   return path.join(venvBin(venvDir, platform), platform === 'win32' ? 'python.exe' : 'python');
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle lock — serializa install/uninstall/pin/update sobre state.json.
+// Dois lifecycle concorrentes (mesmo processo ou CLIs distintos) não podem
+// intercalar escritas: `mkdir` é a operação atômica multi-processo.
+// Recuperação documentada de lock velho: titular com pid morto (SIGKILL) é
+// quebrado imediatamente; lock sem info legível só é quebrado quando a
+// mtime excede `staleMs` (holder pode estar entre mkdir e a info).
+// Remoção manual documentada: apagar `.forge-lifecycle.lock` destrava.
+// ---------------------------------------------------------------------------
+
+export interface ForgeLockOpts {
+  /** Deadline de espera pelo lock (ms) — default 5min (escala do pip). */
+  timeoutMs?: number;
+  /** Lock sem info mais velho que isto (ms) é abandonado — default 10min. */
+  staleMs?: number;
+  /** Intervalo de polling (ms). */
+  pollMs?: number;
+  /** Relógio injetável (testes). */
+  now?: () => number;
+  /** Verificação de pid injetável (testes). */
+  pidAlive?: (pid: number) => boolean;
+}
+
+export interface ForgeLock {
+  dir: string;
+  release: () => void;
+}
+
+export type ForgeLockResult =
+  { ok: true; lock: ForgeLock } | { ok: false; reason: 'busy' | 'error'; detail: string };
+
+/** Diretório-lock único do lifecycle registry — não é uma Forja (dotfile). */
+export function forgeLockDir(home: string): string {
+  return path.join(forgesRoot(home), '.forge-lifecycle.lock');
+}
+
+function pidAliveDefault(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+export async function acquireForgeLock(
+  home: string,
+  opts: ForgeLockOpts = {},
+): Promise<ForgeLockResult> {
+  const timeoutMs = opts.timeoutMs ?? 300_000;
+  const staleMs = opts.staleMs ?? 600_000;
+  const pollMs = opts.pollMs ?? 100;
+  const now = opts.now ?? Date.now;
+  const alive = opts.pidAlive ?? pidAliveDefault;
+  const dir = forgeLockDir(home);
+  const info = path.join(dir, 'info.json');
+  const deadline = now() + timeoutMs;
+  for (;;) {
+    try {
+      mkdirSync(forgesRoot(home), { recursive: true });
+      mkdirSync(dir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        return { ok: false, reason: 'error', detail: `lifecycle lock: ${String(error)}` };
+      }
+      // Lock existe — decide entre titular vivo e abandono.
+      let holder: { pid?: unknown; at?: unknown } | null = null;
+      try {
+        holder = JSON.parse(readFileSync(info, 'utf8')) as { pid?: unknown; at?: unknown };
+      } catch {
+        // info ainda não gravada ou ilegível — decide por mtime abaixo
+      }
+      const pid = typeof holder?.pid === 'number' ? holder.pid : null;
+      // pid morto (SIGKILL/crash) → quebra imediata, mesmo recente.
+      const stale = pid !== null && pid !== process.pid && !alive(pid);
+      const broken =
+        stale ||
+        (holder === null &&
+          (() => {
+            try {
+              return now() - statSync(dir).mtimeMs > staleMs;
+            } catch {
+              return true; // dir sumiu entre checks — tenta de novo
+            }
+          })());
+      if (stale || broken) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+        } catch {
+          // outro waiter quebrou primeiro — próxima tentativa resolve
+        }
+        continue;
+      }
+      if (now() >= deadline) {
+        return {
+          ok: false,
+          reason: 'busy',
+          detail:
+            `lifecycle lock ocupado em ${dir}${pid !== null ? ` (pid ${pid})` : ''} — ` +
+            'outra operação install/uninstall/update está em curso; se o processo morreu, remova o diretório do lock',
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+      continue;
+    }
+    // Adquirido — info é melhor esforço: staleness por mtime cobre ausência.
+    try {
+      writeFileSync(info, JSON.stringify({ pid: process.pid, at: new Date(now()).toISOString() }));
+    } catch {
+      // sem info o lock ainda protege via mtime de diretório
+    }
+    return {
+      ok: true,
+      lock: {
+        dir,
+        release: () => {
+          try {
+            rmSync(dir, { recursive: true, force: true });
+          } catch {
+            // release é melhor esforço — lock velho é recuperável
+          }
+        },
+      },
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Consistência state ↔ receipt ↔ venv — uma instalação quebrada por crash
+// (SIGKILL entre pip e as escritas atômicas) NUNCA pode se apresentar como
+// saudável: o cheque nomeia a divergência e o reparo (`reinstall --clean`
+// ou `uninstall --method registry` + novo install).
+// ---------------------------------------------------------------------------
+
+export type InstallConsistencyStatus =
+  | 'ok'
+  | 'not-installed'
+  | 'orphaned'
+  | 'missing-receipt'
+  | 'unreadable-receipt'
+  | 'forge-mismatch'
+  | 'version-mismatch'
+  | 'missing-venv';
+
+export interface InstallConsistency {
+  ok: boolean;
+  status: InstallConsistencyStatus;
+  detail: string;
+}
+
+const REPAIR_HINT =
+  'repare com `reinstall --method registry --clean` ou remova com `uninstall --method registry`';
+
+export function installConsistency(home: string, name: string): InstallConsistency {
+  const entry = loadForgeState(home).forges[name];
+  const dir = resolveInside(forgesRoot(home), name);
+  const venv = forgeVenv(home, name);
+  if (!entry) {
+    const leftover = (dir !== null && existsSync(dir)) || existsSync(venv);
+    return leftover
+      ? {
+          ok: false,
+          status: 'orphaned',
+          detail: `${name}: venv/diretório presente sem registro no state — instalação interrompida; ${REPAIR_HINT}`,
+        }
+      : { ok: false, status: 'not-installed', detail: `${name}: não instalado via registry` };
+  }
+  const rfile = receiptPath(home, name);
+  if (!existsSync(rfile)) {
+    return {
+      ok: false,
+      status: 'missing-receipt',
+      detail: `${name}: state registra ${entry.version} mas install.json está ausente — escrita interrompida; ${REPAIR_HINT}`,
+    };
+  }
+  let receipt: RegistryInstallReceipt | null = null;
+  try {
+    receipt = JSON.parse(readFileSync(rfile, 'utf8')) as RegistryInstallReceipt;
+  } catch {
+    // tratado abaixo como unreadable-receipt
+  }
+  if (!receipt || typeof receipt.version !== 'string') {
+    return {
+      ok: false,
+      status: 'unreadable-receipt',
+      detail: `${name}: install.json ilegível/corrompido — ${REPAIR_HINT}`,
+    };
+  }
+  if (typeof receipt.forge === 'string' && receipt.forge !== name) {
+    return {
+      ok: false,
+      status: 'forge-mismatch',
+      detail: `${name}: install.json pertence a ${receipt.forge} — ${REPAIR_HINT}`,
+    };
+  }
+  if (receipt.version !== entry.version) {
+    return {
+      ok: false,
+      status: 'version-mismatch',
+      detail: `${name}: state=${entry.version} mas receipt=${receipt.version} — escrita interrompida no meio; ${REPAIR_HINT}`,
+    };
+  }
+  if (!existsSync(entry.venv ?? venv)) {
+    return {
+      ok: false,
+      status: 'missing-venv',
+      detail: `${name}: venv ausente (${entry.venv ?? venv}) — instalação danificada; ${REPAIR_HINT}`,
+    };
+  }
+  return { ok: true, status: 'ok', detail: '' };
 }
 
 export interface RunResult {
@@ -234,6 +464,8 @@ export interface RegistryInstallDeps {
    * divergente do state para sempre.
    */
   receiptPatch?: (receipt: RegistryInstallReceipt) => void;
+  /** Ajustes do lifecycle lock (timeouts/poll/relógio — testes). */
+  lifecycleLock?: ForgeLockOpts;
 }
 
 export type InstallError =
@@ -246,7 +478,17 @@ export type InstallError =
   | { stage: 'already-installed'; detail: string }
   | { stage: 'lock'; error: LockError }
   | { stage: 'pip'; detail: string }
-  | { stage: 'verify'; detail: string };
+  | { stage: 'verify'; detail: string }
+  /** Lifecycle lock ocupado — recusa nomeada, nunca intercala escritas. */
+  | { stage: 'busy'; detail: string }
+  /**
+   * pip instalou mas a persistência (install.json/state.json) falhou —
+   * a instalação existe e NÃO está saudável: installConsistency a nombra
+   * como incompleta até `reinstall --clean` ou `uninstall`.
+   */
+  | { stage: 'persist'; detail: string }
+  /** Estado/recibo divergentes detectados (crash anterior) — recusa. */
+  | { stage: 'incomplete'; detail: string };
 
 /**
  * Interpretador mais novo que satisfaz `requires_python` E o piso do
@@ -367,12 +609,20 @@ export async function registryInstall(
   // Reinstall sobre venv existente sem --clean destruiria a instalação
   // boa se uma etapa posterior falhar — recusa ANTES da resolução PyPI
   // (fail fast, inclusive offline, sem gastar a chamada de rede).
-  if (!deps.clean && existsSync(venvDir)) {
-    return {
-      stage: 'already-installed',
-      detail: `${entry.name}: já instalado em ${venvDir} — reinstale com --clean`,
-    };
-  }
+  // A venv existir também exige state+receipt coerentes: um crash que
+  // deixou a instalação pela metade NÃO se apresenta como saudável —
+  // a resposta é 'incomplete' com o reparo, não 'already-installed'.
+  const consistencyGate = (): InstallError => {
+    const c = installConsistency(deps.home, entry.name);
+    if (c.ok) {
+      return {
+        stage: 'already-installed',
+        detail: `${entry.name}: já instalado em ${venvDir} — reinstale com --clean`,
+      };
+    }
+    return { stage: 'incomplete', detail: c.detail };
+  };
+  if (!deps.clean && existsSync(venvDir)) return consistencyGate();
 
   const resolved = await resolveRelease(entry.dist, {
     pin,
@@ -434,219 +684,259 @@ export async function registryInstall(
     lock = parsed;
   }
 
-  const forgeDir = path.join(forgesRoot(deps.home), entry.name);
-  // `--clean`/lifecycle: a instalação anterior é movida para backup ANTES de
-  // qualquer etapa destrutiva — falha restaura o estado anterior em vez de
-  // deixar a Forja sem install (venv + receipt voltam inteiros pelo rename).
-  let backupDir: string | null = null;
-  if (deps.clean && existsSync(forgeDir)) {
-    backupDir = `${forgeDir}.restore-${process.pid}`;
-    renameSync(forgeDir, backupDir);
+  // Lifecycle lock — a janela mutante inteira (backup → venv → pip →
+  // receipt/state) roda sob o lock: duas instalações concorrentes da
+  // mesma Forja não intercalam escritas nem dividem state.json. Lock
+  // ocupado é recusa nomeada ('busy'), nunca espera cega nem corrupção.
+  const lockRes = await acquireForgeLock(deps.home, deps.lifecycleLock);
+  if (!lockRes.ok) {
+    return { stage: 'busy', detail: `${entry.name}: ${lockRes.detail}` };
   }
-  // venv é o único conteúdo criado nesta tentativa — se o dir da Forja
-  // ficou vazio após remover a venv, remove o dir também (sem órfãos).
-  // Com backup pendente, a restauração devolve a instalação anterior.
-  const cleanup = () => {
-    rmSync(venvDir, { recursive: true, force: true });
-    if (existsSync(forgeDir) && !readdirSync(forgeDir).length) {
-      rmSync(forgeDir, { recursive: true, force: true });
+  try {
+    // Re-cheque sob o lock: outra instalação pode ter completado enquanto
+    // esta esperava — a semântica é a mesma do gate pré-lock.
+    if (!deps.clean && existsSync(venvDir)) return consistencyGate();
+
+    const forgeDir = path.join(forgesRoot(deps.home), entry.name);
+    // `--clean`/lifecycle: a instalação anterior é movida para backup ANTES de
+    // qualquer etapa destrutiva — falha restaura o estado anterior em vez de
+    // deixar a Forja sem install (venv + receipt voltam inteiros pelo rename).
+    let backupDir: string | null = null;
+    if (deps.clean && existsSync(forgeDir)) {
+      backupDir = `${forgeDir}.restore-${process.pid}`;
+      renameSync(forgeDir, backupDir);
     }
-    if (backupDir) {
-      rmSync(forgeDir, { recursive: true, force: true });
-      renameSync(backupDir, forgeDir);
-      backupDir = null;
-    }
-  };
-  const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
-  if (venv.exitCode !== 0) {
-    cleanup();
-    return {
-      stage: 'venv',
-      detail: redactSecrets(venv.stderr ?? venv.stdout ?? 'falha ao criar venv'),
+    // venv é o único conteúdo criado nesta tentativa — se o dir da Forja
+    // ficou vazio após remover a venv, remove o dir também (sem órfãos).
+    // Com backup pendente, a restauração devolve a instalação anterior.
+    const cleanup = () => {
+      rmSync(venvDir, { recursive: true, force: true });
+      if (existsSync(forgeDir) && !readdirSync(forgeDir).length) {
+        rmSync(forgeDir, { recursive: true, force: true });
+      }
+      if (backupDir) {
+        rmSync(forgeDir, { recursive: true, force: true });
+        renameSync(backupDir, forgeDir);
+        backupDir = null;
+      }
     };
-  }
-
-  const vpy = venvPython(venvDir, platform);
-  const spec = `${entry.dist}==${resolved.version}`;
-  mkdirSync(wheels, { recursive: true });
-
-  // Artefatos: online baixa para o wheel cache (popula o modo offline);
-  // offline exige artefatos presentes — nunca finge instalar sem rede.
-  const distFiles = distArtifactFiles(resolved.files, entry.dist);
-  let verifiedHash: string | undefined;
-  let verifiedFile: string | undefined;
-  if (lock) {
-    // Fecho inteiro já conferido (verifyLockFiles). O artefato primário vem
-    // do próprio lock — nunca de um arquivo plantado com nome parecido.
-    const primary =
-      lock.artifacts.find(
-        (a) =>
-          normDist(a.name) === normDist(entry.dist) &&
-          a.version === resolved.version &&
-          a.filename.toLowerCase().endsWith('.whl'),
-      ) ??
-      lock.artifacts.find(
-        (a) => normDist(a.name) === normDist(entry.dist) && a.version === resolved.version,
-      );
-    if (!primary) {
+    const venv = await run(python.exe[0], [...python.exe.slice(1), '-m', 'venv', venvDir]);
+    if (venv.exitCode !== 0) {
       cleanup();
       return {
-        stage: 'lock',
-        error: {
-          kind: 'lock-mismatch',
-          detail: `lock ${deps.lockFile} não contém artefato de ${entry.dist}==${resolved.version}`,
-        },
+        stage: 'venv',
+        detail: redactSecrets(venv.stderr ?? venv.stdout ?? 'falha ao criar venv'),
       };
     }
-    verifiedHash = primary.sha256;
-    verifiedFile = primary.filename;
-    // Requires-Dist de cada wheel ⊆ nomes do lock — dependência transitiva
-    // nova (lock desatualizado) falha com diagnóstico antes do pip.
-    const depErr = await lockTransitiveCheck(lock, wheels, run, [vpy]);
-    if (depErr) {
-      cleanup();
-      return { stage: 'lock', error: depErr };
+
+    const vpy = venvPython(venvDir, platform);
+    const spec = `${entry.dist}==${resolved.version}`;
+    mkdirSync(wheels, { recursive: true });
+
+    // Artefatos: online baixa para o wheel cache (popula o modo offline);
+    // offline exige artefatos presentes — nunca finge instalar sem rede.
+    const distFiles = distArtifactFiles(resolved.files, entry.dist);
+    let verifiedHash: string | undefined;
+    let verifiedFile: string | undefined;
+    if (lock) {
+      // Fecho inteiro já conferido (verifyLockFiles). O artefato primário vem
+      // do próprio lock — nunca de um arquivo plantado com nome parecido.
+      const primary =
+        lock.artifacts.find(
+          (a) =>
+            normDist(a.name) === normDist(entry.dist) &&
+            a.version === resolved.version &&
+            a.filename.toLowerCase().endsWith('.whl'),
+        ) ??
+        lock.artifacts.find(
+          (a) => normDist(a.name) === normDist(entry.dist) && a.version === resolved.version,
+        );
+      if (!primary) {
+        cleanup();
+        return {
+          stage: 'lock',
+          error: {
+            kind: 'lock-mismatch',
+            detail: `lock ${deps.lockFile} não contém artefato de ${entry.dist}==${resolved.version}`,
+          },
+        };
+      }
+      verifiedHash = primary.sha256;
+      verifiedFile = primary.filename;
+      // Requires-Dist de cada wheel ⊆ nomes do lock — dependência transitiva
+      // nova (lock desatualizado) falha com diagnóstico antes do pip.
+      const depErr = await lockTransitiveCheck(lock, wheels, run, [vpy]);
+      if (depErr) {
+        cleanup();
+        return { stage: 'lock', error: depErr };
+      }
+    } else if (deps.offline) {
+      const have = existsSync(wheels) ? readdirSync(wheels) : [];
+      if (!distFiles.length || !distFiles.some((f) => have.includes(f.filename))) {
+        cleanup();
+        return {
+          stage: 'offline-missing-artifact',
+          detail: `${spec}: sem wheel/sdist em ${wheels} — instale online uma vez`,
+        };
+      }
+      // Cache local também é verificado — artefato adulterado aborta o install.
+      const check = checkDistHashes(distFiles, wheels);
+      if ('detail' in check) {
+        cleanup();
+        return { stage: 'hash-mismatch', detail: check.detail };
+      }
+      verifiedHash = check.verifiedHash;
+      verifiedFile = check.verifiedFile;
+    } else {
+      const dl = await run(vpy, [
+        '-m',
+        'pip',
+        'download',
+        '--disable-pip-version-check',
+        '--no-input',
+        '--dest',
+        wheels,
+        spec,
+      ]);
+      if (dl.exitCode !== 0) {
+        cleanup();
+        return {
+          stage: 'download',
+          // stderr do pip pode ecoar credenciais de PIP_INDEX_URL — redação
+          // vale para stdout-JSON, --report e log humano.
+          detail: redactSecrets((dl.stderr ?? dl.stdout ?? 'falha no pip download').trim()),
+        };
+      }
+      // Integridade do artefato da própria dist contra o digest publicado no PyPI.
+      const check = checkDistHashes(distFiles, wheels);
+      if ('detail' in check) {
+        cleanup();
+        return { stage: 'hash-mismatch', detail: check.detail };
+      }
+      verifiedHash = check.verifiedHash;
+      verifiedFile = check.verifiedFile;
     }
-  } else if (deps.offline) {
-    const have = existsSync(wheels) ? readdirSync(wheels) : [];
-    if (!distFiles.length || !distFiles.some((f) => have.includes(f.filename))) {
+
+    // Sem artefato verificado não há instalação — um arquivo plantado no
+    // cache (fora dos metadados) jamais pode vencer a resolução do pip.
+    if (!verifiedFile) {
       cleanup();
       return {
-        stage: 'offline-missing-artifact',
-        detail: `${spec}: sem wheel/sdist em ${wheels} — instale online uma vez`,
+        stage: 'hash-mismatch',
+        detail: `${spec}: nenhum artefato da dist com sha256 verificável nos metadados`,
       };
     }
-    // Cache local também é verificado — artefato adulterado aborta o install.
-    const check = checkDistHashes(distFiles, wheels);
-    if ('detail' in check) {
-      cleanup();
-      return { stage: 'hash-mismatch', detail: check.detail };
-    }
-    verifiedHash = check.verifiedHash;
-    verifiedFile = check.verifiedFile;
-  } else {
-    const dl = await run(vpy, [
+
+    const pipArgs = [
       '-m',
       'pip',
-      'download',
+      'install',
       '--disable-pip-version-check',
       '--no-input',
-      '--dest',
-      wheels,
-      spec,
-    ]);
-    if (dl.exitCode !== 0) {
+      // `--find-links` só no offline: online as dependências resolvem no
+      // índice, não em wheels cacheadas potencialmente velhas/adulteradas.
+      // Limite conhecido (§11.2): offline, deps transitivas resolvem por
+      // nome no --find-links sem pin de hash.
+      ...(deps.offline ? ['--no-index', '--find-links', wheels] : []),
+      // Com lock: o fecho INTEIRO é passado por caminho explícito — o pip não
+      // resolve nada por nome e --no-index bloqueia qualquer queda pra rede.
+      // Sem lock: caminho explícito do artefato da dist verificado — um
+      // arquivo plantado com a mesma dist==versão nunca é escolhido.
+      ...(lock
+        ? lock.artifacts.map((a) => path.join(wheels, a.filename))
+        : [path.join(wheels, verifiedFile)]),
+    ];
+    const pip = await run(vpy, pipArgs);
+    if (pip.exitCode !== 0) {
       cleanup();
       return {
-        stage: 'download',
-        // stderr do pip pode ecoar credenciais de PIP_INDEX_URL — redação
-        // vale para stdout-JSON, --report e log humano.
-        detail: redactSecrets((dl.stderr ?? dl.stdout ?? 'falha no pip download').trim()),
+        stage: 'pip',
+        detail: redactSecrets((pip.stderr ?? pip.stdout ?? 'falha no pip install').trim()),
       };
     }
-    // Integridade do artefato da própria dist contra o digest publicado no PyPI.
-    const check = checkDistHashes(distFiles, wheels);
-    if ('detail' in check) {
-      cleanup();
-      return { stage: 'hash-mismatch', detail: check.detail };
-    }
-    verifiedHash = check.verifiedHash;
-    verifiedFile = check.verifiedFile;
-  }
-
-  // Sem artefato verificado não há instalação — um arquivo plantado no
-  // cache (fora dos metadados) jamais pode vencer a resolução do pip.
-  if (!verifiedFile) {
-    cleanup();
-    return {
-      stage: 'hash-mismatch',
-      detail: `${spec}: nenhum artefato da dist com sha256 verificável nos metadados`,
-    };
-  }
-
-  const pipArgs = [
-    '-m',
-    'pip',
-    'install',
-    '--disable-pip-version-check',
-    '--no-input',
-    // `--find-links` só no offline: online as dependências resolvem no
-    // índice, não em wheels cacheadas potencialmente velhas/adulteradas.
-    // Limite conhecido (§11.2): offline, deps transitivas resolvem por
-    // nome no --find-links sem pin de hash.
-    ...(deps.offline ? ['--no-index', '--find-links', wheels] : []),
-    // Com lock: o fecho INTEIRO é passado por caminho explícito — o pip não
-    // resolve nada por nome e --no-index bloqueia qualquer queda pra rede.
-    // Sem lock: caminho explícito do artefato da dist verificado — um
-    // arquivo plantado com a mesma dist==versão nunca é escolhido.
-    ...(lock
-      ? lock.artifacts.map((a) => path.join(wheels, a.filename))
-      : [path.join(wheels, verifiedFile)]),
-  ];
-  const pip = await run(vpy, pipArgs);
-  if (pip.exitCode !== 0) {
-    cleanup();
-    return {
-      stage: 'pip',
-      detail: redactSecrets((pip.stderr ?? pip.stdout ?? 'falha no pip install').trim()),
-    };
-  }
-  // Ponto de não retorno: pip install ok ⇒ nova instalação venceu — o backup
-  // da instalação anterior (--clean/lifecycle) é descartado.
-  if (backupDir) {
-    rmSync(backupDir, { recursive: true, force: true });
+    // Ponto de não retorno: pip install ok ⇒ nova instalação venceu. O
+    // backup só é descartado DEPOIS do commit (receipt+state) — uma falha
+    // de persistência ainda pode restaurar a instalação anterior.
+    const commitBackup = backupDir;
     backupDir = null;
+
+    const binPath = path.join(
+      venvBin(venvDir, platform),
+      platform === 'win32' ? `${entry.bin}.exe` : entry.bin,
+    );
+    const verifyCmd = [binPath, '--help'];
+    const verify = await run(binPath, ['--help']);
+
+    const receipt: RegistryInstallReceipt = {
+      forge: entry.name,
+      method: 'pypi',
+      dist: entry.dist,
+      version: resolved.version,
+      requiresPython: resolved.requiresPython,
+      python: python.version,
+      source: resolved.source,
+      venv: venvDir,
+      bin: binPath,
+      installedAt: (deps.now ?? (() => new Date().toISOString()))(),
+      verify: { command: verifyCmd, ok: verify.exitCode === 0 },
+      files: resolved.files.map((f) => ({
+        filename: f.filename,
+        sha256: f.sha256,
+        packagetype: f.packagetype,
+      })),
+      verifiedHash,
+      provenance: {
+        registry: 'pypi.org',
+        file: verifiedFile,
+        url: resolved.files.find((f) => f.filename === verifiedFile)?.url,
+        resolvedVia: deps.offline ? 'offline-cache' : 'pypi',
+      },
+      yanked: resolved.yanked,
+      staleCache: resolved.staleCache,
+      offlineLock: lock ? { file: deps.lockFile!, artifacts: lock.artifacts.length } : undefined,
+    };
+    // Patch do lifecycle (history/pinned) antes das duas escritas atômicas —
+    // crash entre install e pós-persistência do chamador não perde histórico.
+    deps.receiptPatch?.(receipt);
+
+    // Commit: install.json + state.json são as duas escritas atômicas.
+    // Falha aqui deixa a venv instalada SEM registro coerente — o erro
+    // 'persist' nomeia isso e installConsistency a marca 'incomplete'
+    // (nunca saudável). O backup restaura a instalação anterior.
+    try {
+      mkdirSync(path.dirname(receiptPath(deps.home, entry.name)), { recursive: true });
+      writeFileAtomic(receiptPath(deps.home, entry.name), `${JSON.stringify(receipt, null, 2)}\n`);
+      const state = loadForgeState(deps.home);
+      state.forges[entry.name] = receipt;
+      saveForgeState(deps.home, state);
+    } catch (error) {
+      if (commitBackup) {
+        rmSync(forgeDir, { recursive: true, force: true });
+        try {
+          renameSync(commitBackup, forgeDir);
+        } catch {
+          // restauração melhor esforço — o erro primário é o persist
+        }
+      }
+      const why = error instanceof Error ? error.message : String(error);
+      const consistency = installConsistency(deps.home, entry.name);
+      return {
+        stage: 'persist',
+        detail:
+          `${entry.name}: pip instalou mas o receipt/state falhou (${why}) — ` +
+          `instalação INCOMPLETA (${consistency.status}): ${consistency.detail || 'reexecute install'}`,
+      };
+    }
+    // Commit feito — o backup da instalação anterior é descartado agora.
+    if (commitBackup) rmSync(commitBackup, { recursive: true, force: true });
+
+    if (verify.exitCode !== 0) {
+      return { stage: 'verify', detail: `${entry.bin} --help saiu com código ${verify.exitCode}` };
+    }
+    return receipt;
+  } finally {
+    lockRes.lock.release();
   }
-
-  const binPath = path.join(
-    venvBin(venvDir, platform),
-    platform === 'win32' ? `${entry.bin}.exe` : entry.bin,
-  );
-  const verifyCmd = [binPath, '--help'];
-  const verify = await run(binPath, ['--help']);
-
-  const receipt: RegistryInstallReceipt = {
-    forge: entry.name,
-    method: 'pypi',
-    dist: entry.dist,
-    version: resolved.version,
-    requiresPython: resolved.requiresPython,
-    python: python.version,
-    source: resolved.source,
-    venv: venvDir,
-    bin: binPath,
-    installedAt: (deps.now ?? (() => new Date().toISOString()))(),
-    verify: { command: verifyCmd, ok: verify.exitCode === 0 },
-    files: resolved.files.map((f) => ({
-      filename: f.filename,
-      sha256: f.sha256,
-      packagetype: f.packagetype,
-    })),
-    verifiedHash,
-    provenance: {
-      registry: 'pypi.org',
-      file: verifiedFile,
-      url: resolved.files.find((f) => f.filename === verifiedFile)?.url,
-      resolvedVia: deps.offline ? 'offline-cache' : 'pypi',
-    },
-    yanked: resolved.yanked,
-    staleCache: resolved.staleCache,
-    offlineLock: lock ? { file: deps.lockFile!, artifacts: lock.artifacts.length } : undefined,
-  };
-  // Patch do lifecycle (history/pinned) antes das duas escritas atômicas —
-  // crash entre install e pós-persistência do chamador não perde histórico.
-  deps.receiptPatch?.(receipt);
-
-  mkdirSync(path.dirname(receiptPath(deps.home, entry.name)), { recursive: true });
-  writeFileAtomic(receiptPath(deps.home, entry.name), `${JSON.stringify(receipt, null, 2)}\n`);
-  const state = loadForgeState(deps.home);
-  state.forges[entry.name] = receipt;
-  saveForgeState(deps.home, state);
-
-  if (verify.exitCode !== 0) {
-    return { stage: 'verify', detail: `${entry.bin} --help saiu com código ${verify.exitCode}` };
-  }
-  return receipt;
 }
 
 export interface RegistryUninstallDeps {

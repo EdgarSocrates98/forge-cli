@@ -2,24 +2,39 @@
 // estado consistente + erro nomeado + zero half-state. Harness: fetch/run
 // injetáveis (mesmo padrão de registry-install/registry-lifecycle).
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CliOptions } from '../src/cli-args.js';
 import {
+  runRegistryInstall,
+  runRegistryList,
   runRegistryRollback,
   runRegistryUninstall,
   runRegistryUpdate,
 } from '../src/cmd/registry.js';
 import { registryEntry } from '../src/registry/catalog.js';
 import {
+  acquireForgeLock,
+  forgeLockDir,
   forgeStatePath,
   forgeVenv,
   forgesRoot,
+  installConsistency,
   loadForgeState,
   receiptPath,
   registryInstall,
+  saveForgeState,
   wheelCacheDir,
   type RegistryInstallReceipt,
   type RunLike,
@@ -27,6 +42,38 @@ import {
 } from '../src/registry/install.js';
 import type { FetchLike } from '../src/registry/pypi.js';
 import { parseVersion } from '../src/registry/versions.js';
+
+// Fault injection via wrapper de fs: vi.mock é hoisted, então o interruptor
+// fica em globalThis — determinístico, sem disco cheio nem permissão real.
+vi.mock('node:fs', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('node:fs')>();
+  const g = globalThis as { __fsFault?: { needle?: string; code?: string; lockMkdir?: boolean } };
+  return {
+    ...mod,
+    openSync: ((p: unknown, flags?: unknown, mode?: unknown) => {
+      const f = g.__fsFault;
+      if (f?.needle && typeof p === 'string' && p.includes(f.needle) && p.endsWith('.tmp')) {
+        const err = new Error(`${f.code}: injected`) as NodeJS.ErrnoException;
+        err.code = f.code;
+        throw err;
+      }
+      return (mod.openSync as (...a: unknown[]) => number)(p, flags, mode);
+    }) as typeof mod.openSync,
+    mkdirSync: ((p: unknown, opts?: unknown) => {
+      const f = g.__fsFault;
+      if (f?.lockMkdir && typeof p === 'string' && p.endsWith('.forge-lifecycle.lock')) {
+        const err = new Error('EACCES: injected') as NodeJS.ErrnoException;
+        err.code = 'EACCES';
+        throw err;
+      }
+      return (mod.mkdirSync as (...a: unknown[]) => unknown)(p, opts);
+    }) as typeof mod.mkdirSync,
+  };
+});
+
+const fsFault = (f?: { needle?: string; code?: string; lockMkdir?: boolean }) => {
+  (globalThis as { __fsFault?: unknown }).__fsFault = f;
+};
 
 let tmp: string;
 beforeEach(() => (tmp = mkdtempSync(path.join(os.tmpdir(), 'fault-'))));
@@ -276,16 +323,29 @@ describe('fault injection — install', () => {
 });
 
 describe('fault injection — state.json corrompido', () => {
-  it('parse falha → .corrupt preserva evidência + estado degrada para vazio', () => {
+  it('parse falha → degrada para vazio sem mutar nada (load é puro)', () => {
     mkdirSync(path.dirname(forgeStatePath(tmp)), { recursive: true });
     writeFileSync(forgeStatePath(tmp), '{ corrupt json !!!');
     const state = loadForgeState(tmp);
     expect(state.forges).toEqual({});
+    // Leitura NUNCA escreve: a quarentena .corrupt só acontece na próxima
+    // escrita (saveForgeState) — um load em --plan/--check não pode
+    // produzir efeito colateral.
+    const corrupt = `${forgeStatePath(tmp)}.corrupt`;
+    expect(existsSync(corrupt)).toBe(false);
+    // state.json original é preservado (não sobrescrito silenciosamente)
+    expect(readFileSync(forgeStatePath(tmp), 'utf8')).toBe('{ corrupt json !!!');
+  });
+
+  it('saveForgeState sobre state corrompido → .corrupt preserva evidência', () => {
+    mkdirSync(path.dirname(forgeStatePath(tmp)), { recursive: true });
+    writeFileSync(forgeStatePath(tmp), '{ corrupt json !!!');
+    saveForgeState(tmp, { forges: {} });
     const corrupt = `${forgeStatePath(tmp)}.corrupt`;
     expect(existsSync(corrupt)).toBe(true);
     expect(readFileSync(corrupt, 'utf8')).toBe('{ corrupt json !!!');
-    // state.json original é preservado (não sobrescrito silenciosamente)
-    expect(readFileSync(forgeStatePath(tmp), 'utf8')).toBe('{ corrupt json !!!');
+    // e o novo state é válido
+    expect(loadForgeState(tmp).forges).toEqual({});
   });
 
   it('install sobre state corrompido → novo state válido sem perder .corrupt', async () => {
@@ -452,5 +512,364 @@ describe('fault injection — recovery após falha', () => {
     expect(ok).not.toHaveProperty('stage');
     if ('stage' in ok) return;
     expect(ok.verifiedHash).toBe(WHEEL_SHA);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cenários P0 faltantes — determinísticos: fs wrapper (spy), lockfile com
+// pid e subprocesso real para SIGKILL. Nunca disco real cheio nem rede real.
+// ---------------------------------------------------------------------------
+
+/** Sentinel que interrompe no primeiro process.exit — emitJson não cai. */
+class ExitSentinel extends Error {}
+
+/** JSON emitido por emitJson (stdout) — captura para asserção de contrato. */
+const collectJson = async (fn: () => unknown): Promise<Record<string, unknown>> => {
+  const chunks: string[] = [];
+  const origWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((c: unknown) => {
+    chunks.push(String(c));
+    return true;
+  }) as typeof origWrite;
+  const spy = vi.spyOn(process, 'exit').mockImplementation((() => {
+    throw new ExitSentinel();
+  }) as never);
+  try {
+    await fn();
+  } catch (e) {
+    if (!(e instanceof ExitSentinel)) throw e;
+  } finally {
+    process.stdout.write = origWrite;
+    spy.mockRestore();
+  }
+  for (const chunk of chunks) {
+    try {
+      return JSON.parse(chunk) as Record<string, unknown>;
+    } catch {
+      // saída de UI (note/log) não é JSON — pula
+    }
+  }
+  throw new Error('nenhum JSON emitido');
+};
+
+describe('fault injection — EACCES/ENOSPC (fs wrapper)', () => {
+  it('EACCES na escrita do receipt (após pip, antes do registro) → persist + nunca saudável', async () => {
+    fsFault({ needle: 'install.json', code: 'EACCES' });
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    fsFault(undefined);
+    // Erro nomeado 'persist': pip instalou, o commit não aconteceu.
+    expect(res).toMatchObject({ stage: 'persist' });
+    expect((res as { detail?: string }).detail).toContain('EACCES');
+    // A venv existe sem state/receipt — installConsistency nomeia, nunca ok.
+    const c = installConsistency(tmp, 'api-forge');
+    expect(c.ok).toBe(false);
+    expect(c.status).toBe('orphaned');
+    // `registry` (list) também a expõe — consistent:false, não "instalada".
+    const doc = await collectJson(() =>
+      runRegistryList(cli(), { home: tmp, names: ['api-forge'] }),
+    );
+    const row = (doc.forges as Record<string, unknown>[])[0];
+    expect(row.consistent).toBe(false);
+    expect(row.consistency).toBe('orphaned');
+    expect(row.installed).toBeNull();
+  });
+
+  it('ENOSPC na escrita do state (receipt gravado) → persist + divergência detectada', async () => {
+    fsFault({ needle: 'state.json', code: 'ENOSPC' });
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    fsFault(undefined);
+    expect(res).toMatchObject({ stage: 'persist' });
+    expect((res as { detail?: string }).detail).toContain('ENOSPC');
+    // install.json ficou mas state.json não — entrada ausente no state ⇒
+    // a instalação NÃO pode se apresentar como saudável.
+    const c = installConsistency(tmp, 'api-forge');
+    expect(c.ok).toBe(false);
+    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
+    // Reexecução (sem --clean) recusa com 'incomplete' — a saída honesta.
+    const retry = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    expect(retry).toMatchObject({ stage: 'incomplete' });
+    // O reparo documentado fecha o ciclo: uninstall remove a órfã.
+    exitCodes();
+    await runRegistryUninstall(cli(), ['api-forge'], { home: tmp });
+    expect(existsSync(forgeDir())).toBe(false);
+  });
+
+  it('EACCES antes do pip (venv intocada) → falha nomeada, zero registro', async () => {
+    // Permissão negada na criação do lock — nem o lifecycle começa.
+    fsFault({ lockMkdir: true });
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    fsFault(undefined);
+    expect(res).toMatchObject({ stage: 'busy' });
+    expect((res as { detail?: string }).detail).toContain('EACCES');
+    expect(existsSync(forgeDir())).toBe(false);
+  });
+});
+
+describe('fault injection — concorrência (lifecycle lock)', () => {
+  it('duas instalações simultâneas da mesma Forja → uma instala, outra recusa already-installed', async () => {
+    const deps = {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+      lifecycleLock: { pollMs: 5, timeoutMs: 15_000 },
+    };
+    const [a, b] = await Promise.all([
+      registryInstall(ENTRY, undefined, deps),
+      registryInstall(ENTRY, undefined, deps),
+    ]);
+    const installed = [a, b].filter((r) => !('stage' in r));
+    const refused = [a, b].filter((r) => 'stage' in r);
+    expect(installed).toHaveLength(1);
+    expect(refused).toHaveLength(1);
+    // O perdedor re-checa sob o lock e recusa com o mesmo contrato do gate.
+    expect(['already-installed', 'incomplete', 'busy']).toContain(
+      (refused[0] as { stage: string }).stage,
+    );
+    // Estado final consistente: uma entrada, venv, receipt — lock liberado.
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.2.0');
+    expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(true);
+    expect(existsSync(receiptPath(tmp, 'api-forge'))).toBe(true);
+    expect(existsSync(forgeLockDir(tmp))).toBe(false);
+    expect(installConsistency(tmp, 'api-forge').ok).toBe(true);
+  });
+
+  it('lock ocupado por titular vivo → recusa nomeada busy (não espera nem corrompe)', async () => {
+    const held = await acquireForgeLock(tmp, { pollMs: 5 });
+    expect(held.ok).toBe(true);
+    if (!held.ok) return;
+    try {
+      const res = await registryInstall(ENTRY, undefined, {
+        home: tmp,
+        cacheDir: cacheDir(),
+        pythons: py(),
+        fetchImpl: fetchOk,
+        run: runner({}),
+        lifecycleLock: { timeoutMs: 50, pollMs: 5 },
+      });
+      expect(res).toMatchObject({ stage: 'busy' });
+      expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(false);
+      expect(existsSync(forgeLockDir(tmp))).toBe(true); // lock do titular intacto
+    } finally {
+      held.lock.release();
+    }
+  });
+
+  it('lock órfão de pid morto → quebra documentada e aquisição imediata', async () => {
+    // Titular simulado: lock dir + info com pid que não existe mais.
+    const dir = forgeLockDir(tmp);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, 'info.json'),
+      JSON.stringify({ pid: 424_242, at: '2026-01-01T00:00:00Z' }),
+    );
+    const res = await acquireForgeLock(tmp, { pidAlive: () => false, pollMs: 5 });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      res.lock.release();
+      expect(existsSync(dir)).toBe(false);
+    }
+  });
+});
+
+describe('fault injection — SIGKILL real no meio da escrita', () => {
+  it('processo morto segurando lock + tmp órfão → próximo run recupera e limpa', async () => {
+    const lockDir = forgeLockDir(tmp);
+    const info = path.join(lockDir, 'info.json');
+    const orphan = path.join(forgesRoot(tmp), `state.json.${process.pid}-dead.${Date.now()}.tmp`);
+    // Subprocesso real: cria o lock (pid dele), grava um tmp parcial e
+    // fica vivo — o SIGKILL do pai mata ANTES de qualquer rename.
+    const child = spawn(
+      process.execPath,
+      [
+        '-e',
+        `const fs=require('fs');
+         fs.mkdirSync(process.argv[1],{recursive:true});
+         fs.writeFileSync(process.argv[2],JSON.stringify({pid:process.pid,at:new Date().toISOString()}));
+         fs.writeFileSync(process.argv[3],'{"forges":{"x":');
+         setInterval(()=>{},1000);`,
+        lockDir,
+        info,
+        orphan,
+      ],
+      { stdio: 'ignore' },
+    );
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(info) || !existsSync(orphan)) {
+      if (Date.now() > deadline) throw new Error('child nunca gravou os artefatos');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    child.kill('SIGKILL');
+    await new Promise((resolve) => child.once('exit', resolve));
+
+    // 1) Lock órfão de pid morto é recuperável imediatamente.
+    const got = await acquireForgeLock(tmp, { timeoutMs: 5_000, pollMs: 10 });
+    expect(got.ok).toBe(true);
+    if (got.ok) got.lock.release();
+
+    // 2) Instalação seguinte funciona e o *.tmp órfão é varrido na escrita.
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    expect(res).not.toHaveProperty('stage');
+    const leftovers = readdirSync(forgesRoot(tmp)).filter((f) => f.endsWith('.tmp'));
+    expect(leftovers).toEqual([]);
+    // 3) State final é válido — a metade escrita pelo processo morto não vaza.
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.2.0');
+    expect(installConsistency(tmp, 'api-forge').ok).toBe(true);
+    expect(existsSync(forgeLockDir(tmp))).toBe(false);
+  });
+});
+
+describe('fault injection — commit boundary: nunca saudável pela metade', () => {
+  it('receipt divergente do state (kill entre as duas escritas) → version-mismatch, nunca ok', async () => {
+    seed('0.2.0', {
+      history: [{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }],
+    });
+    // Simula o rollback morto entre install.json e state.json:
+    // receipt já regressou para 0.1.0, state ainda diz 0.2.0.
+    const receipt = JSON.parse(readFileSync(receiptPath(tmp, 'api-forge'), 'utf8'));
+    receipt.version = '0.1.0';
+    writeFileSync(receiptPath(tmp, 'api-forge'), `${JSON.stringify(receipt, null, 2)}\n`);
+    const c = installConsistency(tmp, 'api-forge');
+    expect(c.ok).toBe(false);
+    expect(c.status).toBe('version-mismatch');
+    // `registry` (list) expõe a divergência — consistent:false, nunca "ok".
+    const doc = await collectJson(() =>
+      runRegistryList(cli(), { home: tmp, names: ['api-forge'] }),
+    );
+    const row = (doc.forges as Record<string, unknown>[])[0];
+    expect(row.consistent).toBe(false);
+    expect(row.consistency).toBe('version-mismatch');
+    // Reparo documentado fecha o ciclo: reinstall --clean regrava o par.
+    const fixed = await registryInstall(ENTRY, '0.1.0', {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+      clean: true,
+    });
+    expect(fixed).not.toHaveProperty('stage');
+    expect(installConsistency(tmp, 'api-forge').ok).toBe(true);
+  });
+
+  it('uninstall parcial (receipt removido, venv+state intactos) → missing-receipt + retry documentado', async () => {
+    seed('0.1.0');
+    rmSync(receiptPath(tmp, 'api-forge'));
+    const c = installConsistency(tmp, 'api-forge');
+    expect(c.ok).toBe(false);
+    expect(c.status).toBe('missing-receipt');
+    // Install sem --clean recusa honesto — 'incomplete', não 'already-installed'.
+    const retry = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    expect(retry).toMatchObject({ stage: 'incomplete' });
+    // Reparo 1: uninstall termina a remoção parcial (state+venv saem).
+    exitCodes();
+    await runRegistryUninstall(cli(), ['api-forge'], { home: tmp });
+    expect(existsSync(forgeDir())).toBe(false);
+    expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
+    // Reparo 2: install novo fecha consistente.
+    const ok = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    expect(ok).not.toHaveProperty('stage');
+    expect(installConsistency(tmp, 'api-forge').ok).toBe(true);
+  });
+
+  it('state apagado com venv+receipt presentes → orphaned, nunca saudável', async () => {
+    seed('0.1.0');
+    rmSync(forgeStatePath(tmp));
+    const c = installConsistency(tmp, 'api-forge');
+    expect(c.ok).toBe(false);
+    expect(c.status).toBe('orphaned');
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runner({}),
+    });
+    expect(res).toMatchObject({ stage: 'incomplete' });
+  });
+});
+
+describe('fault injection — yanked release (honest, nunca silencioso)', () => {
+  it('update para alvo todo-yanked → recusa, instalação intacta e receipt honesto', async () => {
+    seed('0.1.0');
+    const allYanked = pypiPayload('apiforge-af', () => ({ yanked: true }));
+    const codes = exitCodes();
+    await runRegistryUpdate(cli(), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(allYanked) }),
+      run: runner({}),
+    });
+    expect(codes).toContain(1); // recusa nomeada — não "up to date" nem silêncio
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.1.0');
+  });
+
+  it('pin de versão yanked instala MAS marca receipt + plano (nunca silencioso)', async () => {
+    const yanked = pypiPayload('apiforge-af', () => ({ yanked: true }));
+    // Plano expõe yanked:true — o efeito é visível ANTES de instalar.
+    const doc = await collectJson(() =>
+      runRegistryInstall(cli({ plan: true, ref: '0.1.0' }), ['api-forge'], {
+        home: tmp,
+        pythons: py(),
+        fetchImpl: async () => ({ status: 200, body: JSON.stringify(yanked) }),
+        run: runner({}),
+      }),
+    );
+    expect((doc.planned as { yanked?: boolean }[])[0].yanked).toBe(true);
+    // Execução: receipt carrega a evidência (yanked:true) — nada oculto.
+    const res = await registryInstall(ENTRY, '0.1.0', {
+      home: tmp,
+      cacheDir: cacheDir(),
+      pythons: py(),
+      fetchImpl: async () => ({ status: 200, body: JSON.stringify(yanked) }),
+      run: runner({}),
+    });
+    expect(res).not.toHaveProperty('stage');
+    if ('stage' in res) return;
+    expect(res.yanked).toBe(true);
+    expect(loadForgeState(tmp).forges['api-forge'].yanked).toBe(true);
   });
 });

@@ -607,8 +607,11 @@ describe('runMcpCommand', () => {
 
   // --- P1-002: probe de protocolo real --------------------------------------
   // spark-forge-aws tem template `['{bin}','mcp','serve']` — com bin=node,
-  // `node mcp serve` executa <cwd>/mcp como script (cross-platform).
-  const MCP_FILE = path.join(process.cwd(), 'mcp');
+  // `node mcp serve` executa <cwd>/mcp como script (cross-platform). O cwd do
+  // worker é isolado num tmpdir: escrever na raiz do repo polui o snapshot
+  // de pureza dos testes paralelos (plan-purity).
+  const MCP_DIR = mkdtempSync(path.join(os.tmpdir(), 'forge-cli-mcp-cwd-'));
+  const MCP_FILE = path.join(MCP_DIR, 'mcp');
   const mcpServerScript = (behavior: 'ok' | 'garbage' | 'crash' | 'badinit') => {
     const src = `import {createInterface} from 'node:readline';const rl=createInterface({input:process.stdin});
 ${
@@ -637,11 +640,14 @@ if(m.method==='tools/list'){process.stdout.write(JSON.stringify({jsonrpc:'2.0',i
     const chunks: string[] = [];
     const orig = process.stdout.write.bind(process.stdout);
     process.stdout.write = ((s: string) => (chunks.push(s), true)) as typeof orig;
+    const prevCwd = process.cwd();
+    process.chdir(MCP_DIR);
     const code = await runMcpCommand(
       cli({ dir: ws, verify: true, jsonReport: true }),
       ['spark-forge-aws'],
       home,
     ).finally(() => {
+      process.chdir(prevCwd);
       process.stdout.write = orig;
       rmSync(MCP_FILE, { force: true });
     });

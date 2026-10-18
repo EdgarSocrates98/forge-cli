@@ -69,7 +69,8 @@ export async function runHealCommand(cli: CliOptions): Promise<number> {
 
   const nonInteractive = isNonInteractive(cli);
   const confirmed: 'user' | 'flag' | 'never' = cli.yes ? 'flag' : nonInteractive ? 'never' : 'user';
-  const dryRun = cli.plan || confirmed === 'never';
+  // --plan/--dry-run/--check são todas só-plano — reparos nunca aplicam.
+  const dryRun = cli.plan || cli.check || confirmed === 'never';
 
   const { plan } = await planRepairs(findings, { root, dryRun });
   note(describePlan(plan), S.healTitle);

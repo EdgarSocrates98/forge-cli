@@ -1,4 +1,13 @@
-import { lstatSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 const REPO_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
@@ -56,9 +65,31 @@ export function redactSecrets(text: string): string {
   return REDACTIONS.reduce((acc, [re, repl]) => acc.replace(re, repl), text);
 }
 
-/** Escrita atômica: grava em arquivo temporário e renomeia sobre o destino. */
+/**
+ * Escrita atômica: grava em arquivo temporário, fsync e renomeia sobre o
+ * destino. Um SIGKILL entre o open e o rename deixa um `*.tmp` órfão —
+ * o rename nunca publica conteúdo parcial, e a próxima escrita
+ * bem-sucedida no mesmo destino remove os órfãos de runs anteriores.
+ */
 export function writeFileAtomic(file: string, content: string): void {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmp, content, 'utf8');
+  const fd = openSync(tmp, 'w');
+  try {
+    writeFileSync(fd, content, 'utf8');
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   renameSync(tmp, file);
+  try {
+    const dir = path.dirname(file);
+    const base = path.basename(file);
+    for (const f of readdirSync(dir)) {
+      if (f.startsWith(`${base}.`) && f.endsWith('.tmp')) {
+        rmSync(path.join(dir, f), { force: true });
+      }
+    }
+  } catch {
+    // limpeza de órfãos é melhor esforço — nunca derruba a escrita
+  }
 }

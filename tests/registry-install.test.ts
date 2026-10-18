@@ -606,6 +606,8 @@ describe('review-11 — hardening', () => {
         throw new Error('sem rede');
       },
     });
-    expect(res).toMatchObject({ stage: 'already-installed' });
+    // Venv sem state/receipt = instalação interrompida — a recusa nomeia
+    // 'incomplete' (com o reparo), nunca finge 'already-installed'.
+    expect(res).toMatchObject({ stage: 'incomplete' });
   });
 });

@@ -45,7 +45,8 @@ export function envLockDigest(repoDir: string): { files: string[]; digest: strin
   return { files, digest: hash.digest('hex') };
 }
 
-export function writeEnvLock(targetDir: string, repos: readonly ForgeRepo[]): EnvLock {
+/** Monta o lockfile sem gravar — `--plan`/`--check` nunca escreve. */
+export function buildEnvLock(targetDir: string, repos: readonly ForgeRepo[]): EnvLock {
   const lock: EnvLock = {
     schema: 'forge-cli/EnvLock/v1',
     generated_at: new Date().toISOString(),
@@ -58,6 +59,11 @@ export function writeEnvLock(targetDir: string, repos: readonly ForgeRepo[]): En
     const head = loadState(targetDir)?.repos[repo.name]?.head;
     lock.forges[repo.name] = { env_files: files, digest, ...(head ? { head } : {}) };
   }
+  return lock;
+}
+
+export function writeEnvLock(targetDir: string, repos: readonly ForgeRepo[]): EnvLock {
+  const lock = buildEnvLock(targetDir, repos);
   const file = path.join(artifactsRoot(targetDir), 'env.lock.json');
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileAtomic(file, JSON.stringify(lock, null, 2));
@@ -94,9 +100,10 @@ export interface ForgeProfile {
   repos: Record<string, { head?: string; phase?: string }>;
 }
 
-export function exportProfile(targetDir: string, dest: string): ForgeProfile {
+/** Monta o profile sem gravar — `--plan`/`--check` nunca escreve. */
+export function buildProfile(targetDir: string): ForgeProfile {
   const state = loadState(targetDir);
-  const profile: ForgeProfile = {
+  return {
     schema: 'forge-cli/Profile/v1',
     exported_at: new Date().toISOString(),
     ...(state?.pins ? { pins: state.pins } : {}),
@@ -107,6 +114,10 @@ export function exportProfile(targetDir: string, dest: string): ForgeProfile {
       ]),
     ),
   };
+}
+
+export function exportProfile(targetDir: string, dest: string): ForgeProfile {
+  const profile = buildProfile(targetDir);
   mkdirSync(path.dirname(path.resolve(dest)), { recursive: true });
   writeFileAtomic(dest, JSON.stringify(profile, null, 2));
   return profile;

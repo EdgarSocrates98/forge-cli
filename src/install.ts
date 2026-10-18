@@ -161,6 +161,56 @@ export async function install(opts: InstallOptions = {}): Promise<InstallReport>
   return { dir, shims, profilesTouched, pathAlready };
 }
 
+/**
+ * `--plan`/`--check` do self-install: os mesmos arquivos que install()
+ * tocaria (bundle + shim + profiles com bloco novo ou fallback), sem
+ * criar dir, gravar shim nem editar profile/PATH.
+ */
+export function planSelfInstall(opts: InstallOptions = {}): {
+  dir: string;
+  shims: string[];
+  profilesTouched: string[];
+} {
+  const platform = opts.platform ?? process.platform;
+  const home = opts.homedir ?? process.env.USERPROFILE ?? process.env.HOME ?? '';
+  const dir = installDir(home);
+  const shims = [path.join(dir, platform === 'win32' ? 'forge-cli.cmd' : 'forge-cli')];
+  const profilesTouched: string[] = [];
+  if (platform !== 'win32') {
+    const candidates = profileCandidates(home);
+    const existing = candidates.filter((c) => existsSync(c.file));
+    for (const c of existing) {
+      const content = readFileSync(c.file, 'utf8');
+      if (!content.includes(GUARD_START)) profilesTouched.push(c.file);
+    }
+    if (!existing.length) profilesTouched.push(candidates[2].file);
+  }
+  return { dir, shims, profilesTouched };
+}
+
+/**
+ * `--plan`/`--check` do self-uninstall: profiles que perderiam o bloco
+ * guard + o dir que seria removido — nada é escrito nem apagado.
+ */
+export function planSelfUninstall(opts: InstallOptions = {}): {
+  dir: string;
+  dirPresent: boolean;
+  profilesTouched: string[];
+} {
+  const platform = opts.platform ?? process.platform;
+  const home = opts.homedir ?? process.env.USERPROFILE ?? process.env.HOME ?? '';
+  const dir = installDir(home);
+  const profilesTouched: string[] = [];
+  if (platform !== 'win32') {
+    for (const c of profileCandidates(home)) {
+      if (!existsSync(c.file)) continue;
+      const content = readFileSync(c.file, 'utf8');
+      if (stripBlock(content) !== content) profilesTouched.push(c.file);
+    }
+  }
+  return { dir, dirPresent: existsSync(dir), profilesTouched };
+}
+
 export async function uninstall(opts: InstallOptions = {}): Promise<UninstallReport> {
   const platform = opts.platform ?? process.platform;
   const home = opts.homedir ?? process.env.USERPROFILE ?? process.env.HOME ?? '';
