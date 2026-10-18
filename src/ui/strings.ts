@@ -73,6 +73,8 @@ export const S = {
   errRefNeedsOne: '--ref/--version exigem exatamente uma Forja',
   errMethodUnsupported:
     '--method registry só é suportado em install|uninstall|update|reinstall|rollback|pin|unpin',
+  errRegistryUpdateNeedsNames:
+    'update --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
   errRegistryReinstallNeedsNames:
     'reinstall --method registry exige nomes, --only ou --all (Forjas instaladas via registry)',
   errRegistryRollbackNeedsNames:
@@ -118,6 +120,13 @@ export const S = {
   errUnpinNoRef: 'unpin não aceita --version/--ref — remove a fixação existente',
   errRollbackNoRef: 'rollback não aceita --version/--ref — volta ao HEAD anterior registrado',
   errUninstallNoRef: 'uninstall não aceita --version/--ref — remove a Forja instalada',
+  errPinMethodAmbiguous:
+    'instalada via git e via registry — pin/unpin ambíguo; use --method git|registry',
+  pinRegistryAuto:
+    'instalada via registry — pin aplicado ao receipt (equivalente a --method registry)',
+  unpinRegistryAuto:
+    'instalada via registry — unpin aplicado ao receipt (equivalente a --method registry)',
+  errPinVersionMismatch: 'pin registry fixa a versão instalada — instale a desejada antes de fixar',
   errNeedsOneName: 'Informe exatamente uma Forja',
   rollbackDone: 'Checkout revertido para',
   rollbackNote:
@@ -341,6 +350,7 @@ export const S = {
   hostValidated: 'integração validada',
   hostAuthUnknown: 'autenticação não verificada',
   hostVersionUnknown: 'versão não identificada',
+  hostProbeTimeout: 'probe sem resposta (timeout)',
   hostPlanTitle: 'Plano de integração',
   hostNeedsYes: 'Nada foi escrito — reexecute com --yes para aplicar',
   hostRegistered: 'integração registrada',

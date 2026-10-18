@@ -3,10 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  commandOutput,
+  commandProbe,
+  commandWorks,
+  DEFAULT_PROBE_TIMEOUT_MS,
   DEFAULT_WORKSPACE,
   findSetupScript,
   hasGitRepo,
   npmInstallArgs,
+  probeTimeoutMs,
   resolveTargetDir,
   withCmdExt,
 } from '../src/utils/system.js';
@@ -145,5 +150,58 @@ describe('withCmdExt', () => {
     expect(withCmdExt('npm', 'linux')).toBe('npm');
     expect(withCmdExt('git', 'win32')).toBe('git');
     expect(withCmdExt('powershell.exe', 'win32')).toBe('powershell.exe');
+  });
+});
+
+// E2E 11.2.1: `cursor --version` era um shim Electron girando >4min —
+// doctor/hosts-list travavam. Probes de ambiente têm teto: o subprocesso
+// é morto, nunca um Promise.race que o deixa vivo.
+describe('probes de ambiente — teto de subprocesso (E2E 11.2.1)', () => {
+  const HANG = ['-e', 'setInterval(() => {}, 1e9)'];
+
+  it('commandProbe marca timedOut e retorna dentro do teto configurável', async () => {
+    const t0 = Date.now();
+    const res = await commandProbe(process.execPath, HANG, { timeoutMs: 300 });
+    expect(res.timedOut).toBe(true);
+    expect(res.output).toBeNull();
+    // o shim é morto — jamais os >4min do E2E
+    expect(Date.now() - t0).toBeLessThan(20_000);
+  });
+
+  it('commandProbe distingue sem-saída (ausente/falha) de timeout', async () => {
+    const missing = await commandProbe('forge-cli-binary-inexistente-9x', [], {
+      timeoutMs: 5_000,
+    });
+    expect(missing).toEqual({ output: null, timedOut: false });
+    const ok = await commandProbe(process.execPath, ['-e', 'console.log("v1")'], {
+      timeoutMs: 5_000,
+    });
+    expect(ok).toEqual({ output: 'v1', timedOut: false });
+  });
+
+  it('commandOutput devolve null no teto — o caller nunca trava', async () => {
+    expect(await commandOutput(process.execPath, HANG, { timeoutMs: 300 })).toBeNull();
+  });
+
+  it('commandWorks devolve false para o shim pendurado', async () => {
+    expect(await commandWorks(process.execPath, HANG, { timeoutMs: 300 })).toBe(false);
+  });
+
+  it('probeTimeoutMs: default 15s, override por env, valores inválidos ignorados', () => {
+    const prev = process.env.FORGE_CLI_PROBE_TIMEOUT_MS;
+    delete process.env.FORGE_CLI_PROBE_TIMEOUT_MS;
+    try {
+      expect(probeTimeoutMs()).toBe(DEFAULT_PROBE_TIMEOUT_MS);
+      expect(DEFAULT_PROBE_TIMEOUT_MS).toBe(15_000);
+      process.env.FORGE_CLI_PROBE_TIMEOUT_MS = '250';
+      expect(probeTimeoutMs()).toBe(250);
+      process.env.FORGE_CLI_PROBE_TIMEOUT_MS = 'abc';
+      expect(probeTimeoutMs()).toBe(DEFAULT_PROBE_TIMEOUT_MS);
+      process.env.FORGE_CLI_PROBE_TIMEOUT_MS = '0';
+      expect(probeTimeoutMs()).toBe(DEFAULT_PROBE_TIMEOUT_MS);
+    } finally {
+      if (prev === undefined) delete process.env.FORGE_CLI_PROBE_TIMEOUT_MS;
+      else process.env.FORGE_CLI_PROBE_TIMEOUT_MS = prev;
+    }
   });
 });

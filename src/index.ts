@@ -43,6 +43,7 @@ import { loadForgeState } from './registry/install.js';
 import { isCancel, multiselect } from '@clack/prompts';
 import { exitCancelled } from './prompts.js';
 import {
+  pinMethodFor,
   runPinCommand,
   runUnpinCommand,
   runRollbackCommand,
@@ -408,10 +409,33 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'pin') {
+    // Sem --method, o pin segue a instalação REAL: Forja só no registry
+    // nunca recebe estado git implícito (bug E2E 11.2.1); nos dois
+    // métodos, --method resolve a ambiguidade.
+    const route = cli.method === undefined ? pinMethodFor(resolved.names, cli) : 'defer';
+    if (route === 'ambiguous') {
+      log.error(`${resolved.names[0]}: ${S.errPinMethodAmbiguous}`);
+      process.exit(2);
+    }
+    if (route === 'registry') {
+      log.info(`${resolved.names[0]}: ${S.pinRegistryAuto}`);
+      await runRegistryPin(cli, resolved.names, true);
+      return;
+    }
     await runPinCommand(cli, resolved.names);
     return;
   }
   if (resolved.command === 'unpin') {
+    const route = cli.method === undefined ? pinMethodFor(resolved.names, cli) : 'defer';
+    if (route === 'ambiguous') {
+      log.error(`${resolved.names[0]}: ${S.errPinMethodAmbiguous}`);
+      process.exit(2);
+    }
+    if (route === 'registry') {
+      log.info(`${resolved.names[0]}: ${S.unpinRegistryAuto}`);
+      await runRegistryPin(cli, resolved.names, false);
+      return;
+    }
     await runUnpinCommand(cli, resolved.names);
     return;
   }

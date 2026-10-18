@@ -568,10 +568,12 @@ describe('P0 matriz: superfícies secundárias — plan puro ou recusa nomeada',
 });
 
 describe('P0 matriz: flags semânticas inválidas — recusa nomeada, nunca engolidas', () => {
-  it('registry pin --ref: trava é sempre a versão instalada — exit 2', async () => {
+  it('registry pin --ref divergente da instalada: recusa nomeada — exit 1, trava não escrita', async () => {
     seedRegistryInstall();
     await silent(() => runRegistryPin(cli({ ref: '9.9.9' }), ['api-forge'], true, { home }));
-    expect(process.exit).toHaveBeenCalledWith(2);
+    // A trava é sempre a versão instalada: --version divergente é recusa
+    // operacional (1), nunca pin silencioso de versão inexistente.
+    expect(process.exit).toHaveBeenCalledWith(1);
     const state = JSON.parse(readFileSync(forgeStatePath(home), 'utf8'));
     expect(state.forges['api-forge'].pinned).toBeUndefined();
   });

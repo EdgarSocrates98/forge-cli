@@ -5,7 +5,7 @@ import { redactSecrets } from '../safety.js';
 import { CLI_VERSION } from '../version.js';
 import type { RegistryEntry } from './catalog.js';
 import type { ProbedInterpreter, RunLike } from './install.js';
-import { wheelCacheDir } from './install.js';
+import { entryExtras, pipSpec, wheelCacheDir } from './install.js';
 
 /**
  * `forge-cli-offline-lock/1` — fecho transitivo de uma dist PyPI, gerado por
@@ -27,6 +27,12 @@ export interface OfflineLock {
   format: 'forge-cli-offline-lock/1';
   forge: string;
   dist: string;
+  /**
+   * Extras PEP 508 cobertos pelo fecho (`dist[mcp]` no download). Um lock
+   * gerado para a dist nua NÃO cobre deps de extras — install recusa com
+   * lock-mismatch quando diverge do pedido.
+   */
+  extras?: string[];
   version: string;
   python: string;
   platform: NodeJS.Platform | string;
@@ -159,6 +165,8 @@ export async function generateOfflineLock(
 ): Promise<OfflineLock | LockError> {
   const wheels = wheelCacheDir(deps.cacheDir, entry.dist);
   const report = path.join(wheels, '.pip-report.json');
+  // `dist[extras]` no download — o fecho cobre também as deps dos extras
+  // declarados, que passam a constar como artifacts verificáveis.
   const dl = await deps.run(deps.python.exe[0], [
     ...deps.python.exe.slice(1),
     '-m',
@@ -170,7 +178,7 @@ export async function generateOfflineLock(
     wheels,
     '--report',
     report,
-    `${entry.dist}==${version}`,
+    pipSpec(entry, version),
   ]);
   if (dl.exitCode !== 0) {
     return {
@@ -239,10 +247,12 @@ export async function generateOfflineLock(
     });
   }
   artifacts.sort((a, b) => a.filename.localeCompare(b.filename));
+  const extras = entryExtras(entry);
   return {
     format: 'forge-cli-offline-lock/1',
     forge: entry.name,
     dist: entry.dist,
+    ...(extras.length ? { extras } : {}),
     version,
     python: deps.python.version,
     platform: deps.platform ?? process.platform,
@@ -266,6 +276,12 @@ export function parseOfflineLock(raw: unknown): OfflineLock | LockError {
     if (typeof o[k] !== 'string' || !o[k]) {
       return { kind: 'lock-invalid', detail: `campo ${k} ausente no lock` };
     }
+  }
+  if (
+    o.extras !== undefined &&
+    (!Array.isArray(o.extras) || o.extras.some((e) => typeof e !== 'string' || !e))
+  ) {
+    return { kind: 'lock-invalid', detail: 'extras inválidos no lock' };
   }
   if (!Array.isArray(o.artifacts) || !o.artifacts.length) {
     return { kind: 'lock-invalid', detail: 'lock sem artifacts' };
@@ -337,17 +353,21 @@ export function verifyLockFiles(
 
 /**
  * Extrai Requires-Dist de cada wheel via o python do alvo (zipfile +
- * pip._vendor.packaging p/ avaliar markers de ambiente). Falha no helper
- * degrada para linha crua com marker removido — nunca silencia dep real.
+ * pip._vendor.packaging p/ avaliar markers de ambiente). argv[1] carrega
+ * os extras declarados do lock (CSV) — markers `extra == "x"` avaliam
+ * contra eles, então deps de extras pedidos também são conferidas contra
+ * o fecho. Falha no helper degrada para linha crua com marker removido —
+ * nunca silencia dep real.
  */
 const REQUIRES_SCRIPT = [
   'import json,sys,zipfile',
   'out={}',
+  'extras=[e for e in sys.argv[1].split(",") if e]',
   'try:',
   ' from pip._vendor.packaging.requirements import Requirement',
   'except Exception:',
   ' Requirement=None',
-  'for w in sys.argv[1:]:',
+  'for w in sys.argv[2:]:',
   ' reqs=[]',
   ' try:',
   '  with zipfile.ZipFile(w) as z:',
@@ -359,8 +379,9 @@ const REQUIRES_SCRIPT = [
   '      if Requirement is not None:',
   '       try:',
   '        r=Requirement(s)',
-  '        if r.marker is not None and not r.marker.evaluate(): continue',
-  '        if "extra" in s and "extra ==" in s: continue',
+  '        if r.marker is not None:',
+  '         keep=r.marker.evaluate() or any(r.marker.evaluate({"extra":e}) for e in extras)',
+  '         if not keep: continue',
   '        reqs.append(r.name)',
   '       except Exception:',
   '        reqs.append(s.split(";")[0].strip().split(" ")[0])',
@@ -379,7 +400,14 @@ export async function lockTransitiveCheck(
   pythonExe: string[],
 ): Promise<LockError | null> {
   const files = lock.artifacts.map((a) => path.join(wheels, a.filename));
-  const res = await run(pythonExe[0], [...pythonExe.slice(1), '-c', REQUIRES_SCRIPT, ...files]);
+  const extras = (lock.extras ?? []).join(',');
+  const res = await run(pythonExe[0], [
+    ...pythonExe.slice(1),
+    '-c',
+    REQUIRES_SCRIPT,
+    extras,
+    ...files,
+  ]);
   if (res.exitCode !== 0) {
     // Helper indisponível: pip --no-index ainda recusa dep faltante —
     // sem falsos-positivos, mas também sem o diagnóstico fino.

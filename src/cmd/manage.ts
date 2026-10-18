@@ -2,13 +2,46 @@ import { confirm, isCancel, log, note } from '@clack/prompts';
 import { clearPin, loadState, setPin } from '../artifacts.js';
 import { type CliOptions } from '../cli-args.js';
 import { install, planSelfInstall, planSelfUninstall, uninstall } from '../install.js';
+import { registryEntry } from '../registry/catalog.js';
+import { loadForgeState } from '../registry/install.js';
+import { resolveInside } from '../safety.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { errorDetail, resolvePython, resolveTargetDir, runStreamed } from '../utils/system.js';
+import {
+  cliHome,
+  errorDetail,
+  hasGitRepo,
+  resolvePython,
+  resolveTargetDir,
+  runStreamed,
+} from '../utils/system.js';
 import { executeUninstall, planRollback, planUninstall, rollbackRepo } from '../lifecycle.js';
 import { buildNativeOp } from '../native-install.js';
 import { detectInstallMethod, planSelfUpdate } from '../self.js';
 import { catalogFor, emitJson, reposByNames, pickOne, REFUSAL_TEXT } from './shared.js';
+
+export type PinMethodRoute = 'git' | 'registry' | 'ambiguous' | 'defer';
+
+/**
+ * Método real da instalação para `pin`/`unpin` SEM `--method`: o receipt
+ * registry e o clone git são a evidência — nunca o catálogo. Registry-only
+ * → rota registry (pin git silencioso sobre instalação registry foi o bug
+ * do E2E 11.2.1); git-only → git; ambos → 'ambiguous' (recusa nomeada
+ * pede --method explícito); 0 ou >1 nomes → 'defer' (pickOne decide).
+ */
+export function pinMethodFor(
+  names: string[],
+  cli: Pick<CliOptions, 'dir'>,
+  home = cliHome(),
+): PinMethodRoute {
+  if (names.length !== 1) return 'defer';
+  const name = registryEntry(names[0])?.name ?? names[0];
+  const registry = Object.hasOwn(loadForgeState(home).forges, name);
+  const dir = resolveInside(resolveTargetDir(cli.dir), name);
+  const cloned = dir !== null && hasGitRepo(dir);
+  if (registry && cloned) return 'ambiguous';
+  return registry ? 'registry' : 'git';
+}
 
 export async function runPinCommand(cli: CliOptions, names: string[]): Promise<void> {
   const repo = pickOne(cli, names);

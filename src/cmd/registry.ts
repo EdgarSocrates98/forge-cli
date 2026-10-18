@@ -117,6 +117,8 @@ interface RegistryPlanItem {
   ok: boolean;
   detail?: string;
   dist?: string;
+  /** Extras PEP 508 que o install pedirá junto da dist. */
+  extras?: string[];
   version?: string;
   requiresPython?: string;
   python?: string;
@@ -350,6 +352,7 @@ export async function runRegistryInstall(
         forge: name,
         ok: true,
         dist: entry!.dist,
+        ...(entry!.extras?.length ? { extras: entry!.extras } : {}),
         version: resolved.version,
         requiresPython: resolved.requiresPython,
         python: picked.python.version,
@@ -369,7 +372,7 @@ export async function runRegistryInstall(
       planned
         .map((p) =>
           p.ok
-            ? `${p.forge} → ${p.dist}==${p.version} (python ${p.python}, venv ${p.venv})`
+            ? `${p.forge} → ${p.dist}${p.extras?.length ? `[${p.extras.join(',')}]` : ''}==${p.version} (python ${p.python}, venv ${p.venv})`
             : `${p.forge} → falhou: ${p.detail}`,
         )
         .join('\n'),
@@ -966,9 +969,28 @@ async function runRegistryLifecycle(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
-  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const installed = Object.keys(loadForgeState(home).forges);
+  const isCheck = cli.plan || cli.check;
+  // `update --check` sem seleção cobre TODAS as instaladas via registry —
+  // leitura pura, mesmo contrato do `update --check` git que varre os
+  // clones. Sem isso o E2E 11.2.1 via "nenhuma Forja instalada" mesmo
+  // com receipts presentes.
+  const wanted = isCheck && !names.length && !cli.only?.length && !cli.all ? installed : names;
+  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, wanted, home);
   if (!targets.length && !skipped.length && !unknown.length) {
-    const msg = 'nenhuma Forja instalada via registry — nada a atualizar';
+    if (isCheck) {
+      // Check sem alvo não é erro: estado vazio reportado com honestidade.
+      const doc = { method: 'pypi', plan: true, updates: [], skipped: [], warnings: [] };
+      reportTo(doc);
+      if (quiet) emitJson(doc, 0);
+      note('nenhuma Forja instalada via registry — nada a verificar', 'Plano de update');
+      return;
+    }
+    // Instaladas existem mas nenhuma foi selecionada: erro nomeado que
+    // diz COMO selecionar — nunca a mensagem falsa "nenhuma instalada".
+    const msg = installed.length
+      ? S.errRegistryUpdateNeedsNames
+      : 'nenhuma Forja instalada via registry — nada a atualizar';
     reportTo({ error: msg });
     if (quiet) emitJson({ error: msg }, 2);
     log.error(msg);
@@ -982,7 +1004,6 @@ async function runRegistryLifecycle(
   ];
 
   const pinVersion = cli.ref?.replace(/^v(?=\d)/, '');
-  const isCheck = cli.plan || cli.check;
   const items: LifecycleItem[] = [];
   for (const t of targets) {
     const entry = entryFor(t.name, t.receipt);
@@ -1377,10 +1398,12 @@ export async function runRegistryPin(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
-  // `--ref/--version` não existe no pin registry — a trava é sempre a
-  // versão do receipt instalado. Flag de segurança ignorada seria bug.
-  if (cli.ref !== undefined) {
-    const msg = `pin/unpin --method registry não aceita --ref/--version — trava sempre a versão instalada`;
+  // `unpin --ref/--version` não tem sentido — a trava sempre cai por
+  // inteiro; flag ignorada seria mentira (mesmo contrato do unpin git).
+  // No pin, `--version` é honrada: deve igualar a versão INSTALADA —
+  // divergente vira recusa nomeada por Forja (validada mais abaixo).
+  if (!pin && cli.ref !== undefined) {
+    const msg = `unpin --method registry não aceita --ref/--version — remove a trava existente`;
     reportTo({ error: msg });
     if (quiet) emitJson({ error: msg }, 2);
     log.error(msg);
@@ -1434,6 +1457,10 @@ export async function runRegistryPin(
     if (unknown.length) process.exit(2);
     return;
   }
+  // `--version X` no registry fixa a versão INSTALADA — pedir outra criaria
+  // um pin que não corresponde ao receipt: recusa honesta por Forja em vez
+  // de ignorar o argumento silenciosamente.
+  const want = pin ? cli.ref?.replace(/^v(?=\d)/, '') : undefined;
   // load→mutate→save sob o lifecycle lock: um install/uninstall
   // concorrente não pode perder a atualização do pin.
   const lockRes = await acquireForgeLock(home);
@@ -1445,6 +1472,7 @@ export async function runRegistryPin(
     return;
   }
   const done = [];
+  const failed: { forge: string; detail: string }[] = [];
   try {
     const state = loadForgeState(home);
     for (const t of targets) {
@@ -1453,6 +1481,13 @@ export async function runRegistryPin(
       const cur = Object.hasOwn(state.forges, t.name) ? state.forges[t.name] : undefined;
       if (!cur) {
         warnings.push(`${t.name}: removido enquanto o lock era aguardado — ignorado`);
+        continue;
+      }
+      if (pin && want && t.receipt.version !== want) {
+        failed.push({
+          forge: t.name,
+          detail: `${S.errPinVersionMismatch} (instalada ${t.receipt.version} ≠ ${want})`,
+        });
         continue;
       }
       if (pin) {
@@ -1470,14 +1505,19 @@ export async function runRegistryPin(
   const doc = {
     method: 'pypi',
     [pin ? 'pinned' : 'unpinned']: done,
+    ...(failed.length ? { failed } : {}),
     skipped,
     warnings,
     ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
   };
   reportTo(doc);
-  if (quiet) emitJson(doc, unknown.length ? 2 : 0);
+  // Precedência igual à saída humana: falha operacional (pin em versão
+  // divergente) → 1; só restam desconhecidos → 2 (erro de uso).
+  if (quiet) emitJson(doc, failed.length ? 1 : unknown.length ? 2 : 0);
   for (const d of done) {
     log.success(pin ? `${d.forge}: ${S.pinDone} ${d.pinned}` : `${d.forge}: ${S.unpinDone}`);
   }
+  for (const f of failed) log.error(`${f.forge}: ${f.detail}`);
+  if (failed.length) process.exit(1);
   if (unknown.length) process.exit(2);
 }
