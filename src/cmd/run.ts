@@ -145,6 +145,10 @@ export async function runInstallFlow(
     const pin = pinState?.pins?.[repo.name];
     if (pin) refs[repo.name] = pin;
   }
+  // --plan/--dry-run/--check: todas são só-plano para o fluxo git —
+  // o plano mostra o que aconteceria (clone/pull/pin/scripts) e nada
+  // é escrito (state, backups, venv, .env, working tree).
+  const planOnly = cli.plan || cli.check;
   if (resolved.command === 'reinstall') {
     for (const repo of repos) {
       const dir = resolveInside(targetDir, repo.name);
@@ -153,7 +157,7 @@ export async function runInstallFlow(
       if (head) refs[repo.name] = head;
     }
     if (cli.clean) {
-      if (!cli.yes && !cli.plan) {
+      if (!cli.yes && !planOnly) {
         log.error(S.uninstallNeedsYes);
         process.exit(2);
       }
@@ -163,7 +167,7 @@ export async function runInstallFlow(
           log.error(`${repo.name}: ${S.uninstallRefused} — ${REFUSAL_TEXT[plan.reason]}`);
           process.exit(1);
         }
-        if (plan.kind === 'ready' && !cli.plan) {
+        if (plan.kind === 'ready' && !planOnly) {
           const backup = executeUninstall(targetDir, repo, plan);
           if (backup) log.info(`${S.uninstallBackupAt}: ${theme.dim(backup)}`);
         }
@@ -176,7 +180,7 @@ export async function runInstallFlow(
     process.exit(2);
   }
 
-  if (cli.plan) {
+  if (planOnly) {
     const body = repos
       .map(
         (repo) =>

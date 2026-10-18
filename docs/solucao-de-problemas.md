@@ -83,3 +83,49 @@ erro de binário esbuild, rode
   spec nova.
 - `vitest` é `^5` para evitar vulnerabilidades do `tinypool` (ver
   `npm audit`).
+
+## Instalação registry incompleta ou interrompida
+
+Uma instalação morta no meio (SIGKILL, queda de energia, disco cheio)
+nunca se apresenta como saudável: `forge-cli registry` marca a linha
+com `incompleta` e o JSON carrega `consistency` com o motivo exato:
+
+| `consistency`        | Significado                                        |
+| -------------------- | -------------------------------------------------- |
+| `orphaned`           | venv/arquivos no disco sem entrada no `state.json` |
+| `missing-receipt`    | entrada no state, mas `install.json` ausente       |
+| `unreadable-receipt` | `install.json` não parseia                         |
+| `forge-mismatch`     | `install.json` registra outra Forja                |
+| `version-mismatch`   | `install.json` e `state.json` divergem na versão   |
+| `missing-venv`       | state+receipt coerentes, mas a venv sumiu          |
+
+Reparo documentado (as duas únicas portas de saída honestas):
+
+```bash
+forge-cli reinstall --method registry <forja> --clean   # regrava tudo com backup da anterior
+forge-cli uninstall --method registry <forja>           # remove venv + state + receipt (inclui órfãs)
+```
+
+`install` sem `--clean` recusa com `incomplete` — ela nunca sobrescreve
+uma instalação pela metade fingindo que já existia.
+
+## Lifecycle lock preso (`busy`)
+
+Operações registry (install/uninstall/pin) serializam por
+`~/.forge-cli/forges/.forge-lifecycle.lock`. Se o erro diz `busy`:
+
+- **Outra execução em andamento** — espere terminar; o titular é o PID
+  gravado em `.forge-lifecycle.lock/info.json`.
+- **Titular morto** (o PID não existe mais) — o próprio CLI detecta e
+  quebra o lock automaticamente na próxima execução; nada a fazer.
+- **Lock órfão sem metadata legível** — só é considerado stale depois
+  de expirar o threshold de idade; se persistir além disso, remova o
+  diretório `.forge-lifecycle.lock` manualmente (seguro: quem cria o
+  lock nunca tem trabalho a perder fora dele).
+
+## `state.json` corrompido
+
+Leitura nunca escreve: um `state.json` que não parseia é tratado como
+vazio (nada é removido nem sobrescrito) e a evidência só vai para
+`state.json.corrupt` no momento em que uma escrita real acontecer —
+assim `--plan`/`--check`/`registry` (list) não têm efeito colateral.

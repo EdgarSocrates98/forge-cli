@@ -67,6 +67,25 @@ export type RollbackResult =
   | { ok: true; from?: string; to: string }
   | { ok: false; reason: 'no-previous' | 'not-cloned' | 'dirty' | 'failed'; detail?: string };
 
+export type RollbackPlan =
+  | { ok: true; from?: string; to: string }
+  | { ok: false; reason: 'no-previous' | 'not-cloned' | 'dirty' };
+
+/**
+ * Só planeja: as mesmas validações read-only do rollbackRepo (clone,
+ * previousHead no state, working tree limpo) sem o `git checkout` —
+ * `--plan`/`--check` nunca tocam o working tree nem o state.
+ */
+export async function planRollback(targetDir: string, repo: ForgeRepo): Promise<RollbackPlan> {
+  const dir = resolveInside(targetDir, repo.name);
+  if (!dir || !hasGitRepo(dir) || isLinkOrJunction(dir)) return { ok: false, reason: 'not-cloned' };
+  const previous = loadState(targetDir)?.repos[repo.name]?.previousHead;
+  if (!previous) return { ok: false, reason: 'no-previous' };
+  if (await isGitDirty(dir)) return { ok: false, reason: 'dirty' };
+  const from = (await currentHead(dir)) ?? undefined;
+  return { ok: true, from, to: previous };
+}
+
 /** Volta ao HEAD anterior registrado; só mexe no checkout Git, nunca em efeitos do instalador. */
 export async function rollbackRepo(targetDir: string, repo: ForgeRepo): Promise<RollbackResult> {
   const dir = resolveInside(targetDir, repo.name);

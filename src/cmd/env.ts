@@ -74,7 +74,9 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
   const names = rest.filter((a) => !a.startsWith('-'));
   const json = cli.jsonReport;
   const yes = cli.yes || flags.has('--yes');
-  const dryRun = cli.plan || flags.has('--dry-run');
+  // --plan/--dry-run/--check são todas só-plano: .env, .env.bak e
+  // qualquer arquivo do repositório ficam intocados.
+  const dryRun = cli.plan || cli.check || flags.has('--dry-run');
   const rollback = cli.rollback || flags.has('--rollback');
 
   if (!verb || !VERBS.has(verb)) {
@@ -175,6 +177,10 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
     // valor atual (segredos mascarados) e default; valida tipo/formato
     // por kind; preserva o arquivo existente e grava .env.bak antes.
     // Intrinsecamente interativo — --json/--yes/pipes viram recusa nomeada.
+    if (dryRun) {
+      log.error(S.errPlanUnsupported);
+      return 2;
+    }
     if (json || yes || !process.stdin.isTTY || !process.stdout.isTTY) {
       log.error(S.envWizardNonInteractive);
       return 2;
@@ -258,6 +264,29 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
       else log.info(S.envInitExists);
       return 0;
     }
+    // --plan/--check: mostra o que o .env receberia — nada é escrito.
+    if (dryRun) {
+      const plan = planMigration(repoDir, schema);
+      if (json) {
+        console.log(
+          JSON.stringify({
+            command: 'env init',
+            repo,
+            created: false,
+            dryRun: true,
+            actions: maskedActions(plan, secretKeys),
+          }),
+        );
+        return 0;
+      }
+      const actionable = plan.actions.filter((a) => a.kind !== 'keep');
+      note(
+        actionable.length ? planLines(plan, secretKeys).join('\n') : S.envPlanNone,
+        `${S.envPlanTitle} — ${repo}`,
+      );
+      log.info(S.envInitDryRun);
+      return 0;
+    }
     const res = applyMigration(repoDir, planMigration(repoDir, schema), {});
     if (json) console.log(JSON.stringify({ command: 'env init', repo, created: true, ...res }));
     else log.success(`${icons.ok} ${S.envInitDone} ${theme.dim(`(${res.applied.length})`)}`);
@@ -267,6 +296,26 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
   // migrate
   if (rollback) {
     const backup = latestEnvBackup(repoDir);
+    // --plan/--check: mostra o backup que seria restaurado — o .env
+    // não é tocado.
+    if (dryRun) {
+      if (json) {
+        console.log(
+          JSON.stringify({
+            command: 'env migrate --rollback',
+            repo,
+            dryRun: true,
+            backup: backup ?? null,
+          }),
+        );
+      } else if (backup) {
+        log.info(`${S.envBackupAt}: ${theme.dim(backup)}`);
+        log.info(S.envMigrateDryRun);
+      } else {
+        log.error(S.envRollbackNone);
+      }
+      return backup ? 0 : 1;
+    }
     const ok = backup ? rollbackEnv(repoDir, backup) : false;
     if (json) {
       console.log(

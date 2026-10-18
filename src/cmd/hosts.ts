@@ -127,13 +127,24 @@ export async function runHostsCommand(
       }
       return 1;
     }
-    if (verb === 'plan' || !cli.yes) {
+    // --plan/--check em `register`: mesmo plano do verbo `plan` —
+    // a integração NUNCA é aplicada (nenhuma config de host escrita).
+    const planOnly = cli.plan || cli.check;
+    if (verb === 'plan' || planOnly || !cli.yes) {
       if (json) {
-        emit(verb === 'plan' ? plan : { plan, applied: false, detail: S.hostNeedsYes });
+        emit(
+          verb === 'plan'
+            ? plan
+            : {
+                plan,
+                applied: false,
+                detail: planOnly ? S.planDryRunNote : S.hostNeedsYes,
+              },
+        );
         return 0;
       }
       note(planLines(plan), S.hostPlanTitle);
-      log.info(S.hostNeedsYes);
+      log.info(planOnly ? S.planDryRunNote : S.hostNeedsYes);
       return 0;
     }
     const result = await adapter.applyIntegration(plan, { home: hostHome(home) });
@@ -174,6 +185,17 @@ export async function runHostsCommand(
       if (json) emit({ host: adapter.id, restored: false, detail: 'no-backup' });
       else log.error(`${adapter.displayName}: no-backup`);
       return 1;
+    }
+    // --plan/--check: mostra o backup que seria restaurado — a config
+    // do host não é tocada.
+    if (cli.plan || cli.check) {
+      if (json) {
+        emit({ host: adapter.id, restored: false, plan: true, backup });
+        return 0;
+      }
+      note(`${adapter.displayName} ← ${theme.dim(backup)}`, S.hostPlanTitle);
+      log.info(S.planDryRunNote);
+      return 0;
     }
     const stub: HostPlan = {
       host: adapter.id,

@@ -17,6 +17,7 @@ import {
   forgeVenv,
   forgesRoot,
   loadForgeState,
+  saveForgeState,
   type RegistryInstallReceipt,
 } from '../src/registry/install.js';
 import { isPrerelease, parseVersion } from '../src/registry/versions.js';
@@ -379,13 +380,26 @@ describe('mergeRegistryPhase — status honesto quando venv sumiu', () => {
 });
 
 describe('loadForgeState corrompido', () => {
-  it('JSON quebrado → backup .corrupt preservado + estado vazio', () => {
+  it('JSON quebrado → estado vazio sem mutar nada (load é puro)', () => {
     const file = forgeStatePath(tmp);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, '{forges: !!!');
     const state = loadForgeState(tmp);
     expect(state.forges).toEqual({});
+    // Leitura NUNCA escreve — a quarentena .corrupt só acontece na
+    // próxima saveForgeState (um load em --plan/--check não pode ter
+    // efeito colateral).
+    expect(existsSync(`${file}.corrupt`)).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe('{forges: !!!');
+  });
+
+  it('saveForgeState sobre state corrompido → .corrupt preserva evidência', () => {
+    const file = forgeStatePath(tmp);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, '{forges: !!!');
+    saveForgeState(tmp, { forges: {} });
     expect(existsSync(`${file}.corrupt`)).toBe(true);
     expect(readFileSync(`${file}.corrupt`, 'utf8')).toBe('{forges: !!!');
+    expect(loadForgeState(tmp).forges).toEqual({});
   });
 });

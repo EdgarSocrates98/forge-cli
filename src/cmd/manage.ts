@@ -1,14 +1,14 @@
 import { confirm, isCancel, log, note } from '@clack/prompts';
-import { clearPin, setPin } from '../artifacts.js';
+import { clearPin, loadState, setPin } from '../artifacts.js';
 import { type CliOptions } from '../cli-args.js';
-import { install, uninstall } from '../install.js';
+import { install, planSelfInstall, planSelfUninstall, uninstall } from '../install.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { errorDetail, resolvePython, resolveTargetDir, runStreamed } from '../utils/system.js';
-import { executeUninstall, planUninstall, rollbackRepo } from '../lifecycle.js';
+import { executeUninstall, planRollback, planUninstall, rollbackRepo } from '../lifecycle.js';
 import { buildNativeOp } from '../native-install.js';
 import { detectInstallMethod, planSelfUpdate } from '../self.js';
-import { catalogFor, reposByNames, pickOne, REFUSAL_TEXT } from './shared.js';
+import { catalogFor, emitJson, reposByNames, pickOne, REFUSAL_TEXT } from './shared.js';
 
 export async function runPinCommand(cli: CliOptions, names: string[]): Promise<void> {
   const repo = pickOne(cli, names);
@@ -16,7 +16,22 @@ export async function runPinCommand(cli: CliOptions, names: string[]): Promise<v
     log.error(S.errPinNeedsVersion);
     process.exit(2);
   }
-  setPin(resolveTargetDir(cli.dir), repo.name, cli.ref);
+  const targetDir = resolveTargetDir(cli.dir);
+  // --plan/--check: mostra o pin que seria gravado — ZERO mutação
+  // (era o bug real: setPin rodava mesmo com --plan).
+  if (cli.plan || cli.check) {
+    const current = loadState(targetDir)?.pins?.[repo.name];
+    const doc = { plan: true, forge: repo.name, pin: cli.ref, current: current ?? null };
+    if (cli.jsonReport) emitJson(doc);
+    note(
+      `${repo.name} → ${cli.ref}${current ? ` (atual: ${current})` : ` (${S.unpinNone})`}`,
+      S.uninstallPlanTitle,
+    );
+    log.info(S.planDryRunNote);
+    process.exit(0);
+    return;
+  }
+  setPin(targetDir, repo.name, cli.ref);
   log.success(`${icons.ok} ${repo.name}: ${S.pinDone} ${cli.ref}`);
   process.exit(0);
 }
@@ -24,7 +39,25 @@ export async function runPinCommand(cli: CliOptions, names: string[]): Promise<v
 export async function runUnpinCommand(cli: CliOptions, names: string[]): Promise<void> {
   const repo = pickOne(cli, names);
   if (!repo) process.exit(2);
-  const removed = clearPin(resolveTargetDir(cli.dir), repo.name);
+  // `--version` não existe no unpin — flag ignorada seria mentira.
+  if (cli.ref !== undefined) {
+    log.error(S.errUnpinNoRef);
+    process.exit(2);
+  }
+  const targetDir = resolveTargetDir(cli.dir);
+  if (cli.plan || cli.check) {
+    const current = loadState(targetDir)?.pins?.[repo.name];
+    const doc = { plan: true, forge: repo.name, unpin: true, current: current ?? null };
+    if (cli.jsonReport) emitJson(doc);
+    note(
+      `${repo.name} → unpin${current ? ` (atual: ${current})` : ` (${S.unpinNone})`}`,
+      S.uninstallPlanTitle,
+    );
+    log.info(S.planDryRunNote);
+    process.exit(0);
+    return;
+  }
+  const removed = clearPin(targetDir, repo.name);
   log.success(`${icons.ok} ${repo.name}: ${removed ? S.unpinDone : S.unpinNone}`);
   process.exit(0);
 }
@@ -32,7 +65,44 @@ export async function runUnpinCommand(cli: CliOptions, names: string[]): Promise
 export async function runRollbackCommand(cli: CliOptions, names: string[]): Promise<void> {
   const repo = pickOne(cli, names);
   if (!repo) process.exit(2);
-  const res = await rollbackRepo(resolveTargetDir(cli.dir), repo);
+  // `rollback` volta ao HEAD anterior registrado — `--ref` não tem efeito.
+  if (cli.ref !== undefined) {
+    log.error(S.errRollbackNoRef);
+    process.exit(2);
+  }
+  const targetDir = resolveTargetDir(cli.dir);
+  const whyText = (reason: 'no-previous' | 'not-cloned' | 'dirty' | 'failed', detail?: string) =>
+    reason === 'no-previous'
+      ? S.rollbackNoPrevious
+      : reason === 'not-cloned'
+        ? S.rollbackNotCloned
+        : reason === 'dirty'
+          ? S.rollbackDirty
+          : (detail ?? reason);
+  // --plan/--check: mesmas validações read-only, sem `git checkout`.
+  if (cli.plan || cli.check) {
+    const plan = await planRollback(targetDir, repo);
+    const doc = plan.ok
+      ? {
+          plan: true,
+          forge: repo.name,
+          rollback: { from: plan.from ?? null, to: plan.to },
+        }
+      : { plan: true, forge: repo.name, error: whyText(plan.reason) };
+    if (cli.jsonReport) emitJson(doc);
+    if (plan.ok) {
+      note(
+        `${repo.name}: ${plan.from ? plan.from.slice(0, 7) : '?'} → ${plan.to.slice(0, 7)}`,
+        S.uninstallPlanTitle,
+      );
+      log.info(S.planDryRunNote);
+      process.exit(0);
+    }
+    log.error(`${repo.name}: ${whyText(plan.reason)}`);
+    process.exit(1);
+    return;
+  }
+  const res = await rollbackRepo(targetDir, repo);
   if (res.ok) {
     log.success(`${icons.ok} ${repo.name}: ${S.rollbackDone} ${res.to.slice(0, 7)}`);
     log.info(S.rollbackNote);
@@ -51,6 +121,11 @@ export async function runRollbackCommand(cli: CliOptions, names: string[]): Prom
 }
 
 export async function runForgeUninstall(cli: CliOptions, names: string[]): Promise<void> {
+  // `uninstall` não tem alvo de revisão — `--ref` seria ignorado: recusa.
+  if (cli.ref !== undefined) {
+    log.error(S.errUninstallNoRef);
+    process.exit(2);
+  }
   const targetDir = resolveTargetDir(cli.dir);
   const catalog = catalogFor(targetDir);
   const wanted = [...names, ...(cli.only ?? [])];
@@ -84,6 +159,13 @@ export async function runForgeUninstall(cli: CliOptions, names: string[]): Promi
   note(lines.join('\n'), S.uninstallPlanTitle);
   const ready = plans.filter((p) => p.plan.kind === 'ready');
   const refused = plans.some((p) => p.plan.kind === 'refused');
+  // --plan/--check: o plano já foi exibido — sai antes de --yes/prompt
+  // e sem tocar em dir, backups, state ou ledger.
+  if (cli.plan || cli.check) {
+    log.info(S.planDryRunNote);
+    process.exit(refused ? 1 : 0);
+    return;
+  }
   if (!ready.length) {
     process.exit(refused ? 1 : 0);
     return;
@@ -147,6 +229,12 @@ export async function runSelfUpdateCommand(cli: CliOptions): Promise<void> {
     lines.push(`${S.selfUpdateRun}: ${plan.command.bin} ${plan.command.args.join(' ')}`);
   if (plan.manual) lines.push(plan.manual);
   note(lines.join('\n'), S.selfUpdateTitle);
+  // --plan/--check: o comando do update já foi exibido — nunca executa.
+  if (cli.plan || cli.check) {
+    log.info(S.planDryRunNote);
+    process.exit(0);
+    return;
+  }
   if (!plan.command) process.exit(0);
   if (!cli.yes) {
     log.info(S.selfUpdateNeedsYes);
@@ -164,7 +252,24 @@ export async function runSelfUpdateCommand(cli: CliOptions): Promise<void> {
   }
 }
 
-export async function runInstallCommand(): Promise<void> {
+export async function runInstallCommand(cli: CliOptions): Promise<void> {
+  // --plan/--check: lista os mesmos arquivos que install() tocaria —
+  // dir, shim e profiles — sem criar/gravar nada.
+  if (cli.plan || cli.check) {
+    const plan = planSelfInstall();
+    if (cli.jsonReport) emitJson({ plan: true, ...plan });
+    note(
+      [
+        `dir: ${plan.dir}`,
+        ...plan.shims.map((s) => `shim: ${s}`),
+        ...plan.profilesTouched.map((p) => `profile: ${p}`),
+      ].join('\n'),
+      S.selfPlanTitle,
+    );
+    log.info(S.planDryRunNote);
+    process.exit(0);
+    return;
+  }
   const report = await install();
   log.success(`${icons.ok} ${S.installDone} ${theme.dim(report.dir)}`);
   if (report.pathAlready) {
@@ -175,7 +280,21 @@ export async function runInstallCommand(): Promise<void> {
   process.exit(0);
 }
 
-export async function runUninstallCommand(): Promise<void> {
+export async function runUninstallCommand(cli: CliOptions): Promise<void> {
+  if (cli.plan || cli.check) {
+    const plan = planSelfUninstall();
+    if (cli.jsonReport) emitJson({ plan: true, ...plan });
+    note(
+      [
+        `dir: ${plan.dir}${plan.dirPresent ? '' : ` (${S.uninstallAbsent})`}`,
+        ...plan.profilesTouched.map((p) => `profile: ${p}`),
+      ].join('\n'),
+      S.selfPlanTitle,
+    );
+    log.info(S.planDryRunNote);
+    process.exit(0);
+    return;
+  }
   const report = await uninstall();
   log.success(`${icons.ok} ${S.uninstallDone}`);
   if (report.profilesTouched.length) {

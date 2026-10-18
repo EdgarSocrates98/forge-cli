@@ -13,9 +13,11 @@ import { pythonCandidates } from '../preflight.js';
 import { isSafeRepoName, redactSecrets, writeFileAtomic } from '../safety.js';
 import { registryEntry, REGISTRY_PACKAGES, type RegistryEntry } from '../registry/catalog.js';
 import {
+  acquireForgeLock,
   execaRun,
   forgeVenv,
   ghostEntry,
+  installConsistency,
   loadForgeState,
   receiptPath,
   registryInstall,
@@ -93,6 +95,8 @@ function describeInstallError(e: InstallError): string {
   if (e.stage === 'hash-mismatch') return `${S.registryHashMismatch}: ${e.detail}`;
   if (e.stage === 'already-installed') return e.detail;
   if (e.stage === 'lock') return `${e.error.kind}: ${e.error.detail}`;
+  // 'busy'/'persist'/'incomplete' — o detail já é a mensagem completa
+  // (nome da Forja + causa + reparo); o stage prefixa como etiqueta.
   return `${e.stage}: ${e.detail}`;
 }
 
@@ -234,13 +238,23 @@ export async function delegateNative(
   };
 }
 
-/** Persiste `receipt.native` — receipt + state ficam consistentes. */
-function persistReceipt(home: string, receipt: RegistryInstallReceipt): void {
-  writeFileAtomic(receiptPath(home, receipt.forge), `${JSON.stringify(receipt, null, 2)}\n`);
-  const state = loadForgeState(home);
-  if (Object.hasOwn(state.forges, receipt.forge)) {
-    state.forges[receipt.forge] = receipt;
-    saveForgeState(home, state);
+/**
+ * Persiste `receipt.native` — receipt + state ficam consistentes. A
+ * leitura→mutação→grava roda sob o lifecycle lock: um pin/uninstall
+ * concorrente não pode perder a atualização do `native`.
+ */
+async function persistReceipt(home: string, receipt: RegistryInstallReceipt): Promise<void> {
+  const res = await acquireForgeLock(home);
+  if (!res.ok) throw new Error(res.detail);
+  try {
+    writeFileAtomic(receiptPath(home, receipt.forge), `${JSON.stringify(receipt, null, 2)}\n`);
+    const state = loadForgeState(home);
+    if (Object.hasOwn(state.forges, receipt.forge)) {
+      state.forges[receipt.forge] = receipt;
+      saveForgeState(home, state);
+    }
+  } finally {
+    res.lock.release();
   }
 }
 
@@ -425,7 +439,7 @@ export async function runRegistryInstall(
     // Fase 2: delegação ao instalador nativo (skills/agents/hosts/components).
     receipt.native = await delegateNative(cli, entry!, receipt, 'install', deps.run);
     if (receipt.native) {
-      persistReceipt(home, receipt);
+      await persistReceipt(home, receipt);
       const n = receipt.native;
       if (!quiet) {
         if (n.skipped) log.warn(`${name}: ${n.skipped}`);
@@ -529,6 +543,9 @@ export async function runRegistryLock(
     process.exit(1);
   }
   const pin = cli.ref?.replace(/^v(?=\d)/, '');
+  // --plan/--check: resolve + valida o que o lock conteria (sem escrever
+  // cache, sem rodar pip download, sem gravar o lockfile).
+  const isPlan = cli.plan || cli.check;
   const results: { forge: string; ok: boolean; detail: string; file?: string }[] = [];
   const locks: { forge: string; lock: OfflineLock; file: string }[] = [];
   for (const { entry } of entries) {
@@ -537,6 +554,7 @@ export async function runRegistryLock(
       pin,
       cacheDir: registryCacheDir(home),
       fetchImpl: deps.fetchImpl,
+      ephemeral: isPlan,
     });
     if ('kind' in resolved) {
       results.push({ forge: e.name, ok: false, detail: describeResolveError(resolved) });
@@ -545,6 +563,22 @@ export async function runRegistryLock(
     const picked = selectInterpreter(e, resolved, pythons);
     if ('error' in picked) {
       results.push({ forge: e.name, ok: false, detail: describeResolveError(picked.error) });
+      continue;
+    }
+    // --out: arquivo quando uma Forja, diretório quando várias; default
+    // `<forja>.offline-lock.json` no cwd.
+    const out = cli.out
+      ? entries.length === 1
+        ? path.resolve(cli.out)
+        : path.join(path.resolve(cli.out), `${e.name}.offline-lock.json`)
+      : path.resolve(`${e.name}.offline-lock.json`);
+    if (isPlan) {
+      results.push({
+        forge: e.name,
+        ok: true,
+        file: out,
+        detail: `${e.dist}==${resolved.version} — ${S.lockPlanWouldWrite} ${out}`,
+      });
       continue;
     }
     const lock = await generateOfflineLock(e, resolved.version, {
@@ -556,13 +590,6 @@ export async function runRegistryLock(
       results.push({ forge: e.name, ok: false, detail: `${lock.kind}: ${lock.detail}` });
       continue;
     }
-    // --out: arquivo quando uma Forja, diretório quando várias; default
-    // `<forja>.offline-lock.json` no cwd.
-    const out = cli.out
-      ? entries.length === 1
-        ? path.resolve(cli.out)
-        : path.join(path.resolve(cli.out), `${e.name}.offline-lock.json`)
-      : path.resolve(`${e.name}.offline-lock.json`);
     mkdirSync(path.dirname(out), { recursive: true });
     writeFileAtomic(out, `${JSON.stringify(lock, null, 2)}\n`);
     locks.push({ forge: e.name, lock, file: out });
@@ -576,6 +603,7 @@ export async function runRegistryLock(
       log.info(`${e.name}: lock → ${theme.dim(out)} (${lock.artifacts.length} artefatos)`);
   }
   const doc = {
+    ...(isPlan ? { plan: true } : {}),
     locks: locks.map((l) => ({ forge: l.forge, file: l.file, artifacts: l.lock.artifacts.length })),
     results,
   };
@@ -583,7 +611,7 @@ export async function runRegistryLock(
   if (quiet) emitJson(doc, results.every((r) => r.ok) ? 0 : 1);
   for (const r of results) if (!r.ok) log.error(`${r.forge}: ${r.detail}`);
   if (results.some((r) => !r.ok)) process.exit(1);
-  outro(`${icons.ok} lock(s) offline gerado(s)`);
+  outro(isPlan ? `${icons.ok} ${S.planDryRunNote}` : `${icons.ok} lock(s) offline gerado(s)`);
   return results;
 }
 
@@ -610,6 +638,12 @@ export function runRegistryList(
   const rows = REGISTRY_PACKAGES.filter((e) => !wanted || wanted.has(e.name)).map((e) => {
     const inst = state.forges[e.name];
     const binOk = inst ? typeof inst.bin === 'string' && existsSync(inst.bin) : null;
+    // Consistência state↔receipt↔venv: instalação quebrada por crash
+    // (receipt ausente, versão divergente, venv órfã sem state) NUNCA
+    // se apresenta como saudável — o marker nomeia o reparo e o JSON
+    // carrega `consistency` com o status exato.
+    const consistency = installConsistency(home, e.name);
+    const relevant = consistency.status !== 'not-installed';
     return {
       forge: e.name,
       dist: e.dist,
@@ -618,6 +652,8 @@ export function runRegistryList(
       verifyOk: inst ? (inst.verify?.ok ?? null) : null,
       binPresent: binOk,
       bin: inst ? (binOk ? inst.bin : `${inst.bin ?? '?'} (ausente)`) : null,
+      consistent: relevant ? consistency.ok : null,
+      consistency: relevant && !consistency.ok ? consistency.status : null,
       minPython: e.minPython,
     };
   });
@@ -627,7 +663,7 @@ export function runRegistryList(
     rows
       .map(
         (r) =>
-          `${r.installed ? icons.ok : '·'} ${r.forge.padEnd(20)} ${r.dist.padEnd(20)} ${(r.installed ?? '—') + (r.installed && r.verifyOk === false ? ` ${S.registryVerifyFailed}` : '')}`,
+          `${r.installed ? icons.ok : '·'} ${r.forge.padEnd(20)} ${r.dist.padEnd(20)} ${(r.installed ?? '—') + (r.installed && r.verifyOk === false ? ` ${S.registryVerifyFailed}` : '') + (r.consistent === false ? ` ${S.registryIncomplete}` : '')}`,
       )
       .join('\n'),
     'Forjas (registry)',
@@ -655,6 +691,15 @@ export async function runRegistryUninstall(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
+  // `uninstall` não tem alvo de revisão — `--ref` seria ignorado: recusa.
+  if (cli.ref !== undefined) {
+    const msg = S.errUninstallNoRef;
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+    return;
+  }
   const state = loadForgeState(home).forges;
   const installed = Object.keys(state);
   const targets = resolveRegistryTargets(cli, names, installed);
@@ -695,7 +740,10 @@ export async function runRegistryUninstall(
       name,
       dist: entry?.dist ?? receipt?.dist,
       known: Boolean(entry ?? receipt),
-      installed: installed.includes(name),
+      // Órfão de crash (venv/dir presente sem entrada no state) também é
+      // removível — senão a instalação incompleta ficaria sem reparo:
+      // install recusa ('incomplete') e uninstall diria "não instalada".
+      installed: installed.includes(name) || installConsistency(home, name).status === 'orphaned',
     });
   }
   const unknown = [...plan.filter((p) => !p.known).map((p) => p.name), ...unsafe];
@@ -734,6 +782,23 @@ export async function runRegistryUninstall(
         .join('\n'),
       S.registryUninstallConfirm,
     );
+  }
+  // --plan/--check: o plano já foi exibido — sai ANTES de --yes/prompt e
+  // sem tocar em venv, cache, receipt ou state.
+  if (cli.plan || cli.check) {
+    const planDoc = {
+      method: 'pypi',
+      plan: true,
+      removals: removals.map((r) => ({ forge: r.name, dist: r.dist ?? null })),
+      skipped,
+      warnings,
+      ...(errText ? { error: errText } : {}),
+    };
+    reportTo(planDoc);
+    if (quiet) emitJson(planDoc, unknown.length ? 2 : 0);
+    log.info(S.planDryRunNote);
+    if (unknown.length) process.exit(2);
+    return;
   }
   if (!cli.yes) {
     const needYesDoc = {
@@ -788,14 +853,32 @@ export async function runRegistryUninstall(
         if (res.exitCode !== 0) warnings.push(`${r.name}: uninstall nativo saiu ${res.exitCode}`);
       }
     }
-    const res = registryUninstall({ name: r.name, dist: r.dist }, { home });
-    if (res.refused) log.error(`${r.name}: recusado — ${res.refused}`);
-    results.push({
-      forge: r.name,
-      removed: res.removed,
-      cacheRemoved: res.cacheRemoved,
-      ...(native ? { native } : {}),
-    });
+    // Lifecycle lock: rm de venv + grava de state serializam contra
+    // installs/pins concorrentes. Ocupado = recusa nomeada por Forja.
+    const lockRes = await acquireForgeLock(home);
+    if (!lockRes.ok) {
+      log.error(`${r.name}: ${lockRes.detail}`);
+      warnings.push(`${r.name}: ${lockRes.detail}`);
+      results.push({
+        forge: r.name,
+        removed: false,
+        cacheRemoved: false,
+        ...(native ? { native } : {}),
+      });
+      continue;
+    }
+    try {
+      const res = registryUninstall({ name: r.name, dist: r.dist }, { home });
+      if (res.refused) log.error(`${r.name}: recusado — ${res.refused}`);
+      results.push({
+        forge: r.name,
+        removed: res.removed,
+        cacheRemoved: res.cacheRemoved,
+        ...(native ? { native } : {}),
+      });
+    } finally {
+      lockRes.lock.release();
+    }
   }
   const doc = {
     method: 'pypi',
@@ -825,6 +908,8 @@ interface LifecycleItem {
   from: string;
   to?: string;
   detail?: string;
+  /** Resolução falhou (ex.: release alvo yanked/rede) — falha nomeada, não "nada a fazer". */
+  failed?: boolean;
 }
 
 /** Recibo → entrada de catálogo real ou sintética (ghost-forge). */
@@ -925,6 +1010,7 @@ async function runRegistryLifecycle(
         action: 'update',
         from: t.receipt.version,
         detail: describeResolveError(resolved),
+        failed: true,
       });
       continue;
     }
@@ -977,17 +1063,28 @@ async function runRegistryLifecycle(
     );
   }
   if (!actionable.length) {
+    const failed = items.filter((i) => i.failed);
     const doc = {
       method: 'pypi',
       updated: [],
       skipped,
       warnings,
+      // Falha de resolução (alvo yanked, rede, hash) é recusa nomeada —
+      // nunca "nada a atualizar" com exit 0 silencioso.
+      ...(failed.length
+        ? { failed: failed.map((i) => ({ forge: i.name, detail: i.detail })) }
+        : {}),
       ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
     };
     reportTo(doc);
-    if (quiet) emitJson(doc, unknown.length ? 2 : skipped.length && !items.length ? 1 : 0);
+    if (quiet)
+      emitJson(
+        doc,
+        unknown.length ? 2 : failed.length || (skipped.length && !items.length) ? 1 : 0,
+      );
     if (!quiet) log.info('Nada a atualizar.');
     if (unknown.length) process.exit(2);
+    if (failed.length) process.exit(1);
     // Alvo existe no catálogo mas não instalado → nada aconteceu, exit 1.
     if (skipped.length && !items.length) process.exit(1);
     return;
@@ -1044,7 +1141,7 @@ async function runRegistryLifecycle(
     if (receipt.native?.ran && receipt.native.exitCode !== 0)
       warnings.push(`${i.name}: instalador nativo saiu ${receipt.native.exitCode}`);
     // `native` chega depois do install — repersiste receipt + state juntos.
-    if (receipt.native) persistReceipt(home, receipt);
+    if (receipt.native) await persistReceipt(home, receipt);
     if (!quiet) spin.stop(`${i.name}: ${theme.ok(`${i.from} → ${i.to}`)}`);
     results.push({ forge: i.name, ok: true, from: i.from, to: i.to, bin: receipt.bin });
   }
@@ -1144,7 +1241,7 @@ export async function runRegistryReinstall(
     if (receipt.native?.skipped) warnings.push(`${t.name}: ${receipt.native.skipped}`);
     if (receipt.native?.ran && receipt.native.exitCode !== 0)
       warnings.push(`${t.name}: instalador nativo saiu ${receipt.native.exitCode}`);
-    if (receipt.native) persistReceipt(home, receipt);
+    if (receipt.native) await persistReceipt(home, receipt);
     if (!quiet) spin.stop(`${t.name}: ${theme.ok('reinstalado')} (${receipt.version})`);
     results.push({ forge: t.name, ok: true, version: receipt.version, bin: receipt.bin });
   }
@@ -1280,6 +1377,16 @@ export async function runRegistryPin(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
+  // `--ref/--version` não existe no pin registry — a trava é sempre a
+  // versão do receipt instalado. Flag de segurança ignorada seria bug.
+  if (cli.ref !== undefined) {
+    const msg = `pin/unpin --method registry não aceita --ref/--version — trava sempre a versão instalada`;
+    reportTo({ error: msg });
+    if (quiet) emitJson({ error: msg }, 2);
+    log.error(msg);
+    process.exit(2);
+    return;
+  }
   const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
   const ignored = ignoredRegistryFlags(cli);
   const warnings = [
@@ -1294,18 +1401,72 @@ export async function runRegistryPin(
     process.exit(unknown.length ? 2 : 1);
     return;
   }
-  const state = loadForgeState(home);
-  const done = [];
-  for (const t of targets) {
-    if (pin) {
-      state.forges[t.name].pinned = t.receipt.version;
-      done.push({ forge: t.name, pinned: t.receipt.version });
-    } else {
-      delete state.forges[t.name].pinned;
-      done.push({ forge: t.name, pinned: null });
-    }
+  // --plan/--check: mostra exatamente o que o pin/unpin gravaria no
+  // state — ZERO mutação (era o bug real: --plan era ignorado e o
+  // state.json era reescrito).
+  if (cli.plan || cli.check) {
+    const planned = targets.map((t) => ({
+      forge: t.name,
+      pinned: pin ? t.receipt.version : null,
+      current: t.receipt.pinned ?? null,
+    }));
+    const doc = {
+      method: 'pypi',
+      plan: true,
+      [pin ? 'pinned' : 'unpinned']: planned,
+      skipped,
+      warnings,
+      ...(unknown.length ? { error: `${unknown.join(', ')}: sem dist no catálogo registry` } : {}),
+    };
+    reportTo(doc);
+    if (quiet) emitJson(doc, unknown.length ? 2 : 0);
+    note(
+      planned
+        .map((p) =>
+          pin
+            ? `${p.forge} → pin ${p.pinned}${p.current ? ` (atual: ${p.current})` : ''}`
+            : `${p.forge} → unpin${p.current ? ` (atual: ${p.current})` : ' (não estava fixada)'}`,
+        )
+        .join('\n'),
+      S.registryPinPlanTitle,
+    );
+    log.info(S.planDryRunNote);
+    if (unknown.length) process.exit(2);
+    return;
   }
-  saveForgeState(home, state);
+  // load→mutate→save sob o lifecycle lock: um install/uninstall
+  // concorrente não pode perder a atualização do pin.
+  const lockRes = await acquireForgeLock(home);
+  if (!lockRes.ok) {
+    reportTo({ error: lockRes.detail });
+    if (quiet) emitJson({ error: lockRes.detail }, 1);
+    log.error(lockRes.detail);
+    process.exit(1);
+    return;
+  }
+  const done = [];
+  try {
+    const state = loadForgeState(home);
+    for (const t of targets) {
+      // Receipt pode ter sido removido entre o escopo e o lock — o
+      // re-cheque own-property evita recriar entrada apagada.
+      const cur = Object.hasOwn(state.forges, t.name) ? state.forges[t.name] : undefined;
+      if (!cur) {
+        warnings.push(`${t.name}: removido enquanto o lock era aguardado — ignorado`);
+        continue;
+      }
+      if (pin) {
+        cur.pinned = t.receipt.version;
+        done.push({ forge: t.name, pinned: t.receipt.version });
+      } else {
+        delete cur.pinned;
+        done.push({ forge: t.name, pinned: null });
+      }
+    }
+    saveForgeState(home, state);
+  } finally {
+    lockRes.lock.release();
+  }
   const doc = {
     method: 'pypi',
     [pin ? 'pinned' : 'unpinned']: done,

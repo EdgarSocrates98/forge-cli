@@ -94,6 +94,12 @@ const AI_TASKS = new Set([
 
 /** forge-cli ai <task> — §6.3 optional AI mode (opt-in via forge-cli.config.json). */
 export async function runAiCommand(cli: CliOptions): Promise<number> {
+  // `ai` roda o bridge externo (subprocesso + possível cache) — --plan
+  // não tem semântica aqui e nunca é engolido: recusa nomeada.
+  if (cli.plan || cli.check) {
+    log.error(S.errPlanUnsupported);
+    return 2;
+  }
   const targetDir = resolveTargetDir(cli.dir);
   const task = cli.positionals[1];
   if (!task || !AI_TASKS.has(task)) {
@@ -150,6 +156,13 @@ export async function runBundleCommand(cli: CliOptions): Promise<number> {
       log.error(S.bundleNeedsPath);
       return 1;
     }
+    // --plan/--check: o arquivo de destino do bundle não é escrito.
+    if (cli.plan || cli.check) {
+      if (cli.jsonReport) emitJson({ plan: true, verb: 'export', file: dest });
+      log.info(`${S.lockPlanWouldWrite} ${dest}`);
+      log.info(S.planDryRunNote);
+      return 0;
+    }
     try {
       const result = await exportBundle(targetDir, catalogFor(targetDir), dest, {
         includeEnvKeys: cli.positionals.slice(3),
@@ -197,12 +210,24 @@ export async function runBundleCommand(cli: CliOptions): Promise<number> {
 export async function runLearningCommand(cli: CliOptions): Promise<number> {
   const targetDir = resolveTargetDir(cli.dir);
   const verb = cli.positionals[1];
-  if (verb === 'enable') {
-    enableLearning(targetDir);
-    log.success(S.learningEnabled);
-    return 0;
-  }
-  if (verb === 'disable') {
+  if (verb === 'enable' || verb === 'disable') {
+    // --plan/--check: mostra o toggle que seria aplicado — o arquivo
+    // de learning não é escrito.
+    if (cli.plan || cli.check) {
+      const status = learningStatus(targetDir);
+      const would = verb === 'enable';
+      if (cli.jsonReport) emitJson({ plan: true, verb, current: status.enabled, would });
+      log.info(
+        `${S.learningTitle}: ${status.enabled ? S.learningOn : S.learningOff} → ${would ? S.learningOn : S.learningOff}`,
+      );
+      log.info(S.planDryRunNote);
+      return 0;
+    }
+    if (verb === 'enable') {
+      enableLearning(targetDir);
+      log.success(S.learningEnabled);
+      return 0;
+    }
     disableLearning(targetDir);
     log.success(S.learningDisabled);
     return 0;

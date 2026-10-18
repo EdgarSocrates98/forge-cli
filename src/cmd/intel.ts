@@ -5,6 +5,8 @@ import { discoverEnvironment } from '../discovery.js';
 import { recommendForjas } from '../recommend.js';
 import {
   analyzeBumps,
+  buildEnvLock,
+  buildProfile,
   checkEnvLock,
   exportProfile,
   importProfile,
@@ -96,6 +98,19 @@ export async function runLockCommand(cli: CliOptions, args: string[]): Promise<n
   const catalog = catalogFor(targetDir);
   const verb = args[0] ?? 'write';
   if (verb === 'write') {
+    // --plan/--check: o lockfile que seria gerado é exibido — nada escrito.
+    if (cli.plan || cli.check) {
+      const lock = buildEnvLock(targetDir, catalog);
+      if (cli.jsonReport) {
+        console.log(JSON.stringify({ plan: true, ...lock }, null, 2));
+      } else {
+        log.info(
+          `${S.lockPlanWouldWrite} .forge-cli/env.lock.json (${Object.keys(lock.forges).length} forjas)`,
+        );
+        log.info(S.planDryRunNote);
+      }
+      return 0;
+    }
     const lock = writeEnvLock(targetDir, catalog);
     if (cli.jsonReport) console.log(JSON.stringify(lock, null, 2));
     else log.info(`${S.lockfileWritten} .forge-cli/env.lock.json`);
@@ -119,6 +134,18 @@ export async function runProfileCommand(cli: CliOptions, args: string[]): Promis
   const targetDir = resolveTargetDir(cli.dir);
   const [verb, file] = args;
   if (verb === 'export' && file) {
+    // --plan/--check: mostra o profile que seria exportado — o arquivo
+    // de destino não é criado nem sobrescrito.
+    if (cli.plan || cli.check) {
+      const profile = buildProfile(targetDir);
+      if (cli.jsonReport) {
+        console.log(JSON.stringify({ plan: true, file, ...profile }, null, 2));
+      } else {
+        log.info(`${S.lockPlanWouldWrite} ${file} (${Object.keys(profile.repos).length} repos)`);
+        log.info(S.planDryRunNote);
+      }
+      return 0;
+    }
     const profile = exportProfile(targetDir, file);
     if (cli.jsonReport) console.log(JSON.stringify(profile, null, 2));
     else log.info(`${S.profileExportDone} ${file}`);

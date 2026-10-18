@@ -262,6 +262,11 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'wizard') {
+    // O wizard é só interativo — flags de segurança não são engolidas.
+    if (cli.plan || cli.check) {
+      log.error(S.errPlanUnsupported);
+      process.exit(2);
+    }
     if (isNonInteractive(cli) || cli.yes) {
       log.error(S.errCloneNeedsNames);
       process.exit(2);
@@ -378,7 +383,7 @@ async function main(): Promise<void> {
     cli = { ...cli, only: present };
   }
   if (resolved.command === 'self-install') {
-    await runInstallCommand();
+    await runInstallCommand(cli);
     return;
   }
   if (resolved.command === 'self-update') {
@@ -386,7 +391,7 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'self-uninstall') {
-    await runUninstallCommand();
+    await runUninstallCommand(cli);
     return;
   }
   if (resolved.command === 'uninstall' && cli.method === 'registry') {
@@ -395,7 +400,7 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'uninstall' && !resolved.names.length && !isNonInteractive(cli)) {
     log.warn(S.warnLegacyUninstall);
-    await runUninstallCommand();
+    await runUninstallCommand(cli);
     return;
   }
   if (resolved.command === 'uninstall') {

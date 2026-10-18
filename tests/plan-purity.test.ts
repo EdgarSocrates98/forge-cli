@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   runRegistryInstall,
   runRegistryList,
+  runRegistryLock,
+  runRegistryPin,
   runRegistryReinstall,
   runRegistryRollback,
   runRegistryUninstall,
@@ -46,9 +48,20 @@ vi.mock('../src/mcp/handshake.js', () => ({
 import { runDoctor2Command, runHealCommand } from '../src/cmd/doctor2.js';
 import { runEnvCommand } from '../src/cmd/env.js';
 import { runHostsCommand, runMcpCommand } from '../src/cmd/hosts.js';
-import { runRecoverCommand } from '../src/cmd/intel.js';
-import { runForgeUninstall } from '../src/cmd/manage.js';
+import { runLockCommand, runProfileCommand, runRecoverCommand } from '../src/cmd/intel.js';
+import { runAiCommand, runBundleCommand, runLearningCommand } from '../src/cmd/intel2.js';
+import {
+  runForgeUninstall,
+  runInstallCommand,
+  runPinCommand,
+  runRollbackCommand,
+  runSelfUpdateCommand,
+  runUninstallCommand,
+  runUnpinCommand,
+} from '../src/cmd/manage.js';
 import { runListCommand, runStatusCommand, runUpdateCheckCommand } from '../src/cmd/query.js';
+import { parseCliArgs } from '../src/cli-args.js';
+import { stateFileFor } from '../src/artifacts.js';
 
 let home: string;
 let ws: string;
@@ -343,5 +356,258 @@ describe('P0-002: consultas read-only → zero mutação em home e workspace', (
         s.isTTY = saved[i];
       });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Matriz de aceite P0 — TODA superfície mutante honra --plan/--check ou
+// recusa de forma nomeada. Cada teste exige snapshot idêntico de home+ws.
+// ---------------------------------------------------------------------------
+describe('P0 matriz: pin/unpin/rollback/uninstall — plan nunca muta', () => {
+  it('pin --plan (git): mostra o pin que seria gravado — state.json intocado (o bug real)', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runPinCommand(cli({ plan: true, ref: 'v1.2.3' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(existsSync(stateFileFor(ws))).toBe(false);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('pin --check (git): mesmo contrato que --plan', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runPinCommand(cli({ check: true, ref: 'v1.2.3' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(existsSync(stateFileFor(ws))).toBe(false);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('pin sem --plan (git): grava — contraste que prova o gate', async () => {
+    await silent(() => runPinCommand(cli({ ref: 'v1.2.3' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    const state = JSON.parse(readFileSync(stateFileFor(ws), 'utf8'));
+    expect(state.pins['api-forge']).toBe('v1.2.3');
+  });
+
+  it('unpin --plan (git): mostra pin atual — clearPin nunca roda', async () => {
+    // Semeia um pin real para provar que o plano não o remove.
+    await silent(() => runPinCommand(cli({ ref: 'v1.2.3' }), ['api-forge']));
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runUnpinCommand(cli({ plan: true }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    const state = JSON.parse(readFileSync(stateFileFor(ws), 'utf8'));
+    expect(state.pins['api-forge']).toBe('v1.2.3'); // pin sobrevive ao plano
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('rollback --plan (git): inspeção read-only, zero checkout/state', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runRollbackCommand(cli({ plan: true }), ['api-forge']));
+    // Repo não clonado → recusa nomeada (not-cloned), nunca mutation.
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('uninstall --plan (git): plano de remoção exibido antes de --yes/prompt', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runForgeUninstall(cli({ plan: true }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('self-install --plan: lista dir/shim/profiles sem gravar nada', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runInstallCommand(cli({ plan: true })));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('self-uninstall --plan: plano sem remover dir nem tocar profile', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runUninstallCommand(cli({ plan: true })));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('self-update --plan: mostra comando do update sem executar', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runSelfUpdateCommand(cli({ plan: true })));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+});
+
+describe('P0 matriz: registry pin/unpin/uninstall/lock — plan nunca muta', () => {
+  it('registry pin --plan: mostra a trava que seria gravada — state.json intocado', async () => {
+    seedRegistryInstall();
+    const before = snapshot(home);
+    await silent(() => runRegistryPin(cli({ plan: true }), ['api-forge'], true, { home }));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before);
+    // E o pin NÃO foi aplicado:
+    const state = JSON.parse(readFileSync(forgeStatePath(home), 'utf8'));
+    expect(state.forges['api-forge'].pinned).toBeUndefined();
+  });
+
+  it('registry unpin --plan: idem — a trava existente sobrevive ao plano', async () => {
+    seedRegistryInstall();
+    // Aplica um pin real primeiro (fora do modo plano).
+    await silent(() => runRegistryPin(cli(), ['api-forge'], true, { home }));
+    const before = snapshot(home);
+    await silent(() => runRegistryPin(cli({ plan: true }), ['api-forge'], false, { home }));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before);
+    const state = JSON.parse(readFileSync(forgeStatePath(home), 'utf8'));
+    expect(state.forges['api-forge'].pinned).toBe('0.1.0');
+  });
+
+  it('registry uninstall --plan: plano antes de confirmação/remoção — nada apagado', async () => {
+    seedRegistryInstall();
+    const venv = forgeVenv(home, 'api-forge');
+    const before = snapshot(home);
+    await silent(() => runRegistryUninstall(cli({ plan: true }), ['api-forge'], { ...run, home }));
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(snapshot(home)).toBe(before);
+    expect(existsSync(venv)).toBe(true);
+  });
+
+  it('registry lock --plan: resolve+valida sem lockfile/cache/downloads', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws), cwd: snapshot(process.cwd()) };
+    await silent(() =>
+      runRegistryLock(cli({ plan: true }), ['api-forge'], {
+        home,
+        pythons: py,
+        fetchImpl: fetchOk,
+        ...run,
+      }),
+    );
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+    // Lockfile NUNCA é criado em modo plano — nem no cwd nem no home.
+    expect(existsSync(path.join(process.cwd(), 'api-forge.offline-lock.json'))).toBe(false);
+    expect(snapshot(process.cwd())).toBe(before.cwd);
+  });
+});
+
+describe('P0 matriz: superfícies secundárias — plan puro ou recusa nomeada', () => {
+  it('lock write --plan: exibe o lockfile sem criar env.lock.json', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() => runLockCommand(cli({ plan: true }), ['write']));
+    expect(code).toBe(0);
+    expect(existsSync(path.join(ws, '.forge-cli', 'env.lock.json'))).toBe(false);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('profile export --plan: exibe o profile sem criar o arquivo', async () => {
+    const file = path.join(ws, 'profile-export.json');
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() => runProfileCommand(cli({ plan: true }), ['export', file]));
+    expect(code).toBe(0);
+    expect(existsSync(file)).toBe(false);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('learning enable --plan: mostra o toggle sem gravar config', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() =>
+      runLearningCommand(cli({ plan: true, positionals: ['learning', 'enable'] })),
+    );
+    expect(code).toBe(0);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('bundle export --plan: mostra destino sem escrever o arquivo', async () => {
+    const file = path.join(ws, 'bundle.tgz');
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() =>
+      runBundleCommand(cli({ plan: true, positionals: ['bundle', 'export', file] })),
+    );
+    expect(code).toBe(0);
+    expect(existsSync(file)).toBe(false);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('ai --plan: semântica de plano inexistente → recusa nomeada (exit 2)', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() =>
+      runAiCommand(cli({ plan: true, positionals: ['ai', 'explain-error'] })),
+    );
+    expect(code).toBe(2);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('env init --plan: .env e .env.bak intocados', async () => {
+    mkdirSync(path.join(ws, 'api-forge'), { recursive: true });
+    writeFileSync(path.join(ws, 'api-forge', '.env.example'), 'FOO=\n');
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    const code = await silent(() => runEnvCommand(cli({ plan: true }), ['init', 'api-forge']));
+    expect(code).toBe(0);
+    expect(existsSync(path.join(ws, 'api-forge', '.env'))).toBe(false);
+    expect(snapshot(home)).toBe(before.home);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+});
+
+describe('P0 matriz: flags semânticas inválidas — recusa nomeada, nunca engolidas', () => {
+  it('registry pin --ref: trava é sempre a versão instalada — exit 2', async () => {
+    seedRegistryInstall();
+    await silent(() => runRegistryPin(cli({ ref: '9.9.9' }), ['api-forge'], true, { home }));
+    expect(process.exit).toHaveBeenCalledWith(2);
+    const state = JSON.parse(readFileSync(forgeStatePath(home), 'utf8'));
+    expect(state.forges['api-forge'].pinned).toBeUndefined();
+  });
+
+  it('registry unpin --ref: recusa nomeada — exit 2, state intacto', async () => {
+    seedRegistryInstall();
+    const before = snapshot(home);
+    await silent(() => runRegistryPin(cli({ ref: '9.9.9' }), ['api-forge'], false, { home }));
+    expect(process.exit).toHaveBeenCalledWith(2);
+    expect(snapshot(home)).toBe(before);
+  });
+
+  it('unpin --ref (git): flag sem efeito → exit 2', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runUnpinCommand(cli({ ref: 'v9.9.9' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(2);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('rollback --ref (git): rollback usa HEAD anterior registrado — exit 2', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runRollbackCommand(cli({ ref: 'v9.9.9' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(2);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('uninstall --ref (git): remoção não tem alvo de revisão — exit 2', async () => {
+    const before = { home: snapshot(home), ws: snapshot(ws) };
+    await silent(() => runForgeUninstall(cli({ ref: 'v9.9.9' }), ['api-forge']));
+    expect(process.exit).toHaveBeenCalledWith(2);
+    expect(snapshot(ws)).toBe(before.ws);
+  });
+
+  it('registry uninstall --ref: recusa nomeada — exit 2, nada removido', async () => {
+    seedRegistryInstall();
+    const before = snapshot(home);
+    await silent(() =>
+      runRegistryUninstall(cli({ ref: '9.9.9' }), ['api-forge'], { ...run, home }),
+    );
+    expect(process.exit).toHaveBeenCalledWith(2);
+    expect(snapshot(home)).toBe(before);
+    expect(existsSync(forgeVenv(home, 'api-forge'))).toBe(true);
+  });
+
+  it('parseCliArgs: ref fora do formato seguro (`bad..ref`) → CliError', () => {
+    expect(() => parseCliArgs(['pin', 'api-forge', '--ref', 'bad..ref'])).toThrowError(/inválid/i);
   });
 });
