@@ -477,20 +477,29 @@ describe('P0 matriz: registry pin/unpin/uninstall/lock — plan nunca muta', () 
   });
 
   it('registry lock --plan: resolve+valida sem lockfile/cache/downloads', async () => {
-    const before = { home: snapshot(home), ws: snapshot(ws), cwd: snapshot(process.cwd()) };
-    await silent(() =>
-      runRegistryLock(cli({ plan: true }), ['api-forge'], {
-        home,
-        pythons: py,
-        fetchImpl: fetchOk,
-        ...run,
-      }),
-    );
+    // cwd isolado: snapshots da raiz do repo não são determinísticos sob
+    // workers paralelos (outros arquivos podem criar fixtures lá).
+    const cwdTmp = mkdtempSync(path.join(os.tmpdir(), 'forge-cli-lockcwd-'));
+    const prevCwd = process.cwd();
+    process.chdir(cwdTmp);
+    const before = { home: snapshot(home), ws: snapshot(ws), cwd: snapshot(cwdTmp) };
+    try {
+      await silent(() =>
+        runRegistryLock(cli({ plan: true }), ['api-forge'], {
+          home,
+          pythons: py,
+          fetchImpl: fetchOk,
+          ...run,
+        }),
+      );
+    } finally {
+      process.chdir(prevCwd);
+    }
     expect(snapshot(home)).toBe(before.home);
     expect(snapshot(ws)).toBe(before.ws);
     // Lockfile NUNCA é criado em modo plano — nem no cwd nem no home.
-    expect(existsSync(path.join(process.cwd(), 'api-forge.offline-lock.json'))).toBe(false);
-    expect(snapshot(process.cwd())).toBe(before.cwd);
+    expect(existsSync(path.join(cwdTmp, 'api-forge.offline-lock.json'))).toBe(false);
+    expect(snapshot(cwdTmp)).toBe(before.cwd);
   });
 });
 
