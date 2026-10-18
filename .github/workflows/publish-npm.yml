@@ -40,6 +40,10 @@ jobs:
       sha: ${{ steps.gate.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # shallow default omits tag objects — the --tag gate runs
+          # `git rev-list vX.Y.Z` and would fail "tag-missing" on a real tag
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24.x
