@@ -63,10 +63,14 @@ export function withCmdExt(bin: string, platform: NodeJS.Platform = process.plat
   return platform === 'win32' && /^(npm|npx|pnpm|yarn)$/i.test(bin) ? `${bin}.cmd` : bin;
 }
 
-export async function commandWorks(command: string, args: string[]): Promise<boolean> {
+export async function commandWorks(
+  command: string,
+  args: string[],
+  timeoutMs = 15_000,
+): Promise<boolean> {
   try {
-    const result = await execa(command, args, { reject: false });
-    return result.exitCode === 0;
+    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
+    return !result.timedOut && result.exitCode === 0;
   } catch {
     return false;
   }
@@ -80,10 +84,16 @@ export async function resolvePython(): Promise<string[] | null> {
   return null;
 }
 
-export async function commandOutput(command: string, args: string[]): Promise<string | null> {
+export async function commandOutput(
+  command: string,
+  args: string[],
+  timeoutMs = 15_000,
+): Promise<string | null> {
   try {
-    const result = await execa(command, args, { reject: false });
-    if (result.exitCode !== 0) return null;
+    // Sem timeout um shim de host pode girar para sempre (host Electron
+    // travado manteve `doctor`/`hosts list` bloqueados >4 min — E2E-A).
+    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
+    if (result.timedOut || result.exitCode !== 0) return null;
     return (result.stdout || result.stderr || '').trim() || 'ok';
   } catch {
     return null;
