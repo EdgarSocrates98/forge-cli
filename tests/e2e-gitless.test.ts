@@ -106,6 +106,15 @@ function makeZipLikeSource(dir: string, version: string, files: Record<string, s
   }
 }
 
+/** Parse de `--json` com diagnóstico: stdout vazio em CI mostra o stderr real. */
+function parseJson(text: string, ctx: { code: number; out: string }): any {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`--json vazio/inválido (exit ${ctx.code}).\nstdout+stderr:\n${ctx.out}`);
+  }
+}
+
 /** Linhas do log do stub que NÃO são probes de descoberta permitidos. */
 function gitRepoOps(): string[] {
   if (!existsSync(gitLog)) return [];
@@ -123,7 +132,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     // 1) install — exit 0, JSON local, receipt persistido.
     const inst = await cli('install', v1, '--yes', '--json');
     expect(inst.code).toBe(0);
-    const instDoc = JSON.parse(inst.stdout);
+    const instDoc = parseJson(inst.stdout, inst);
     expect(instDoc.method).toBe('local');
     expect(instDoc.results[0].ok).toBe(true);
     expect(instDoc.results[0].forge).toBe('acme-forge');
@@ -148,7 +157,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     // 2) status enxerga a instalação local sem consultar git.
     const st = await cli('status', '--dir', path.join(ws, 'workspace'), '--json');
     expect(st.code).toBe(0);
-    const stDoc = JSON.parse(st.stdout) as {
+    const stDoc = parseJson(st.stdout, st) as {
       name: string;
       phase: string;
       install_method?: string;
@@ -162,7 +171,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     // 3) doctor 2.0 — o check dedicado de fontes locais passa.
     const doc = await cli('doctor', '--dir', path.join(ws, 'workspace'), '--json');
     expect([0, 1]).toContain(doc.code);
-    const report = JSON.parse(doc.stdout) as {
+    const report = parseJson(doc.stdout, doc) as {
       checks: { id: string; result: string; evidence?: string[] }[];
     };
     const localCheck = report.checks.find((c) => c.id === 'installation.local-sources.present');
@@ -174,7 +183,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     makeZipLikeSource(v2, '2.0.0', { 'app.py': 'v2\n', 'new-feature.py': 'new\n' });
     const upd = await cli('update', v2, '--yes', '--json');
     expect(upd.code).toBe(0);
-    const updDoc = JSON.parse(upd.stdout);
+    const updDoc = parseJson(upd.stdout, upd);
     expect(updDoc.results[0].ok).toBe(true);
     expect(readFileSync(path.join(v1, 'app.py'), 'utf8')).toBe('v2\n'); // atualizado
     expect(existsSync(path.join(v1, 'new-feature.py'))).toBe(true); // copiado
@@ -197,7 +206,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     // 6) uninstall — só managed_artifacts saem; fonte e arquivo ficam.
     const un = await cli('uninstall', 'acme-forge', '--yes', '--json');
     expect(un.code).toBe(0);
-    const unDoc = JSON.parse(un.stdout);
+    const unDoc = parseJson(un.stdout, un);
     expect(unDoc.results[0].ok).toBe(true);
     expect(unDoc.results[0].removed).toEqual(
       expect.arrayContaining(['.env', '.venv', 'dist-marker']),

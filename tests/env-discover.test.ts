@@ -624,7 +624,9 @@ describe('preflight agregado (discoverEnvironment) — nunca para no primeiro bl
     expect(errs).toEqual([]);
     expect(report.shells.powershell).toBeDefined();
     expect(report.shells.git_bash).toBeDefined();
-  }, 30_000);
+    // Windows real scan: reg.exe + Program Files + py launcher + N probes
+    // de ≤5s cada passam do timeout default num runner ocupado.
+  }, 120_000);
 });
 
 describe('localInstall — rota Windows via winShells', () => {

@@ -48,6 +48,19 @@ export async function checkEnvironment(): Promise<{ winShells?: WinSetupShells }
 }
 
 export function emitJson(data: unknown, exitCode = 0): never {
+  // stdout num pipe POSIX é stream ASSÍNCRONO — `process.exit` logo após
+  // `write` descarta o que ficou na fila do Socket (no macOS + Node ≤20 o
+  // JSON do `doctor --json`, ~12 KB, era engolido/truncado e o CI lia
+  // "Unexpected end of JSON input"). `setBlocking(true)` torna o fd
+  // bloqueante — o chunk inteiro chega ao kernel antes do exit; é o mesmo
+  // mecanismo que já torna stdout síncrono em TTY/arquivo/Windows. Sem
+  // `_handle` (stream substituída ou exótica) o comportamento anterior vale.
+  const handle = (
+    process.stdout as unknown as {
+      _handle?: { setBlocking?: (blocking: boolean) => void };
+    }
+  )._handle;
+  handle?.setBlocking?.(true);
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
   process.exit(exitCode);
 }
