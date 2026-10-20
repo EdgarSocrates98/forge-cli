@@ -195,10 +195,12 @@ export function isNonInteractive(cli: CliOptions): boolean {
 /** Bloco contextual por comando — `forge-cli <cmd> --help` / `help <cmd>`. */
 const COMMAND_USAGE: Record<string, string> = {
   install:
-    '\ninstall <forjas> — PyPI+venv (default) ou git clone + setup (--method git).\n' +
-    '  --plan só mostra o plano; --ref/--version fixa UMA Forja; --all/--only selecionam.',
+    '\ninstall <forjas|<dir>> — PyPI+venv (default) ou git clone + setup (--method git).\n' +
+    '  <dir> existente = fonte local (detecção forge/LocalForgeSourceDetection/v1;\n' +
+    '  sem git/clone/rede no caminho gitless). --plan só mostra; --ref fixa UMA Forja.',
   update:
-    '\nupdate [forjas] — pull + setup. --check só verifica; --method registry usa o receipt.\n' +
+    '\nupdate [forjas|<dir>] — pull + setup. --check só verifica; --method registry usa o receipt.\n' +
+    '  <dir> é a fonte mais nova de uma fonte local (substituição de arquivos).\n' +
     '  Sem nomes no interativo: oferece as Forjas presentes; --yes exige seleção.',
   registry:
     '\nregistry [list|install|lock] — catálogo PyPI + receipts.\n' +

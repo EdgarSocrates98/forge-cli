@@ -387,9 +387,13 @@ Uso:
   forge-cli list                Lista o catálogo e o último estado conhecido
   forge-cli install [forjas]    Instala uma ou mais Forjas (sem nomes: interativo)
                                 --method registry instala do PyPI em venv isolada
+                                <dir> existente instala da fonte local (forge.json;
+                                nunca clona nem chama git — recusas FORGE-*)
   forge-cli clone <forjas>      Só clona/sincroniza; não executa scripts
   forge-cli update [forjas]     Atualiza (pull + setup); --check só verifica
                                 --method registry: mais nova no PyPI; respeita pin; --check plano
+                                update <dir>: <dir> é a fonte mais nova — substituição de
+                                arquivos na fonte registrada (sem pull, sem rede gitless)
   forge-cli versions [forjas]   Lista tags/versões e revisão atual
   forge-cli reinstall <forjas>  Reexecuta o setup mantendo a revisão atual; --clean recria o clone
                                 --method registry: reinstala a mesma versão do receipt (drift)
@@ -398,6 +402,8 @@ Uso:
   forge-cli rollback <forja>    Volta o checkout ao HEAD anterior registrado
                                 --method registry: desempilha a versão anterior do receipt
   forge-cli uninstall <forjas>  Remove clones limpos (backup de .env/configs; exige --yes)
+                                Forja local (install <dir>): remove só artefatos gerenciados —
+                                o diretório-fonte e arquivos do usuário permanecem
   forge-cli components [forjas] Mostra o instalador nativo e as flags suportadas por Forja
   forge-cli help                Mostra esta ajuda
   forge-cli status [forjas]     Estado local (clonado, versão, alterações)

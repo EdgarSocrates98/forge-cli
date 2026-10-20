@@ -5,19 +5,18 @@ is assumed; what Git Bash / WSL handling exists. Audit date: 2026-10-20.
 
 ## Per-repo shell assumptions
 
-| Repo | OS/shell detection | PowerShell assumed? | Git Bash handling | Windows CI |
-|---|---|---|---|---|
-| forge-cli | `process.platform` branches; execa direct-spawn (no `shell:true`) | **yes, at 4 sites** — `install.ts:86` (user PATH r/w), `preflight.ts:127-138` (**fatal** check `$PSVersionTable`), `discovery.ts:397-398`, `system.ts:37-47` (setup.ps1 selection) | **none** — `.sh` files ignored on win32 (`tests/system.test.ts:91-95`), `install.windows.sh` doesn't exist | GHA windows-latest in ci.yml |
-| 7 Python forges | `install.sh`: `${MSYSTEM:-}:${OSTYPE:-}` matches `*MSYS*\|*MINGW*\|*UCRT*\|*CYGWIN*` (`install.sh:16-19`) | `install.ps1` is PowerShell-only; `setup.ps1` likewise | **partial** — `install.sh` detects MSYS env and runs; bootstrap `_is_git_bash` (`forge_bootstrap.py:471-486`) writes **both** env.sh (POSIX style) and HKCU user env (`:597-608`, `winreg :505-535`, `cygpath` fallback `:489-502`) | ci matrix per repo |
-| forge-portal | n/a | `scripts/check_i18n.py:29` mentions powershell (non-blocking) | n/a | yes |
-| data-sentinel-forge | n/a — no installers | none found in src/ | n/a | Linux/Windows/macOS CI (installation.md:5-6) |
+| Repo                | OS/shell detection                                                                                        | PowerShell assumed?                                                                                                                                                                | Git Bash handling                                                                                                                                                                                                                   | Windows CI                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| forge-cli           | `process.platform` branches; execa direct-spawn (no `shell:true`)                                         | **yes, at 4 sites** — `install.ts:86` (user PATH r/w), `preflight.ts:127-138` (**fatal** check `$PSVersionTable`), `discovery.ts:397-398`, `system.ts:37-47` (setup.ps1 selection) | **none** — `.sh` files ignored on win32 (`tests/system.test.ts:91-95`), `install.windows.sh` doesn't exist                                                                                                                          | GHA windows-latest in ci.yml                 |
+| 7 Python forges     | `install.sh`: `${MSYSTEM:-}:${OSTYPE:-}` matches `*MSYS*\|*MINGW*\|*UCRT*\|*CYGWIN*` (`install.sh:16-19`) | `install.ps1` is PowerShell-only; `setup.ps1` likewise                                                                                                                             | **partial** — `install.sh` detects MSYS env and runs; bootstrap `_is_git_bash` (`forge_bootstrap.py:471-486`) writes **both** env.sh (POSIX style) and HKCU user env (`:597-608`, `winreg :505-535`, `cygpath` fallback `:489-502`) | ci matrix per repo                           |
+| forge-portal        | n/a                                                                                                       | `scripts/check_i18n.py:29` mentions powershell (non-blocking)                                                                                                                      | n/a                                                                                                                                                                                                                                 | yes                                          |
+| data-sentinel-forge | n/a — no installers                                                                                       | none found in src/                                                                                                                                                                 | n/a                                                                                                                                                                                                                                 | Linux/Windows/macOS CI (installation.md:5-6) |
 
 ## forge-cli PowerShell usage detail
 
 ```ts
 // src/preflight.ts:127-138 — fatal on win32 for git-method flow:
-execa('powershell.exe', ['-NoProfile','-Command',
-  '$PSVersionTable.PSVersion | Out-Null']) // !ok → block before mutation
+execa('powershell.exe', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion | Out-Null']); // !ok → block before mutation
 ```
 
 ```ts
@@ -32,7 +31,7 @@ const WIN_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
 - `discovery.ts:397-398` probes `powershell.exe` for version display.
 - **No `pwsh` distinction** anywhere — `powershell.exe` only; PowerShell 7
   (`pwsh.exe`) is never probed.
-- **No cmd fallback**: `.cmd` shims are *emitted* (`shims.ts:46-57`) but
+- **No cmd fallback**: `.cmd` shims are _emitted_ (`shims.ts:46-57`) but
   no installer logic runs through cmd.
 
 ## What exists for Git Bash today
@@ -55,13 +54,13 @@ const WIN_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
 
 ## Gaps vs FASE 2 requirements
 
-| Requirement | Today |
-|---|---|
-| Shell capability report {powershell, pwsh, bash, git_bash, wsl, cygwin, msys2} | **absent** — only powershell.exe probe at preflight |
-| Windows route = PS → ps1, else Git Bash → install.windows.sh | routing hard-coded to .ps1; `install.windows.sh` **does not exist** in any repo |
-| FORGE-SHELL-NOT-FOUND / -UNAVAILABLE | no codes exist |
-| Probe evidence per capability | single boolean `powershell ok` |
-| pwsh vs powershell | not distinguished |
+| Requirement                                                                    | Today                                                                           |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Shell capability report {powershell, pwsh, bash, git_bash, wsl, cygwin, msys2} | **absent** — only powershell.exe probe at preflight                             |
+| Windows route = PS → ps1, else Git Bash → install.windows.sh                   | routing hard-coded to .ps1; `install.windows.sh` **does not exist** in any repo |
+| FORGE-SHELL-NOT-FOUND / -UNAVAILABLE                                           | no codes exist                                                                  |
+| Probe evidence per capability                                                  | single boolean `powershell ok`                                                  |
+| pwsh vs powershell                                                             | not distinguished                                                               |
 
 ## Existing Windows tests
 

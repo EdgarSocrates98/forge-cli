@@ -12,7 +12,7 @@ import { cliHome, currentHead, hasGitRepo, resolveTargetDir } from '../utils/sys
 import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
 import { existsSync } from 'node:fs';
-import { loadForgeState, type RegistryInstallReceipt } from '../registry/install.js';
+import { loadForgeState, type InstallReceipt } from '../registry/install.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
 import { processBatch } from './batch.js';
 import {
@@ -89,25 +89,61 @@ export async function runListCommand(cli: CliOptions): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
   const state = loadState(targetDir);
   const registry = loadForgeState(cliHome()).forges;
-  const body = catalogFor(targetDir)
-    .map((repo) => {
-      const line = listLine(repo, state?.repos[repo.name]);
-      const reg = registry[repo.name];
-      return reg ? `${line} ${theme.dim(`+ pypi ${reg.dist}==${reg.version}`)}` : line;
-    })
-    .join('\n');
+  const catalog = catalogFor(targetDir);
+  const catalogNames = new Set(catalog.map((r) => r.name));
+  const regLine = (reg: InstallReceipt): string =>
+    reg.method === 'local' ? `+ local ${reg.version}` : `+ pypi ${reg.dist}==${reg.version}`;
+  const lines = catalog.map((repo) => {
+    const line = listLine(repo, state?.repos[repo.name]);
+    const reg = registry[repo.name];
+    return reg ? `${line} ${theme.dim(regLine(reg))}` : line;
+  });
+  // Receipts fora do catálogo (fonte local com forge_id próprio) — uma
+  // linha cada para que nada instalado fique invisível no list.
+  for (const [name, reg] of Object.entries(registry)) {
+    if (catalogNames.has(name)) continue;
+    lines.push(
+      `${icons.ok} ${name} ${theme.dim(`${regLine(reg)}${reg.method === 'local' ? ` — ${reg.source_dir}` : ''}`)}`,
+    );
+  }
+  const body = lines.join('\n');
   if (cli.jsonReport) {
-    emitJson(
-      catalogFor(targetDir).map((repo) => ({
+    emitJson([
+      ...catalog.map((repo) => ({
         name: repo.name,
         url: repo.url,
         description: repo.description,
         last: state?.repos[repo.name] ?? null,
         registry: registry[repo.name]
-          ? { dist: registry[repo.name].dist, version: registry[repo.name].version }
+          ? {
+              dist: registry[repo.name].dist,
+              version: registry[repo.name].version,
+              method: registry[repo.name].method,
+            }
           : null,
       })),
-    );
+      ...Object.entries(registry)
+        .filter(([name]) => !catalogNames.has(name))
+        .map(([name, reg]) => ({
+          name,
+          url: null,
+          description: null,
+          last: null,
+          registry: {
+            dist: reg.dist,
+            version: reg.version,
+            method: reg.method,
+            ...(reg.method === 'local'
+              ? {
+                  source_dir: reg.source_dir,
+                  is_git: reg.is_git,
+                  source_trust: reg.source_trust,
+                  integrity: reg.integrity,
+                }
+              : {}),
+          },
+        })),
+    ]);
   }
   note(body, S.listTitle);
   process.exit(0);
@@ -118,10 +154,26 @@ export async function runListCommand(cli: CliOptions): Promise<void> {
  * drift (venv apagada depois da instalação), não "installed" — o mesmo
  * existsSync que `forge-cli registry` usa, para os dois comandos
  * concordarem.
+ * Receipts `method:'local'` (install <dir>) carregam is_git/source_trust/
+ * manifest_valid/integrity no status: a fonte sem `.git` é instalação
+ * reconhecida — só vira drift quando o source_dir registrado some.
+ * Receipts com nome fora do catálogo são ANEXADOS — nada instalado
+ * fica invisível no status.
  */
 export function mergeRegistryPhase(
-  infos: { name: string; phase: string; describe?: string }[],
-  registry: Record<string, RegistryInstallReceipt>,
+  infos: {
+    name: string;
+    phase: string;
+    describe?: string;
+    dirty?: boolean;
+    is_git?: boolean;
+    install_method?: string;
+    source_trust?: string;
+    manifest_valid?: boolean;
+    integrity?: string;
+    source_dir?: string;
+  }[],
+  registry: Record<string, InstallReceipt>,
 ): void {
   for (const i of infos) {
     // Registry é dado não confiável (state.json pode estar malformado):
@@ -129,6 +181,26 @@ export function mergeRegistryPhase(
     // receipt sem `verify`/`bin` não derruba o status.
     const reg = Object.hasOwn(registry, i.name) ? registry[i.name] : undefined;
     if (!reg || typeof reg !== 'object') continue;
+    if (reg.method === 'local') {
+      i.install_method = 'local';
+      i.is_git = reg.is_git === true;
+      if (typeof reg.source_trust === 'string') i.source_trust = reg.source_trust;
+      if (typeof reg.manifest_valid === 'boolean') i.manifest_valid = reg.manifest_valid;
+      if (typeof reg.integrity === 'string') i.integrity = reg.integrity;
+      if (typeof reg.source_dir === 'string') i.source_dir = reg.source_dir;
+      const tag = `local ${reg.source_dir ?? '?'}==${reg.version ?? '?'}`;
+      const srcMissing = typeof reg.source_dir !== 'string' || !existsSync(reg.source_dir);
+      if (srcMissing) {
+        if (i.phase === 'not-installed' || i.phase === 'installed') i.phase = 'drifted';
+        i.describe = [i.describe, `${tag} (fonte ausente)`].filter(Boolean).join(' + ');
+      } else if (i.phase === 'not-installed') {
+        i.phase = 'installed';
+        i.describe = `${tag}${reg.verify?.ok === false ? ' (verify falhou)' : ''}`;
+      } else {
+        i.describe = [i.describe, tag].filter(Boolean).join(' + ');
+      }
+      continue;
+    }
     const tag = `pypi ${reg.dist ?? '?'}==${reg.version ?? '?'}`;
     const binMissing = typeof reg.bin !== 'string' || !existsSync(reg.bin);
     if (binMissing) {
@@ -140,6 +212,36 @@ export function mergeRegistryPhase(
     } else {
       i.describe = [i.describe, tag].filter(Boolean).join(' + ');
     }
+  }
+  // Receipts cujo nome não está no catálogo (fonte local com forge_id
+  // próprio, ghost PyPI): uma linha sintética cada — o status nunca
+  // esconde uma instalação registrada.
+  const covered = new Set(infos.map((i) => i.name));
+  for (const [name, reg] of Object.entries(registry)) {
+    if (covered.has(name) || !reg || typeof reg !== 'object') continue;
+    if (reg.method === 'local') {
+      const srcOk = typeof reg.source_dir === 'string' && existsSync(reg.source_dir);
+      infos.push({
+        name,
+        phase: srcOk ? 'installed' : 'drifted',
+        describe: `local ${reg.source_dir ?? '?'}==${reg.version ?? '?'}${srcOk ? '' : ' (fonte ausente)'}${reg.verify?.ok === false ? ' (verify falhou)' : ''}`,
+        dirty: false,
+        is_git: reg.is_git === true,
+        install_method: 'local',
+        ...(typeof reg.source_trust === 'string' ? { source_trust: reg.source_trust } : {}),
+        ...(typeof reg.manifest_valid === 'boolean' ? { manifest_valid: reg.manifest_valid } : {}),
+        ...(typeof reg.integrity === 'string' ? { integrity: reg.integrity } : {}),
+        ...(typeof reg.source_dir === 'string' ? { source_dir: reg.source_dir } : {}),
+      });
+      continue;
+    }
+    const binMissing = typeof reg.bin !== 'string' || !existsSync(reg.bin);
+    infos.push({
+      name,
+      phase: binMissing ? 'drifted' : 'installed',
+      describe: `pypi ${reg.dist ?? '?'}==${reg.version ?? '?'}${binMissing ? ' (bin ausente)' : ''}`,
+      dirty: false,
+    });
   }
 }
 

@@ -40,6 +40,12 @@ import {
 } from './cmd/registry.js';
 import { registryEntry, registryNames, REGISTRY_PACKAGES } from './registry/catalog.js';
 import { loadForgeState } from './registry/install.js';
+import { looksLikePathArg } from './source/detect.js';
+import {
+  runLocalInstallCommand,
+  runLocalLifecycleCommand,
+  runLocalUpdateCommand,
+} from './cmd/local.js';
 import { isCancel, multiselect } from '@clack/prompts';
 import { exitCancelled } from './prompts.js';
 import {
@@ -176,7 +182,7 @@ async function main(): Promise<void> {
     cli = next;
   }
   if (cli.verbose) setTaskLogLimit(200);
-  const resolved = resolveCommand(cli);
+  let resolved = resolveCommand(cli);
   if (resolved.command === 'unknown') {
     log.error(`${S.errUnknownCommand}: ${resolved.unknown}`);
     console.log(usage());
@@ -233,6 +239,71 @@ async function main(): Promise<void> {
   ]);
   if (cli.method === 'git' && !METHOD_COMMANDS.has(resolved.command)) {
     log.warn(`--method git não tem efeito em "${resolved.command}" — ignorado`);
+  }
+  // ---------------------------------------------------------------------
+  // Fonte local (ciclo 12.1): `install|update <dir>` passa pelo detector
+  // forge/LocalForgeSourceDetection/v1 — NUNCA pelo catálogo registry e
+  // nunca por clone git. Diretório existente OU cara de caminho decide a
+  // rota; misturar dir com nome de catálogo é recusa explícita.
+  // ---------------------------------------------------------------------
+  if (resolved.command === 'install' || resolved.command === 'update') {
+    const pathlike = resolved.names.filter((n) => looksLikePathArg(n));
+    if (pathlike.length && pathlike.length !== resolved.names.length) {
+      log.error(
+        `FORGE-SOURCE-INVALID: mistura de diretório e nome de Forja — passe o diretório-fonte sozinho: ${pathlike.join(', ')}`,
+      );
+      process.exit(2);
+    }
+    if (pathlike.length) {
+      if (cli.method === 'registry') {
+        log.error(
+          `FORGE-SOURCE-INVALID: --method registry espera nomes do catálogo, não diretórios — remova --method ou use nomes`,
+        );
+        process.exit(2);
+      }
+      if (resolved.command === 'install') {
+        await runLocalInstallCommand(cli, resolved.names);
+      } else {
+        await runLocalUpdateCommand(cli, resolved.names);
+      }
+      return;
+    }
+  }
+  // Lifecycle by-name de fonte local: receipts method:'local' seguem a
+  // rota local quando --method não é dito (mesmo contrato do pinMethodFor
+  // — a instalação real decide o método, não a suposição do usuário).
+  if (cli.method === undefined) {
+    const forges = loadForgeState(cliHome()).forges;
+    const local = resolved.names.filter(
+      (n) => Object.hasOwn(forges, n) && forges[n].method === 'local',
+    );
+    if (local.length) {
+      if (resolved.command === 'update') {
+        // `update <nome>` de fonte sem git: a semântica git (pull/remote)
+        // não existe — a recusa nomeada aponta a rota correta.
+        for (const n of local) {
+          const r = forges[n];
+          log.error(
+            `FORGE-SOURCE-GITLESS: ${n}: fonte sem git — \`update\` exige o diretório-fonte mais novo`,
+          );
+          log.info(
+            `→ forge-cli update ${r.method === 'local' ? r.source_dir : n} (ou um diretório-fonte mais novo)`,
+          );
+        }
+        const rest = resolved.names.filter((n) => !local.includes(n));
+        if (!rest.length) process.exit(2);
+        resolved = { ...resolved, names: rest };
+      } else if (resolved.command === 'uninstall' || resolved.command === 'reinstall') {
+        await runLocalLifecycleCommand(
+          cli,
+          resolved.command === 'uninstall' ? 'uninstall' : 'repair',
+          local,
+        );
+        const rest = resolved.names.filter((n) => !local.includes(n));
+        if (!rest.length) return;
+        resolved = { ...resolved, names: rest };
+      }
+    }
   }
   if (resolved.command === 'doctor') {
     process.exitCode = await runDoctor2Command(cli);

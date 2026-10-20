@@ -78,10 +78,11 @@ function forgeDescriptor(
   }
   const receipt = loadForgeState(home).forges[name];
   const entry = registryEntry(name);
-  if (receipt?.bin && entry?.mcp?.length) {
-    const binDir = path.dirname(receipt.bin);
+  const bin = receipt?.bin;
+  if (bin && entry?.mcp?.length) {
+    const binDir = path.dirname(bin);
     const mcp_command = entry.mcp.map((tok) => {
-      if (tok === '{bin}') return receipt.bin;
+      if (tok === '{bin}') return bin;
       if (tok.startsWith('{binDir}/')) {
         const script = tok.slice('{binDir}/'.length);
         return path.join(binDir, process.platform === 'win32' ? `${script}.exe` : script);

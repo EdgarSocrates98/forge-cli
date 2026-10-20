@@ -15,6 +15,7 @@ import { inspectEnv } from '../envintel/inspect.js';
 import { deriveSchema } from '../envintel/schema.js';
 import type { HostDetection } from '../hosts/types.js';
 import { checkEnvLock, interruptedRuns, type EnvLock } from '../maintenance.js';
+import { loadForgeState, type LocalInstallReceipt } from '../registry/install.js';
 import { resolveInside } from '../safety.js';
 import { hasGitRepo } from '../utils/system.js';
 import { boundEntries, errMsg, listDir, mkCheck, readJson, type DoctorCtx } from './context.js';
@@ -482,6 +483,58 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
           ? { correctiveAction: 'reinstall or remove stale registry entries' }
           : {}),
         reversible: recordedMissing.length ? false : null,
+      }),
+    );
+  }
+
+  // Fontes locais (`install <dir>`): receipts method:'local' — uma fonte
+  // sem `.git` é instalação saudável por definição; só a ausência do
+  // source_dir registrado é problema real (drift, não "não-git").
+  const localEntries = Object.entries(loadForgeState(ctx.home).forges).filter(
+    (e): e is [string, LocalInstallReceipt] => e[1]?.method === 'local',
+  );
+  if (!localEntries.length) {
+    checks.push(
+      mkCheck(ctx.now, {
+        id: 'installation.local-sources.present',
+        domain: 'installation',
+        result: 'skip',
+        severity: 'info',
+        diagnosis: 'nenhuma fonte local registrada (install <dir>)',
+        evidence: ['receipts method=local: 0'],
+        reversible: null,
+      }),
+    );
+  } else {
+    const lines = localEntries.map(([name, r]) => {
+      const src = typeof r.source_dir === 'string' ? r.source_dir : '?';
+      const srcOk = typeof r.source_dir === 'string' && existsSync(r.source_dir);
+      return (
+        `${name}: is_git=${r.is_git === true} trust=${r.source_trust ?? '?'} ` +
+        `manifest_valid=${r.manifest_valid === true} integrity=${r.integrity ?? '?'} ` +
+        `env=${r.execution_environment?.platform ?? '?'} dir=${src}${srcOk ? '' : ' (AUSENTE)'}`
+      );
+    });
+    const missing = localEntries.filter(
+      ([, r]) => typeof r.source_dir !== 'string' || !existsSync(r.source_dir),
+    );
+    checks.push(
+      mkCheck(ctx.now, {
+        id: 'installation.local-sources.present',
+        domain: 'installation',
+        result: missing.length ? 'warn' : 'pass',
+        severity: missing.length ? 'medium' : 'info',
+        diagnosis: missing.length
+          ? `${missing.length} fonte(s) local(is) com diretório ausente`
+          : `${localEntries.length} fonte(s) local(is) íntegra(s)`,
+        evidence: boundEntries(ctx, lines).shown,
+        ...(missing.length
+          ? {
+              correctiveAction:
+                'reinstall <forja> com a fonte de volta ou uninstall <forja> para remover o registro',
+            }
+          : {}),
+        reversible: missing.length ? false : null,
       }),
     );
   }

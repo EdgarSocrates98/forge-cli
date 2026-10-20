@@ -664,18 +664,54 @@ export function runRegistryList(
       consistent: relevant ? consistency.ok : null,
       consistency: relevant && !consistency.ok ? consistency.status : null,
       minPython: e.minPython,
+      ...(inst?.method === 'local'
+        ? {
+            is_git: inst.is_git,
+            source_trust: inst.source_trust,
+            manifest_valid: inst.manifest_valid,
+            integrity: inst.integrity,
+            source_dir: inst.source_dir,
+          }
+        : {}),
     };
   });
-  if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, { forges: rows });
-  if (registryQuiet(cli)) emitJson({ forges: rows });
+  // Receipts fora do catálogo (fonte local com forge_id próprio ou ghost
+  // PyPI) — uma linha por receipt para que nada instalado fique invisível.
+  const extraRows = Object.entries(state.forges)
+    .filter(([name]) => !REGISTRY_PACKAGES.some((e) => e.name === name))
+    .filter(([name]) => !wanted || wanted.has(name))
+    .map(([name, inst]) => ({
+      forge: name,
+      dist: inst.dist,
+      installed: inst.version ?? null,
+      method: inst.method ?? null,
+      verifyOk: inst.verify?.ok ?? null,
+      binPresent: typeof inst.bin === 'string' ? existsSync(inst.bin) : null,
+      bin: inst.bin ?? null,
+      consistent: null,
+      consistency: null,
+      minPython: null,
+      ...(inst.method === 'local'
+        ? {
+            is_git: inst.is_git,
+            source_trust: inst.source_trust,
+            manifest_valid: inst.manifest_valid,
+            integrity: inst.integrity,
+            source_dir: inst.source_dir,
+          }
+        : {}),
+    }));
+  const allRows = [...rows, ...extraRows];
+  if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, { forges: allRows });
+  if (registryQuiet(cli)) emitJson({ forges: allRows });
   note(
-    rows
+    allRows
       .map(
         (r) =>
-          `${r.installed ? icons.ok : '·'} ${r.forge.padEnd(20)} ${r.dist.padEnd(20)} ${(r.installed ?? '—') + (r.installed && r.verifyOk === false ? ` ${S.registryVerifyFailed}` : '') + (r.consistent === false ? ` ${S.registryIncomplete}` : '')}`,
+          `${r.installed ? icons.ok : '·'} ${r.forge.padEnd(20)} ${r.dist.padEnd(20)} ${(r.installed ?? '—') + (r.method === 'local' ? ' (local)' : '') + (r.installed && r.verifyOk === false ? ` ${S.registryVerifyFailed}` : '') + (r.consistent === false ? ` ${S.registryIncomplete}` : '')}`,
       )
       .join('\n'),
-    'Forjas (registry)',
+    'Forjas (registry + fontes locais)',
   );
 }
 
@@ -730,7 +766,13 @@ export async function runRegistryUninstall(
   // entrada removida do catálogo não pode travar a remoção). Chaves do
   // state são dado não confiável: nome inseguro (path traversal) é
   // recusa nomeada — nunca chega ao rmSync.
-  const plan: { name: string; dist?: string; known: boolean; installed: boolean }[] = [];
+  const plan: {
+    name: string;
+    dist?: string;
+    known: boolean;
+    installed: boolean;
+    local?: boolean;
+  }[] = [];
   const unsafe: string[] = [];
   const seen = new Set<string>();
   for (const raw of targets) {
@@ -749,10 +791,16 @@ export async function runRegistryUninstall(
       name,
       dist: entry?.dist ?? receipt?.dist,
       known: Boolean(entry ?? receipt),
+      // Receipt de fonte local NUNCA vira rmSync registry: o envelope do
+      // receipt e os artefatos na fonte são da rota local (`uninstall
+      // <nome>` sem --method), que preserva o diretório-fonte.
+      local: receipt?.method === 'local',
       // Órfão de crash (venv/dir presente sem entrada no state) também é
       // removível — senão a instalação incompleta ficaria sem reparo:
       // install recusa ('incomplete') e uninstall diria "não instalada".
-      installed: installed.includes(name) || installConsistency(home, name).status === 'orphaned',
+      installed:
+        receipt?.method !== 'local' &&
+        (installed.includes(name) || installConsistency(home, name).status === 'orphaned'),
     });
   }
   const unknown = [...plan.filter((p) => !p.known).map((p) => p.name), ...unsafe];
@@ -761,8 +809,16 @@ export async function runRegistryUninstall(
     ...unsafe.map((u) => `${u}: nome inseguro no state — recusado (path traversal)`),
   ].join(' | ');
   const removals = plan.filter((p) => p.installed);
-  const skipped = plan.filter((p) => p.known && !p.installed).map((p) => p.name);
+  const skipped = plan.filter((p) => p.known && !p.installed && !p.local).map((p) => p.name);
   warnings.push(...skipped.map((n) => `${n}: não estava instalado via registry — ignorado`));
+  warnings.push(
+    ...plan
+      .filter((p) => p.local)
+      .map(
+        (p) =>
+          `${p.name}: instalada via fonte local — use \`uninstall ${p.name}\` sem --method (preserva a fonte)`,
+      ),
+  );
   if (!quiet) {
     for (const u of plan.filter((p) => !p.known).map((p) => p.name))
       log.error(`${u}: sem dist no catálogo registry`);
@@ -849,7 +905,7 @@ export async function runRegistryUninstall(
       const op = repo && buildNativeOp(repo, 'uninstall', cli.yes ?? false);
       if (!op) {
         native = { argv: [], ran: false, skipped: 'sem op nativa de uninstall documentada' };
-      } else if (op.argv[0] === '{python}' || !receipt) {
+      } else if (op.argv[0] === '{python}' || !receipt || receipt.method === 'local') {
         native = {
           argv: op.argv,
           ran: false,
@@ -929,17 +985,21 @@ function entryFor(name: string, receipt: RegistryInstallReceipt) {
 /**
  * Escopo compartilhado: resolve alvos → receipts → plano. Recusas de nome
  * inseguro e desconhecidos seguem o mesmo contrato do uninstall.
+ * Receipts `method:'local'` (install <dir>) NÃO são alvos registry —
+ * viram bucket próprio para o warning explicar a rota correta em vez
+ * do falso "não estava instalado via registry".
  */
 function lifecycleTargets(
   cli: CliOptions,
   names: string[],
   home: string,
-): { ok: LifecycleTarget[]; unknown: string[]; skipped: string[] } {
+): { ok: LifecycleTarget[]; unknown: string[]; skipped: string[]; local: string[] } {
   const state = loadForgeState(home).forges;
   const targets = resolveRegistryTargets(cli, names, Object.keys(state));
   const ok: LifecycleTarget[] = [];
   const unknown: string[] = [];
   const skipped: string[] = [];
+  const local: string[] = [];
   const seen = new Set<string>();
   for (const raw of targets) {
     const entry = registryEntry(raw);
@@ -955,9 +1015,13 @@ function lifecycleTargets(
       else unknown.push(name);
       continue;
     }
+    if (receipt.method === 'local') {
+      local.push(name);
+      continue;
+    }
     ok.push({ name, receipt });
   }
-  return { ok, unknown, skipped };
+  return { ok, unknown, skipped, local };
 }
 
 interface LifecycleTarget {
@@ -982,8 +1046,8 @@ async function runRegistryLifecycle(
   // clones. Sem isso o E2E 11.2.1 via "nenhuma Forja instalada" mesmo
   // com receipts presentes.
   const wanted = isCheck && !names.length && !cli.only?.length && !cli.all ? installed : names;
-  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, wanted, home);
-  if (!targets.length && !skipped.length && !unknown.length) {
+  const { ok: targets, unknown, skipped, local } = lifecycleTargets(cli, wanted, home);
+  if (!targets.length && !skipped.length && !unknown.length && !local.length) {
     if (isCheck) {
       // Check sem alvo não é erro: estado vazio reportado com honestidade.
       const doc = { method: 'pypi', plan: true, updates: [], skipped: [], warnings: [] };
@@ -1006,6 +1070,10 @@ async function runRegistryLifecycle(
   const ignored = ignoredRegistryFlags(cli);
   const warnings: string[] = [
     ...skipped.map((n) => `${n}: não estava instalado via registry — ignorado`),
+    ...local.map(
+      (n) =>
+        `${n}: instalada via fonte local — verbos registry não se aplicam (use \`update <dir>\` ou \`uninstall ${n}\` sem --method)`,
+    ),
     ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
   ];
 
@@ -1204,10 +1272,11 @@ export async function runRegistryReinstall(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
-  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const { ok: targets, unknown, skipped, local } = lifecycleTargets(cli, names, home);
   const ignored = ignoredRegistryFlags(cli);
   const warnings = [
     ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...local.map((n) => `${n}: instalada via fonte local — use \`reinstall ${n}\` sem --method`),
     ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
   ];
   if (!targets.length) {
@@ -1296,10 +1365,11 @@ export async function runRegistryRollback(
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
-  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const { ok: targets, unknown, skipped, local } = lifecycleTargets(cli, names, home);
   const ignored = ignoredRegistryFlags(cli);
   const warnings = [
     ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...local.map((n) => `${n}: instalada via fonte local — rollback de versão não se aplica`),
     ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
   ];
   const plan = targets.map((t) => {
@@ -1416,10 +1486,11 @@ export async function runRegistryPin(
     process.exit(2);
     return;
   }
-  const { ok: targets, unknown, skipped } = lifecycleTargets(cli, names, home);
+  const { ok: targets, unknown, skipped, local } = lifecycleTargets(cli, names, home);
   const ignored = ignoredRegistryFlags(cli);
   const warnings = [
     ...skipped.map((n) => `${n}: não instalado via registry — ignorado`),
+    ...local.map((n) => `${n}: instalada via fonte local — pin registry não se aplica`),
     ...(ignored.length ? [`${S.registryIgnoredFlags}: ${ignored.join(', ')}`] : []),
   ];
   if (!targets.length) {

@@ -153,7 +153,7 @@ describe('contract fixtures on disk', () => {
 });
 
 describe('canonical schemas exist on disk and match embedded copies', () => {
-  it('ships all eight contracts', () => {
+  it('ships all nine contracts', () => {
     expect(CONTRACT_IDS.sort()).toEqual(
       [
         'forge/ForgeCapability/v1',
@@ -164,13 +164,14 @@ describe('canonical schemas exist on disk and match embedded copies', () => {
         'forge/ForgeInstallContract/v1',
         'forge/ForgeOperationPlan/v1',
         'forge/ForgeOperationReceipt/v1',
+        'forge/LocalForgeSourceDetection/v1',
       ].sort(),
     );
   });
 
   it('embedded schemas are byte-parity with contracts/schemas/*.json (modulo meta keys)', () => {
     const files = readdirSync(SCHEMA_DIR).filter((f) => f.endsWith('.json'));
-    expect(files.length).toBe(8);
+    expect(files.length).toBe(9);
     for (const file of files) {
       const disk = JSON.parse(readFileSync(path.join(SCHEMA_DIR, file), 'utf8'));
       const embedded = SCHEMAS[disk.$id];

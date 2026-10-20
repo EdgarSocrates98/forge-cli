@@ -20,7 +20,7 @@ Priority pipeline (`forge_bootstrap.py:190-249`):
 
 Validation: **version spec check executed** against the spec string in
 `forge.json` (`python: ">=3.10"`, `">=3.11"`, `">=3.12"` per forge).
-`sys.executable` is **not** an interpreter *source* — it only pins the
+`sys.executable` is **not** an interpreter _source_ — it only pins the
 version the launcher resolved to.
 
 ### 2. install.sh (all 7 forges)
@@ -69,18 +69,18 @@ pins `3.12` (`pyproject.toml:6-7`).
 
 ## What's NOT discovered today
 
-| Source | forge-cli | bootstrap | Notes |
-|---|---|---|---|
-| `FORGE_PYTHON` env var | ✗ | ✗ | proposed contract |
-| `--python` CLI flag | ✗ (registry path selects internally) | ✓ | flag exists in bootstrap only |
-| `py` launcher with `-X.Y` | ✓ (win32) | ✓ | both probe `-3.N` pins |
-| PATH `python3/python` | ✓ | ✓ | |
-| Active venv (`VIRTUAL_ENV`, `.venv/`) | ✗ | ✗ | no env detection |
-| pyenv / uv / conda / asdf shims | ✗ (except uv toolchain probe) | ✗ (uv only for *install*) | manager dirs not enumerated |
-| `~/AppData/Local/Programs/Python/*` | ✗ | ✗ | corporate default location missed |
-| `/usr/local/bin`, `/opt/*/bin`, brew | ✗ (PATH only) | ✗ | non-PATH dirs unenumerated |
-| Windows registry uninstall keys | ✗ | ✗ | never read |
-| Conventional dirs near repo | ✗ | ✗ | |
+| Source                                | forge-cli                            | bootstrap                 | Notes                             |
+| ------------------------------------- | ------------------------------------ | ------------------------- | --------------------------------- |
+| `FORGE_PYTHON` env var                | ✗                                    | ✗                         | proposed contract                 |
+| `--python` CLI flag                   | ✗ (registry path selects internally) | ✓                         | flag exists in bootstrap only     |
+| `py` launcher with `-X.Y`             | ✓ (win32)                            | ✓                         | both probe `-3.N` pins            |
+| PATH `python3/python`                 | ✓                                    | ✓                         |                                   |
+| Active venv (`VIRTUAL_ENV`, `.venv/`) | ✗                                    | ✗                         | no env detection                  |
+| pyenv / uv / conda / asdf shims       | ✗ (except uv toolchain probe)        | ✗ (uv only for _install_) | manager dirs not enumerated       |
+| `~/AppData/Local/Programs/Python/*`   | ✗                                    | ✗                         | corporate default location missed |
+| `/usr/local/bin`, `/opt/*/bin`, brew  | ✗ (PATH only)                        | ✗                         | non-PATH dirs unenumerated        |
+| Windows registry uninstall keys       | ✗                                    | ✗                         | never read                        |
+| Conventional dirs near repo           | ✗                                    | ✗                         |                                   |
 
 ## Confirmed failure modes (python off-PATH)
 

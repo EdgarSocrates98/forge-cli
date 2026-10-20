@@ -85,8 +85,66 @@ export interface RegistryInstallReceipt {
   offlineLock?: { file: string; artifacts: number };
 }
 
+/**
+ * Receipt de fonte local (`install <dir>` — ciclo 12.1): mesma forma e
+ * convenções de persistência do receipt registry (install.json +
+ * state.json atômicos sob o lifecycle lock), com a proveniência da
+ * fonte no lugar da proveniência PyPI. `verify`/`bin` seguem exigentes:
+ * `verify: {command:[], ok:true}` = nada declarado para verificar;
+ * `bin` recebe o caminho do venv quando existe, senão o cli declarado.
+ */
+export interface LocalInstallReceipt {
+  forge: string;
+  method: 'local';
+  /** Campo pedido pelo spec: discriminador estável do método local. */
+  install_method: 'local';
+  dist: string;
+  version: string;
+  python?: string;
+  venv?: string;
+  bin?: string;
+  shim?: string;
+  shimRefused?: string;
+  installedAt: string;
+  updatedAt?: string;
+  verify: { command: string[]; ok: boolean };
+  files: { filename: string; sha256?: string; packagetype?: string }[];
+  pinned?: string;
+  history?: { version: string; installedAt: string }[];
+  native?: RegistryInstallReceipt['native'];
+  /** Diretório-fonte (gitless ou checkout) — NUNCA removido no uninstall. */
+  source_dir: string;
+  /** `.git` diretório/arquivo observado na instalação — sempre falso em gitless. */
+  is_git: boolean;
+  /** Nível de identidade do detector (A/B/C) — trust da fonte registrada. */
+  source_trust: 'A' | 'B' | 'C' | 'none';
+  manifest_valid: boolean;
+  /** 'partial' = fonte parcial confirmada ou checksum divergente/ausente. */
+  integrity: 'verified' | 'partial' | 'unverified';
+  execution_environment: {
+    platform: string;
+    arch: string;
+    node: string;
+    /** shell/executor que rodou o bootstrap (sh, powershell.exe, python…). */
+    shell: string | null;
+  };
+  /** Campos PyPI sem papel num receipt local — ausentes na prática. */
+  extras?: string[];
+  yanked?: boolean;
+  /** Estado do detector no momento da instalação — evidência do veredito. */
+  source_state?: string;
+  /** Script executado (relativo ao source_dir) — repair/update re-executa. */
+  setup_script?: string;
+  /** Entradas de topo criadas pelo instalador — as ÚNICAS removidas no uninstall. */
+  managed_artifacts: string[];
+  /** Arquivos da fonte (relativos) — update por substituição os reconcilia. */
+  source_files: string[];
+}
+
+export type InstallReceipt = RegistryInstallReceipt | LocalInstallReceipt;
+
 export interface ForgeState {
-  forges: Record<string, RegistryInstallReceipt>;
+  forges: Record<string, InstallReceipt>;
 }
 
 export function forgesRoot(home: string): string {
@@ -361,7 +419,9 @@ export type InstallConsistencyStatus =
   | 'unreadable-receipt'
   | 'forge-mismatch'
   | 'version-mismatch'
-  | 'missing-venv';
+  | 'missing-venv'
+  /** Fonte local (`install <dir>`): diretório-fonte do receipt sumiu. */
+  | 'missing-source';
 
 export interface InstallConsistency {
   ok: boolean;
@@ -421,6 +481,26 @@ export function installConsistency(home: string, name: string): InstallConsisten
       detail: `${name}: state=${entry.version} mas receipt=${receipt.version} — escrita interrompida no meio; ${REPAIR_HINT}`,
     };
   }
+  if (entry.method === 'local') {
+    // Fonte local: a saúde é o source_dir + a venv quando registrada —
+    // nunca um checkout `.git` (a fonte pode ser gitless por definição).
+    const src = typeof entry.source_dir === 'string' ? entry.source_dir : null;
+    if (!src || !existsSync(src)) {
+      return {
+        ok: false,
+        status: 'missing-source',
+        detail: `${name}: fonte local ausente (${src ?? 'desconhecida'}) — repare com \`reinstall ${name}\` (fonte nova) ou remova o registro com \`uninstall ${name}\``,
+      };
+    }
+    if (typeof entry.venv === 'string' && entry.venv && !existsSync(entry.venv)) {
+      return {
+        ok: false,
+        status: 'missing-venv',
+        detail: `${name}: venv ausente (${entry.venv}) — repare com \`reinstall ${name}\``,
+      };
+    }
+    return { ok: true, status: 'ok', detail: '' };
+  }
   if (!existsSync(entry.venv ?? venv)) {
     return {
       ok: false,
@@ -439,6 +519,8 @@ export interface RunResult {
 export interface RunOpts {
   /** Timeout do subprocesso em ms (default 5min — pip pode ser lento). */
   timeoutMs?: number;
+  /** Diretório de trabalho — scripts de fonte local rodam DENTRO da fonte. */
+  cwd?: string;
 }
 export type RunLike = (cmd: string, args: string[], opts?: RunOpts) => Promise<RunResult>;
 
@@ -450,6 +532,7 @@ export async function execaRun(
   const res = await execa(cmd, args, {
     reject: false,
     timeout: opts.timeoutMs ?? 300_000,
+    ...(opts.cwd ? { cwd: opts.cwd } : {}),
   });
   return {
     exitCode: res.exitCode ?? 1,

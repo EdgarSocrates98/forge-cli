@@ -11,33 +11,33 @@ The 7-Forge Python bootstrap (`forge_bootstrap.py`, byte-identical sha256
 work lands in forge-cli + the shell-script surface**; the bootstrap needs
 only receipt-field extensions and an `install.windows.sh` path.
 
-| Layer | Changes needed | Spec |
-|---|---|---|
-| forge-cli (TS) | directory-state classifier, local-path install, gitless lifecycle verbs, shell env discovery, python pipeline, FORGE-* taxonomy | lf-0015/0016/0017 |
-| shell surface | NEW `install.windows.sh` (Git Bash native); shared InstallReceipt contract; env persistence parity | lf-0018 |
-| forge_bootstrap.py (canonical, the-forge) | receipt `python{}`/`environment{}`/`source_trust` fields; gitless stamps | lf-0018 |
-| vendored copies (7 forges) | re-vendor via `scripts/installkit/vendor.py` + `_SOURCE_SHA256` restamp | lf-0019 |
-| tests + CI | ubuntu+windows matrix, git-bash steps, simulated no-PS E2E | lf-0019 |
-| docs | install guides per scenario, FORGE-* troubleshooting, acceptance report | lf-0019 |
+| Layer                                     | Changes needed                                                                                                                  | Spec              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| forge-cli (TS)                            | directory-state classifier, local-path install, gitless lifecycle verbs, shell env discovery, python pipeline, FORGE-* taxonomy | lf-0015/0016/0017 |
+| shell surface                             | NEW `install.windows.sh` (Git Bash native); shared InstallReceipt contract; env persistence parity                              | lf-0018           |
+| forge_bootstrap.py (canonical, the-forge) | receipt `python{}`/`environment{}`/`source_trust` fields; gitless stamps                                                        | lf-0018           |
+| vendored copies (7 forges)                | re-vendor via `scripts/installkit/vendor.py` + `_SOURCE_SHA256` restamp                                                         | lf-0019           |
+| tests + CI                                | ubuntu+windows matrix, git-bash steps, simulated no-PS E2E                                                                      | lf-0019           |
+| docs                                      | install guides per scenario, FORGE-* troubleshooting, acceptance report                                                         | lf-0019           |
 
 ## FASE → spec mapping
 
-| FASE | Content | Spec | Owner repo(s) |
-|---|---|---|---|
-| 0 | Audit (this doc set) | lf-0014 | forge-cli docs |
-| 1 | Gitless states, identity A/B/C, op semantics | lf-0015 | forge-cli `src/` |
-| 2 | Shell capability discovery | lf-0016 | forge-cli `src/` |
-| 3 | `install.windows.sh` | lf-0018 | vendored to all forges via the-forge installkit |
-| 4 | Python discovery pipeline | lf-0017 | forge-cli + bootstrap `--python` alignment |
-| 5 | Preflight 2.0 aggregate report | lf-0016 | forge-cli `src/preflight.ts` |
-| 6 | Path selection matrix | lf-0016 | forge-cli `src/` |
-| 7 | Shared installer contract | lf-0018 | installkit canonical + vendored |
-| 8 | Env persistence + FORGE-* errors | lf-0018 | all entry points |
-| 9 | Positive+negative tests | lf-0019 | per-repo suites |
-| 10 | Rollout to forges | lf-0019 | vendor.py re-vendor |
-| 11 | CI gates (ubuntu+windows) | lf-0019 | ci.yml matrices |
-| 12 | Docs + portal surface | lf-0019 | docs/ + forge-portal manifest |
-| 13 | Acceptance | lf-0019 | `docs/cycle12/acceptance-report.md` |
+| FASE | Content                                      | Spec    | Owner repo(s)                                   |
+| ---- | -------------------------------------------- | ------- | ----------------------------------------------- |
+| 0    | Audit (this doc set)                         | lf-0014 | forge-cli docs                                  |
+| 1    | Gitless states, identity A/B/C, op semantics | lf-0015 | forge-cli `src/`                                |
+| 2    | Shell capability discovery                   | lf-0016 | forge-cli `src/`                                |
+| 3    | `install.windows.sh`                         | lf-0018 | vendored to all forges via the-forge installkit |
+| 4    | Python discovery pipeline                    | lf-0017 | forge-cli + bootstrap `--python` alignment      |
+| 5    | Preflight 2.0 aggregate report               | lf-0016 | forge-cli `src/preflight.ts`                    |
+| 6    | Path selection matrix                        | lf-0016 | forge-cli `src/`                                |
+| 7    | Shared installer contract                    | lf-0018 | installkit canonical + vendored                 |
+| 8    | Env persistence + FORGE-* errors             | lf-0018 | all entry points                                |
+| 9    | Positive+negative tests                      | lf-0019 | per-repo suites                                 |
+| 10   | Rollout to forges                            | lf-0019 | vendor.py re-vendor                             |
+| 11   | CI gates (ubuntu+windows)                    | lf-0019 | ci.yml matrices                                 |
+| 12   | Docs + portal surface                        | lf-0019 | docs/ + forge-portal manifest                   |
+| 13   | Acceptance                                   | lf-0019 | `docs/cycle12/acceptance-report.md`             |
 
 ## Sequencing (dependencies)
 
@@ -60,6 +60,7 @@ lf-0016's discovery contract shape; lf-0019 is strictly last.
 ## Concrete file targets (from audit)
 
 **forge-cli new/modified:**
+
 - `src/source/detect.ts` (new) — 8-state classifier + identity levels
 - `src/env/discover.ts` (new) — `forge/EnvironmentDiscovery/v1` + shells
 - `src/env/python.ts` (new) — discovery pipeline + validation
@@ -71,6 +72,7 @@ lf-0016's discovery contract shape; lf-0019 is strictly last.
 - `src/utils/system.ts` — win32 script selection gains `install.windows.sh`
 
 **the-forge (canonical, then vendored):**
+
 - `install.windows.sh` (new template at repo root + installkit)
 - `scripts/installkit/forge_bootstrap.py` — `python{}`/`environment{}`/
   `source_trust` receipt fields

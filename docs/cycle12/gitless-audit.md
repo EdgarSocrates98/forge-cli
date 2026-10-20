@@ -16,7 +16,7 @@ Byte-identity verified 2026-10-20:
 - `scripts/forge_bootstrap.py` — 8 copies (7 forges + canonical) sha256
   `dbcc32580802…` **all identical** (1013 lines each).
 - `*/_installkit.py` — 7 vendored copies stamped `_SOURCE_SHA256 =
-  "bc189dd2ae0028ce"`; canonical holds `"canonical"`.
+"bc189dd2ae0028ce"`; canonical holds `"canonical"`.
 - `*/_forge_portal.py` — 8 copies (7 forges + `forge-portal/portal_core/`
   canonical) sha256 `fed7e298fc06…` **all identical** (1162 lines each).
 - `data-sentinel-forge` — not part of the vendored fleet (no installkit,
@@ -24,18 +24,18 @@ Byte-identity verified 2026-10-20:
 
 ## Per-repo findings
 
-| Repo | Commit | `.git` required for install? | `git` calls in installer | States distinguishable today |
-|---|---|---|---|---|
-| forge-cli | f4e340f | yes — `hasGitRepo(dir)` = `existsSync(dir/.git)` (`src/utils/system.ts:29-31`) | clone/pull/fetch/rev-parse/checkout (`system.ts:150-236`, `git-revs.ts:28-86`) | GIT_REPOSITORY (`.git` exists) vs *everything-else* (`non-git` label) |
-| the-forge | 6f322af | **no** — `load_config` only needs valid `forge.json` (`forge_bootstrap.py:116-131`) | best-effort `git rev-parse` for receipt stamping only, `None` on failure (`:862-874`) | GIT_REPO vs GITLESS-with-valid-forge.json — **implicitly supported by bootstrap but not classified/named** |
-| spark-forge-aws | cae545b | no (same bootstrap) | same stamping-only pattern | same |
-| spark-forge-azure | 447a2e4 | no | same | same |
-| api-forge | fee6e7f | no | same | same |
-| platform-forge | 1fbf34d | no | same | same |
-| forge-doctor-api | 0c94bc3 | no | same; extra `scripts/forge_install.py` lifecycle adapter also uses `forge.json`, not `.git` | same |
-| forge-doctor-data | 4c8c7ff | no | same | same |
-| forge-portal | 9d997d2 | n/a — npm install, no Python installer | n/a | n/a |
-| data-sentinel-forge | e67d8a6 | n/a — `uv sync`/`pip install .`, no installer | n/a | n/a |
+| Repo                | Commit  | `.git` required for install?                                                        | `git` calls in installer                                                                    | States distinguishable today                                                                               |
+| ------------------- | ------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| forge-cli           | f4e340f | yes — `hasGitRepo(dir)` = `existsSync(dir/.git)` (`src/utils/system.ts:29-31`)      | clone/pull/fetch/rev-parse/checkout (`system.ts:150-236`, `git-revs.ts:28-86`)              | GIT_REPOSITORY (`.git` exists) vs _everything-else_ (`non-git` label)                                      |
+| the-forge           | 6f322af | **no** — `load_config` only needs valid `forge.json` (`forge_bootstrap.py:116-131`) | best-effort `git rev-parse` for receipt stamping only, `None` on failure (`:862-874`)       | GIT_REPO vs GITLESS-with-valid-forge.json — **implicitly supported by bootstrap but not classified/named** |
+| spark-forge-aws     | cae545b | no (same bootstrap)                                                                 | same stamping-only pattern                                                                  | same                                                                                                       |
+| spark-forge-azure   | 447a2e4 | no                                                                                  | same                                                                                        | same                                                                                                       |
+| api-forge           | fee6e7f | no                                                                                  | same                                                                                        | same                                                                                                       |
+| platform-forge      | 1fbf34d | no                                                                                  | same                                                                                        | same                                                                                                       |
+| forge-doctor-api    | 0c94bc3 | no                                                                                  | same; extra `scripts/forge_install.py` lifecycle adapter also uses `forge.json`, not `.git` | same                                                                                                       |
+| forge-doctor-data   | 4c8c7ff | no                                                                                  | same                                                                                        | same                                                                                                       |
+| forge-portal        | 9d997d2 | n/a — npm install, no Python installer                                              | n/a                                                                                         | n/a                                                                                                        |
+| data-sentinel-forge | e67d8a6 | n/a — `uv sync`/`pip install .`, no installer                                       | n/a                                                                                         | n/a                                                                                                        |
 
 ## forge-cli detail (the gitless gap owner)
 
@@ -67,16 +67,16 @@ Required states: GIT_REPOSITORY, GIT_WORKTREE, GITLESS_VALID_FORGE,
 GITLESS_PARTIAL_FORGE, UNKNOWN_DIRECTORY, CONFLICTING_IDENTITY,
 INVALID_MANIFEST, UNTRUSTED_SOURCE.
 
-| State | Today |
-|---|---|
-| GIT_REPOSITORY | detected (`.git` exists) |
-| GIT_WORKTREE | **not distinguished** — `.git` file (worktree link) treated same as `.git` dir |
-| GITLESS_VALID_FORGE | **not detected** — bootstrap would succeed but forge-cli never reaches it (local path rejected at arg parse); install.sh run manually would work via bootstrap's forge.json-only path |
-| GITLESS_PARTIAL_FORGE | not detected — no partial-manifest concept |
-| UNKNOWN_DIRECTORY | collapses into `non-git` label |
-| CONFLICTING_IDENTITY | not detected — manifest-vs-structure never compared |
-| INVALID_MANIFEST | `manifest.ts:21-47` validates `forge_id`/`cli`/`mcp_command` shape only when read; not surfaced as an install-blocking verdict |
-| UNTRUSTED_SOURCE | no trust model exists |
+| State                 | Today                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GIT_REPOSITORY        | detected (`.git` exists)                                                                                                                                                              |
+| GIT_WORKTREE          | **not distinguished** — `.git` file (worktree link) treated same as `.git` dir                                                                                                        |
+| GITLESS_VALID_FORGE   | **not detected** — bootstrap would succeed but forge-cli never reaches it (local path rejected at arg parse); install.sh run manually would work via bootstrap's forge.json-only path |
+| GITLESS_PARTIAL_FORGE | not detected — no partial-manifest concept                                                                                                                                            |
+| UNKNOWN_DIRECTORY     | collapses into `non-git` label                                                                                                                                                        |
+| CONFLICTING_IDENTITY  | not detected — manifest-vs-structure never compared                                                                                                                                   |
+| INVALID_MANIFEST      | `manifest.ts:21-47` validates `forge_id`/`cli`/`mcp_command` shape only when read; not surfaced as an install-blocking verdict                                                        |
+| UNTRUSTED_SOURCE      | no trust model exists                                                                                                                                                                 |
 
 **Key finding**: the Python bootstrap already tolerates gitless dirs
 (`forge.json` suffices, `git` calls are best-effort stamps). The gap is

@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "forge/LocalForgeSourceDetection/v1",
+  "title": "LocalForgeSourceDetection",
+  "type": "object",
+  "required": [
+    "schema",
+    "path",
+    "state",
+    "is_git",
+    "manifest_valid",
+    "identity",
+    "source_trust",
+    "integrity",
+    "structure",
+    "reasons"
+  ],
+  "properties": {
+    "schema": { "const": "forge/LocalForgeSourceDetection/v1" },
+    "path": { "type": "string", "minLength": 1 },
+    "state": {
+      "enum": [
+        "GIT_REPOSITORY",
+        "GIT_WORKTREE",
+        "GITLESS_VALID_FORGE",
+        "GITLESS_PARTIAL_FORGE",
+        "UNKNOWN_DIRECTORY",
+        "CONFLICTING_IDENTITY",
+        "INVALID_MANIFEST",
+        "UNTRUSTED_SOURCE"
+      ]
+    },
+    "is_git": { "type": "boolean" },
+    "manifest_valid": { "type": "boolean" },
+    "forge_id": { "type": "string" },
+    "identity": { "enum": ["A", "B", "C", "none"] },
+    "source_trust": { "enum": ["A", "B", "C", "none"] },
+    "integrity": { "enum": ["verified", "partial", "unverified"] },
+    "structure": {
+      "type": "object",
+      "required": ["setup_scripts", "project_markers"],
+      "properties": {
+        "setup_scripts": { "type": "array", "items": { "type": "string" } },
+        "project_markers": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "reasons": { "type": "array", "items": { "type": "string" } },
+    "refusal": {
+      "type": "object",
+      "required": ["code", "cause", "remedy"],
+      "properties": {
+        "code": {
+          "enum": [
+            "FORGE-SOURCE-NOT-FOUND",
+            "FORGE-SOURCE-GITLESS",
+            "FORGE-SOURCE-INVALID",
+            "FORGE-SOURCE-CONFLICT",
+            "FORGE-INSTALL-VERIFICATION-FAILED"
+          ]
+        },
+        "cause": { "type": "string", "minLength": 1 },
+        "remedy": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

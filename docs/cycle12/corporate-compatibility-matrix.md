@@ -10,18 +10,18 @@ C=forge-cli, PF=forge-portal, DS=data-sentinel-forge.
 
 ## Scenario matrix
 
-| # | Scenario | C | T | A | P | W | Z | DA | DD | PF | DS |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | PyPI/registry install | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | n/a | broken* |
-| 2 | git clone → installer | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | n/a | n/a |
-| 3 | GitHub ZIP (gitless, intact) | **broken** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | n/a | n/a |
-| 4 | Copied dir (no .git) | **broken** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | n/a | n/a |
-| 5 | Gitless, partial manifest | broken | untested | untested | untested | untested | untested | untested | untested | n/a | n/a |
-| 6 | Windows + PowerShell | untested-CI | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | n/a | untested |
-| 7 | Windows + Git Bash, **no PowerShell** | **broken** | untested | untested | untested | untested | untested | untested | untested | n/a | n/a |
-| 8 | Python outside PATH (corporate) | **broken** | broken | broken | broken | broken | broken | broken | broken | n/a | untested |
-| 9 | Multiple Linux pythons | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | n/a | n/a |
-| 10 | Restricted perms / no global install | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | confirmed | n/a | untested |
+| #   | Scenario                              | C           | T           | A           | P           | W           | Z           | DA          | DD          | PF  | DS       |
+| --- | ------------------------------------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | --- | -------- |
+| 1   | PyPI/registry install                 | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | n/a | broken*  |
+| 2   | git clone → installer                 | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | n/a | n/a      |
+| 3   | GitHub ZIP (gitless, intact)          | **broken**  | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | n/a | n/a      |
+| 4   | Copied dir (no .git)                  | **broken**  | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | confirmed** | n/a | n/a      |
+| 5   | Gitless, partial manifest             | broken      | untested    | untested    | untested    | untested    | untested    | untested    | untested    | n/a | n/a      |
+| 6   | Windows + PowerShell                  | untested-CI | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | n/a | untested |
+| 7   | Windows + Git Bash, **no PowerShell** | **broken**  | untested    | untested    | untested    | untested    | untested    | untested    | untested    | n/a | n/a      |
+| 8   | Python outside PATH (corporate)       | **broken**  | broken      | broken      | broken      | broken      | broken      | broken      | broken      | n/a | untested |
+| 9   | Multiple Linux pythons                | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | n/a | n/a      |
+| 10  | Restricted perms / no global install  | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | confirmed   | n/a | untested |
 
 \* data-sentinel-forge is published on neither PyPI nor npm (checked
 2026-10 publication run — not in the 8 published packages).
