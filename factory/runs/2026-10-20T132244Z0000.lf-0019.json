@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0019.implement.claude.md)"
+  ],
+  "created_at": "2026-10-20T13:22:44+00:00",
+  "id": "lf-0019",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0019.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0019.md",
+  "spec_sha256": "494aeea53d6ad93121a3269e009ca9988cf5cdf2fdb635a31ce618ed0701944e",
+  "status": "planned",
+  "title": "Cycle 12.1 test matrix + CI gates + rollout to forges + docs"
+}
