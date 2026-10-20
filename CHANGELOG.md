@@ -2,6 +2,15 @@
 
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
+## [0.2.3] - 2026-10-20
+
+### Changed
+- `install` is registry-first (PyPI + isolated venv) by default;
+  `--method git` opt-in for clone+setup.
+- Launchers emitted in `~/.forge-cli/bin` (POSIX `exec` with escaped
+  paths, Windows `.cmd` with refusal on non-expressible bins); uninstall
+  removes the recorded shim.
+- Lockfile libc constraints restored for optional native packages.
 
 ## [0.2.1] - 2026-10-18
 
