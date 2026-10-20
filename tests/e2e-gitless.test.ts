@@ -107,7 +107,10 @@ function makeZipLikeSource(dir: string, version: string, files: Record<string, s
 }
 
 /** Parse de `--json` com diagnóstico: stdout vazio em CI mostra o stderr real. */
-function parseJson(text: string, ctx: { code: number; out: string }): any {
+function parseJson(
+  text: string,
+  ctx: { code: number; out: string },
+): ReturnType<typeof JSON.parse> {
   try {
     return JSON.parse(text);
   } catch {
@@ -131,7 +134,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
 
     // 1) install — exit 0, JSON local, receipt persistido.
     const inst = await cli('install', v1, '--yes', '--json');
-    expect(inst.code).toBe(0);
+    expect(inst.code, inst.out).toBe(0);
     const instDoc = parseJson(inst.stdout, inst);
     expect(instDoc.method).toBe('local');
     expect(instDoc.results[0].ok).toBe(true);
@@ -156,7 +159,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
 
     // 2) status enxerga a instalação local sem consultar git.
     const st = await cli('status', '--dir', path.join(ws, 'workspace'), '--json');
-    expect(st.code).toBe(0);
+    expect(st.code, st.out).toBe(0);
     const stDoc = parseJson(st.stdout, st) as {
       name: string;
       phase: string;
@@ -170,7 +173,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
 
     // 3) doctor 2.0 — o check dedicado de fontes locais passa.
     const doc = await cli('doctor', '--dir', path.join(ws, 'workspace'), '--json');
-    expect([0, 1]).toContain(doc.code);
+    expect([0, 1], doc.out).toContain(doc.code);
     const report = parseJson(doc.stdout, doc) as {
       checks: { id: string; result: string; evidence?: string[] }[];
     };
@@ -182,7 +185,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     const v2 = path.join(ws, 'acme-forge-2.0.0');
     makeZipLikeSource(v2, '2.0.0', { 'app.py': 'v2\n', 'new-feature.py': 'new\n' });
     const upd = await cli('update', v2, '--yes', '--json');
-    expect(upd.code).toBe(0);
+    expect(upd.code, upd.out).toBe(0);
     const updDoc = parseJson(upd.stdout, upd);
     expect(updDoc.results[0].ok).toBe(true);
     expect(readFileSync(path.join(v1, 'app.py'), 'utf8')).toBe('v2\n'); // atualizado
@@ -199,13 +202,13 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     rmSync(path.join(v1, 'dist-marker'), { recursive: true, force: true });
     writeFileSync(path.join(v1, 'user-notes.txt'), 'arquivo do usuário — nunca tocar\n');
     const rep = await cli('reinstall', 'acme-forge', '--yes', '--json');
-    expect(rep.code).toBe(0);
+    expect(rep.code, rep.out).toBe(0);
     expect(existsSync(path.join(v1, 'dist-marker'))).toBe(true);
     expect(existsSync(path.join(v1, 'user-notes.txt'))).toBe(true);
 
     // 6) uninstall — só managed_artifacts saem; fonte e arquivo ficam.
     const un = await cli('uninstall', 'acme-forge', '--yes', '--json');
-    expect(un.code).toBe(0);
+    expect(un.code, un.out).toBe(0);
     const unDoc = parseJson(un.stdout, un);
     expect(unDoc.results[0].ok).toBe(true);
     expect(unDoc.results[0].removed).toEqual(
@@ -227,7 +230,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     const dir = path.join(ws, 'acme-forge-1.0.0');
     makeZipLikeSource(dir, '1.0.0');
     const res = await cli('install', dir, '--method', 'git', '--yes', '--json');
-    expect(res.code).toBe(2);
+    expect(res.code, res.out).toBe(2);
     expect(res.out).toContain('FORGE-SOURCE-GITLESS');
     expect(existsSync(path.join(home, '.forge-cli', 'forges', 'acme-forge'))).toBe(false);
     expect(gitRepoOps()).toEqual([]);
@@ -238,7 +241,7 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     makeZipLikeSource(dir, '1.0.0');
     expect((await cli('install', dir, '--yes')).code).toBe(0);
     const res = await cli('update', 'acme-forge', '--yes');
-    expect(res.code).toBe(2);
+    expect(res.code, res.out).toBe(2);
     expect(res.out).toContain('FORGE-SOURCE-GITLESS');
     expect(res.out).toContain(dir); // o remédio aponta o diretório-fonte
     expect(gitRepoOps()).toEqual([]);

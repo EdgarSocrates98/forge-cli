@@ -265,7 +265,44 @@ function targetFindings(targets: WriteTarget[]): EnvFinding[] {
 export async function discoverEnvironment(deps: DiscoverDeps = {}): Promise<EnvironmentDiscovery> {
   const platform = deps.platform ?? process.platform;
   const home = deps.home ?? cliHome();
-  const shells = await discoverShells(deps);
+  // As três frentes de sonda são independentes entre si — shells, git e o
+  // pipeline Python não consomem resultados umas das outras (o toolchain de
+  // Python fica depois porque precisa do interpretador selecionado). No
+  // Windows cada frente soma dezenas de probes ≤5 s (reg.exe, Program
+  // Files, `py`, `where.exe`, shells); rodá-las em paralelo evita a soma
+  // serial sem mudar o relatório resultante — mesma máquina → mesmo JSON.
+  const [shells, gitProbe, pyDiscovery] = await Promise.all([
+    discoverShells(deps),
+    deps.gitProbe
+      ? deps.gitProbe()
+      : commandOutput('git', ['--version']).then((output) => ({ output, timedOut: false })),
+    // Pipeline lf-0017 completo — `run`/`exists`/`env`/`platform` são os
+    // MESMOS da sonda de shells: um fake único controla a descoberta toda.
+    // `pythonProbe` legado (testes pré-lf-0017) vira descoberta sintética.
+    deps.pythonDiscovery
+      ? deps.pythonDiscovery({
+          platform,
+          env: deps.env,
+          run: deps.run,
+          exists: deps.exists,
+          osHome: deps.osHome,
+          cwd: deps.cwd,
+          targetDir: deps.workspace,
+          explicit: deps.pythonExplicit,
+        })
+      : deps.pythonProbe
+        ? legacyPythonDiscovery(platform, deps.pythonProbe)
+        : discoverPythons({
+            platform,
+            env: deps.env,
+            run: deps.run,
+            exists: deps.exists,
+            osHome: deps.osHome,
+            cwd: deps.cwd,
+            targetDir: deps.workspace,
+            explicit: deps.pythonExplicit,
+          }),
+  ]);
   const route = routeOf(platform, shells);
   const targets = resolveWriteTargets({
     env: deps.env,
@@ -282,41 +319,12 @@ export async function discoverEnvironment(deps: DiscoverDeps = {}): Promise<Envi
     },
   });
 
-  const gitProbe = deps.gitProbe
-    ? await deps.gitProbe()
-    : { output: await commandOutput('git', ['--version']), timedOut: false };
   const git = {
     present: gitProbe !== null && !gitProbe.timedOut && gitProbe.output !== null,
     version: gitProbe?.output ?? null,
     executable: gitProbe?.output ? 'git' : null,
   };
 
-  // Pipeline lf-0017 completo — `run`/`exists`/`env`/`platform` são os
-  // MESMOS da sonda de shells: um fake único controla a descoberta toda.
-  // `pythonProbe` legado (testes pré-lf-0017) vira descoberta sintética.
-  const pyDiscovery = deps.pythonDiscovery
-    ? await deps.pythonDiscovery({
-        platform,
-        env: deps.env,
-        run: deps.run,
-        exists: deps.exists,
-        osHome: deps.osHome,
-        cwd: deps.cwd,
-        targetDir: deps.workspace,
-        explicit: deps.pythonExplicit,
-      })
-    : deps.pythonProbe
-      ? await legacyPythonDiscovery(platform, deps.pythonProbe)
-      : await discoverPythons({
-          platform,
-          env: deps.env,
-          run: deps.run,
-          exists: deps.exists,
-          osHome: deps.osHome,
-          cwd: deps.cwd,
-          targetDir: deps.workspace,
-          explicit: deps.pythonExplicit,
-        });
   const pySelected = pyDiscovery.selected;
   // Interpretador já selecionado alimenta a sonda de toolchain — sem
   // segunda descoberta (o `-m pip` dela roda no interpretador escolhido).
