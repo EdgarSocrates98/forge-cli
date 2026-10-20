@@ -1027,9 +1027,13 @@ export function registryUninstall(
   // own-property: state é dado não confiável — 'constructor' e afins
   // não podem casar membros do Object.prototype.
   const hadReceipt = Object.hasOwn(state.forges, target.name);
+  // Preferir o shim gravado no receipt — um `bin` movido deixaria um
+  // launcher órfão em ~/.forge-cli/bin se derivássemos o nome dele.
   const shimRemoved = removeForgeShim(
     deps.home,
-    hadReceipt ? state.forges[target.name].bin : undefined,
+    hadReceipt
+      ? (state.forges[target.name].shim ?? state.forges[target.name].bin)
+      : undefined,
     deps.platform ?? process.platform,
   );
   if (hadReceipt) delete state.forges[target.name];
