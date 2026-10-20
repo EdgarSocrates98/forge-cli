@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0020.implement.claude.md)"
+  ],
+  "created_at": "2026-10-20T23:25:14+00:00",
+  "id": "lf-0020",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0020.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0020.md",
+  "spec_sha256": "06c1f7cc4faa13dff5fd7335e345e9413a11afac559ba582630c1f5a1bb9111e",
+  "status": "planned",
+  "title": "Cycle 13 graph audit + P0 reproduction + synthetic datasets"
+}
