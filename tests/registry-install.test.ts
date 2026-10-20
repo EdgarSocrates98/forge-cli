@@ -727,7 +727,9 @@ describe('launchers (~/.forge-cli/bin)', () => {
     if ('stage' in res) return;
     expect(res.shim).toBe(path.join(tmp, '.forge-cli', 'bin', 'apiforge'));
     const body = readFileSync(res.shim!, 'utf8');
-    expect(body).toContain(`exec "${res.bin}"`);
+    // o shim escapa `\`, `"`, `$`, backtick dentro das aspas — a asserção
+    // replica o escape do shQuote (Windows CI passa um path com `\`)
+    expect(body).toContain(`exec "${res.bin.replace(/(["\\$`])/g, '\\$1')}"`);
     expect(statSync(res.shim!).mode & 0o111).not.toBe(0);
     // shim gravado no state.json — lifecycle lê de lá
     expect(loadForgeState(tmp).forges['api-forge'].shim).toBe(res.shim);
