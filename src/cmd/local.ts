@@ -22,6 +22,7 @@ import {
   type LocalDeps,
   type LocalOutcome,
 } from '../source/install.js';
+import { windowsSetupShells } from '../env/shells.js';
 import { icons, theme } from '../ui/theme.js';
 import { cliHome, resolvePython } from '../utils/system.js';
 import { emitJson } from './shared.js';
@@ -38,12 +39,15 @@ function reportTo(cli: CliOptions, doc: unknown): void {
   writeFileAtomic(file, redactSecrets(JSON.stringify(doc, null, 2)));
 }
 
-function depsFor(cli: CliOptions, home: string): LocalDeps {
+async function depsFor(cli: CliOptions, home: string): Promise<LocalDeps> {
   return {
     home,
     run: execaRun,
     yes: cli.yes,
     timeoutMs: cli.timeoutSecs * 1000,
+    // Rota de shell verificada (win32) — powershell/pwsh/Git Bash; o
+    // probe é no-op fora do Windows (POSIX nem spawna).
+    ...(process.platform === 'win32' ? { winShells: await windowsSetupShells() } : {}),
     // Fonte parcial só pergunta em TTY real — pipes/--json nunca travam
     // (mesmo contrato dos fluxos git/registry).
     confirm:
@@ -134,7 +138,7 @@ function methodGitGate(
 export async function runLocalInstallCommand(cli: CliOptions, dirs: string[]): Promise<void> {
   const home = cliHome();
   if (cli.plan || cli.check) planDetections(cli, dirs, 'install');
-  const deps = depsFor(cli, home);
+  const deps = await depsFor(cli, home);
   deps.python = await resolvePython();
   const results: Record<string, unknown>[] = [];
   let refusals = 0;
@@ -205,7 +209,7 @@ export async function runLocalInstallCommand(cli: CliOptions, dirs: string[]): P
 export async function runLocalUpdateCommand(cli: CliOptions, dirs: string[]): Promise<void> {
   const home = cliHome();
   if (cli.plan || cli.check) planDetections(cli, dirs, 'update');
-  const deps = depsFor(cli, home);
+  const deps = await depsFor(cli, home);
   deps.python = await resolvePython();
   const results: Record<string, unknown>[] = [];
   let refusals = 0;
@@ -272,7 +276,7 @@ export async function runLocalLifecycleCommand(
   names: string[],
 ): Promise<void> {
   const home = cliHome();
-  const deps = depsFor(cli, home);
+  const deps = await depsFor(cli, home);
   deps.python = await resolvePython();
   const state = loadForgeState(home).forges;
 

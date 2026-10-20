@@ -5,6 +5,7 @@ import {
   pythonVersion,
   runPreflight,
 } from '../src/preflight.js';
+import { S } from '../src/ui/strings.js';
 
 describe('isNodeSupported', () => {
   it('accepts Node >= 20', () => {
@@ -24,9 +25,11 @@ describe('isNodeSupported', () => {
 });
 
 describe('runPreflight', () => {
-  it('fatal = git/node/powershell; npm/python/pip/path = warn com hint', async () => {
+  it('fatal = git/node/shell-route; npm/python/pip/path = warn com hint', async () => {
     const checks = await runPreflight('win32');
-    const fatalNames = new Set(['Git disponível', 'Node.js >= 20', 'powershell.exe disponível']);
+    // lf-0016: a checagem fatal de shell agregou powershell/pwsh/Git Bash —
+    // só falha quando NENHUMA rota nativa executa (WSL nunca substitui).
+    const fatalNames = new Set([S.preflightGit, S.preflightNode, S.preflightShellWin]);
     for (const check of checks) {
       if (fatalNames.has(check.name)) {
         expect(check.severity).toBe('fatal');

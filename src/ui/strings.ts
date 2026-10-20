@@ -11,7 +11,7 @@ export const S = {
   preflightTitle: 'Verificando ambiente',
   preflightGit: 'Git disponível',
   preflightNode: 'Node.js >= 20',
-  preflightPwsh: 'powershell.exe disponível',
+  preflightShellWin: 'Shell de setup Windows (powershell/pwsh/Git Bash)',
   preflightPython: 'Python 3 disponível (recomendado)',
   preflightNpm: 'npm disponível',
   preflightPyTool: 'pip/pipx/uv (pacotes Python)',
@@ -21,7 +21,8 @@ export const S = {
   preflightHintGit: 'instale git (apt/brew/winget) e repita',
   preflightHintNode: 'instale Node >= 20 via nvm/fnm ou nodejs.org',
   preflightHintNpm: 'npm vem com o Node — reinstale Node completo',
-  preflightHintPwsh: 'instale PowerShell 7+ (winget install PowerShell)',
+  preflightHintShellWin:
+    'instale PowerShell 7+ (winget install Microsoft.PowerShell) ou Git for Windows — Git Bash vira a rota .sh; WSL não substitui shell nativo',
   preflightHintPython: 'método registry precisa de Python >= 3.10',
   preflightHintPyTool: 'instale pipx/uv ou `python -m ensurepip`',
   preflightHintPath: 'ajuste permissões de ~ ou defina FORGE_CLI_HOME',
@@ -331,6 +332,8 @@ export const S = {
   envRollbackDone: '.env restaurado a partir do backup',
   envRollbackNone: 'Nenhum backup de .env encontrado',
   envDoctorTitle: 'Diagnóstico de .env',
+  envDiscoverTitle: 'Descoberta de ambiente (shells, rota, alvos)',
+  envPathsTitle: 'Alvos de escrita da instalação',
   envValueNeverShown: 'valores nunca são exibidos',
   envWizardNonInteractive:
     'env wizard é interativo — para não-interativo use `env init` ou `env migrate --yes`',

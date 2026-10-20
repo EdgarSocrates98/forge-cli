@@ -14,8 +14,27 @@ export function cliHome(): string {
   return process.env.FORGE_CLI_HOME || os.homedir();
 }
 
-const WIN_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
+/**
+ * Cadeias de script de setup por rota (ciclo 12.1, lf-0016). Windows tem
+ * DUAS rotas nativas: `.ps1` via PowerShell/pwsh e `.sh` via Git Bash
+ * (`install.windows.sh` é o script dedicado — lf-0018 — seguido dos
+ * candidatos POSIX, que o Git Bash executa nativamente). WSL, Cygwin e
+ * MSYS2 nunca entram na cadeia — reportados pela descoberta, não rotas.
+ */
+const WIN_PS_SETUP_CANDIDATES = ['setup.ps1', 'install.ps1'];
+const WIN_BASH_SETUP_CANDIDATES = ['install.windows.sh', 'setup.sh', 'install.sh'];
 const POSIX_SETUP_CANDIDATES = ['setup.sh', 'install.sh'];
+
+/**
+ * Shells de setup resolvidas pela descoberta (`windowsSetupShells`):
+ * `ps` = condutor .ps1 verificado (powershell.exe|pwsh), `bash` = bash.exe
+ * do Git for Windows verificado executando. Ausente na posição = rota
+ * indisponível — capability é execução verificada, nunca palpite de PATH.
+ */
+export interface WinSetupShells {
+  ps?: string;
+  bash?: string;
+}
 
 export function resolveTargetDir(input: string | undefined, cwd = process.cwd()): string {
   const trimmed = input?.trim();
@@ -30,18 +49,38 @@ export function hasGitRepo(dir: string): boolean {
   return existsSync(path.join(dir, '.git'));
 }
 
+/**
+ * Escolhe o script de setup pelo OS + shells verificadas. Em `win32` sem
+ * `winShells` mantém o comportamento legado (só cadeia `.ps1` via
+ * powershell.exe); com `winShells` a cadeia é `.ps1` quando `ps` existe
+ * senão `.sh` via Git Bash — `install.windows.sh` primeiro, depois os
+ * candidatos POSIX que o Git Bash executa. `{}` (sondado, nada encontrado)
+ * = sem rota → `null`; `undefined` (não sondado) = legado.
+ */
 export function findSetupScript(
   repoDir: string,
   platform: NodeJS.Platform = process.platform,
+  winShells?: WinSetupShells,
 ): SetupScript | null {
   if (platform === 'win32') {
-    for (const file of WIN_SETUP_CANDIDATES) {
-      if (existsSync(path.join(repoDir, file))) {
-        return {
-          file,
-          command: 'powershell.exe',
-          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file],
-        };
+    const ps = winShells === undefined ? 'powershell.exe' : winShells.ps;
+    if (ps) {
+      for (const file of WIN_PS_SETUP_CANDIDATES) {
+        if (existsSync(path.join(repoDir, file))) {
+          return {
+            file,
+            command: ps,
+            args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file],
+          };
+        }
+      }
+    }
+    const bash = winShells?.bash;
+    if (bash) {
+      for (const file of WIN_BASH_SETUP_CANDIDATES) {
+        if (existsSync(path.join(repoDir, file))) {
+          return { file, command: bash, args: [file] };
+        }
       }
     }
     return null;

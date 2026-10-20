@@ -212,8 +212,10 @@ const COMMAND_USAGE: Record<string, string> = {
     '  TOOLS_DISCOVERED→SAFE_TOOL_CALLED→HOST_VERIFIED. tools/call só na allowlist do catálogo.',
   hosts: '\nhosts [list|plan|register|validate|rollback] — integração claude/devin/codex/copilot.',
   env:
-    '\nenv <verbo> [forja] — inspect|plan|init|validate|migrate|wizard|doctor.\n' +
-    '  wizard é interativo (required/default/máscara/validação, .env.bak); demais honram --json/--yes.',
+    '\nenv <verbo> [forja] — inspect|plan|init|validate|migrate|wizard|doctor|discover|paths.\n' +
+    '  discover = relatório forge/EnvironmentDiscovery/v1 (shells verificadas, rota Windows, alvos);\n' +
+    '  paths = matriz de alvos de escrita (flag > env > usuário > sistema); wizard é interativo;\n' +
+    '  demais honram --json/--yes.',
   doctor: '\ndoctor [--fix] — diagnóstico do ambiente; --fix repara o que falhar.',
   wizard: '\nwizard — assistente guiado: descobrir → recomendar → instalar (interativo).',
   versions: '\nversions [forjas] — tags/versões do remote e revisão atual.',

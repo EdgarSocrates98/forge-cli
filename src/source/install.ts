@@ -32,7 +32,7 @@ import {
 } from '../registry/install.js';
 import { emitForgeShim, removeForgeShim } from '../registry/shims.js';
 import { resolveInside, writeFileAtomic } from '../safety.js';
-import { findSetupScript } from '../utils/system.js';
+import { errorDetail, findSetupScript, type WinSetupShells } from '../utils/system.js';
 import { detectSource, type SourceDetection } from './detect.js';
 
 export interface LocalDeps {
@@ -40,6 +40,13 @@ export interface LocalDeps {
   run?: RunLike;
   platform?: NodeJS.Platform;
   now?: () => string;
+  /**
+   * Shells Windows verificadas pela descoberta (lf-0016): `ps` conduz
+   * `.ps1`, `bash` (Git Bash verificado) a `.sh`/`install.windows.sh`.
+   * `undefined` = não sondado (legado só-PowerShell); `{}` = sondado e
+   * nenhuma rota → FORGE-SHELL-NOT-FOUND quando nada executa.
+   */
+  winShells?: WinSetupShells;
   /**
    * Interpretador (argv) para o fallback `scripts/forge_bootstrap.py` —
    * o instalador nativo real das Forjas que roda sem `.git` desde que
@@ -185,18 +192,19 @@ export function snapshotSourceFiles(dir: string, managedTop: Set<string>): strin
 
 /**
  * Seleção do script de bootstrap — o MESMO caminho do fluxo git:
- * `findSetupScript` (POSIX setup.sh/install.sh via `sh -c`, Windows
- * .ps1 via powershell.exe). Sem script, `scripts/forge_bootstrap.py`
- * com interpretador conhecido é o fallback nativo do ecossistema.
- * lf-0018: aqui entra o fallback bash para `install.windows.sh` no
- * Windows (Git Bash) — o ponto de extensão é este seletor.
+ * `findSetupScript` (POSIX setup.sh/install.sh via `sh -c`; Windows:
+ * `.ps1` via powershell/pwsh quando `winShells.ps` existe, senão `.sh`
+ * via Git Bash com `install.windows.sh` primeiro na cadeia — lf-0016).
+ * Sem script, `scripts/forge_bootstrap.py` com interpretador conhecido
+ * é o fallback nativo do ecossistema (roda via Python, sem shell).
  */
 export function selectSetup(
   det: SourceDetection,
   platform: NodeJS.Platform,
   python?: string[] | null,
+  winShells?: WinSetupShells,
 ): { file: string; command: string; args: string[] } | null {
-  const script = findSetupScript(det.path, platform);
+  const script = findSetupScript(det.path, platform, winShells);
   if (script) return script;
   const bootstrap = path.join('scripts', 'forge_bootstrap.py');
   if (python?.length && existsSync(path.join(det.path, bootstrap))) {
@@ -335,6 +343,51 @@ async function partialGate(det: SourceDetection, deps: LocalDeps): Promise<Local
   };
 }
 
+/** Recusa nomeada quando a sonda de shells não achou rota nativa (win32). */
+function winShellNotFound(dir: string): LocalFailure {
+  return {
+    code: 'FORGE-SHELL-NOT-FOUND',
+    cause: `${dir}: nenhuma shell de instalação utilizável no Windows (powershell.exe/pwsh ausentes e Git Bash não executa)`,
+    remedy:
+      'instale PowerShell 7+ (`winget install Microsoft.PowerShell`), habilite o powershell.exe 5.1 do Windows ou instale Git for Windows — o Git Bash vira a rota de `install.windows.sh`. WSL nunca substitui shell nativo',
+  };
+}
+
+/**
+ * `provisionEnvironment` falhando é persistência de ambiente quebrada —
+ * ganha código próprio (FORGE-ENV-PERSISTENCE-FAILED), nunca exceção solta.
+ */
+async function provisionOrRefuse(dir: string, forgeId?: string): Promise<LocalFailure | null> {
+  try {
+    await provisionEnvironment(dir, forgeId);
+    return null;
+  } catch (error) {
+    return {
+      code: 'FORGE-ENV-PERSISTENCE-FAILED',
+      cause: `${dir}: falha ao provisionar ambiente (.env/configs): ${errorDetail(error)}`,
+      remedy:
+        'verifique a permissão de escrita no diretório da fonte e reexecute — o instalador grava .env e copia os configs de exemplo',
+    };
+  }
+}
+
+/** Sem script selecionável: distingue "sem rota de shell" de "fonte inválida". */
+function noScriptFailure(
+  det: SourceDetection,
+  platform: NodeJS.Platform,
+  winShells: WinSetupShells | undefined,
+): LocalFailure {
+  if (platform === 'win32' && winShells !== undefined && !winShells.ps && !winShells.bash) {
+    return winShellNotFound(det.path);
+  }
+  return {
+    code: 'FORGE-SOURCE-INVALID',
+    cause: `${det.path}: sem script de setup executável (${platform === 'win32' ? 'setup.ps1/install.ps1/install.windows.sh' : 'setup.sh/install.sh'}) e sem fallback scripts/forge_bootstrap.py + interpretador`,
+    remedy:
+      'forneça o script de setup na fonte ou instale manualmente via scripts/forge_bootstrap.py',
+  };
+}
+
 /**
  * `install <dir>` — classifica, confirma fonte parcial quando exigido,
  * provisiona .env/configs, roda o bootstrap no lugar e persiste o
@@ -360,20 +413,13 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
   }
 
   const before = topLevelEntries(det.path);
-  await provisionEnvironment(det.path, det.forge_id);
+  const envFailure = await provisionOrRefuse(det.path, det.forge_id);
+  if (envFailure) return fail(envFailure, det);
 
   const platform = deps.platform ?? process.platform;
-  const script = selectSetup(det, platform, deps.python);
+  const script = selectSetup(det, platform, deps.python, deps.winShells);
   if (!script) {
-    return fail(
-      {
-        code: 'FORGE-SOURCE-INVALID',
-        cause: `${det.path}: sem script de setup executável (${platform === 'win32' ? 'setup.ps1/install.ps1' : 'setup.sh/install.sh'}) e sem fallback scripts/forge_bootstrap.py + interpretador`,
-        remedy:
-          'forneça o script de setup na fonte ou instale manualmente via scripts/forge_bootstrap.py',
-      },
-      det,
-    );
+    return fail(noScriptFailure(det, platform, deps.winShells), det);
   }
   const res = await run(script.command, script.args, {
     cwd: det.path,
@@ -507,15 +553,25 @@ async function runUpdateAt(
   const det = detectSource(dir);
   if (det.refusal) return fail(det.refusal, det);
   const before = topLevelEntries(det.path);
-  await provisionEnvironment(det.path, det.forge_id);
-  const script = selectSetup(det, deps.platform ?? process.platform, deps.python);
+  const envFailure = await provisionOrRefuse(det.path, det.forge_id);
+  if (envFailure) return fail(envFailure, det);
+  const platform = deps.platform ?? process.platform;
+  const script = selectSetup(det, platform, deps.python, deps.winShells);
   if (!script) {
+    if (
+      platform === 'win32' &&
+      deps.winShells !== undefined &&
+      !deps.winShells.ps &&
+      !deps.winShells.bash
+    ) {
+      return fail(winShellNotFound(det.path), det);
+    }
     return fail(
       {
         code: 'FORGE-SOURCE-INVALID',
         cause: `${det.path}: fonte atualizada sem script de setup executável`,
         remedy:
-          'a fonte nova precisa de install.sh/setup.sh (ou scripts/forge_bootstrap.py + python)',
+          'a fonte nova precisa de install.sh/setup.sh/install.windows.sh (ou scripts/forge_bootstrap.py + python)',
       },
       det,
     );
@@ -613,14 +669,25 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
     if (target && existsSync(target)) rmSync(target, { recursive: true, force: true });
   }
   const before = topLevelEntries(dir);
-  await provisionEnvironment(dir, det.forge_id);
-  const script = selectSetup(det, deps.platform ?? process.platform, deps.python);
+  const envFailure = await provisionOrRefuse(dir, det.forge_id);
+  if (envFailure) return fail(envFailure, det);
+  const platform = deps.platform ?? process.platform;
+  const script = selectSetup(det, platform, deps.python, deps.winShells);
   if (!script) {
+    if (
+      platform === 'win32' &&
+      deps.winShells !== undefined &&
+      !deps.winShells.ps &&
+      !deps.winShells.bash
+    ) {
+      return fail(winShellNotFound(dir), det);
+    }
     return fail(
       {
         code: 'FORGE-SOURCE-INVALID',
         cause: `${dir}: sem script de setup para o repair`,
-        remedy: 'restaure install.sh/setup.sh na fonte ou reinstale com `install <dir>`',
+        remedy:
+          'restaure install.sh/setup.sh/install.windows.sh na fonte ou reinstale com `install <dir>`',
       },
       det,
     );

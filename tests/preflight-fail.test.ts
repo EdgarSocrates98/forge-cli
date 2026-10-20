@@ -24,7 +24,7 @@ describe('preflight failure paths', () => {
     const checks = await runPreflight('win32');
     expect(checks.every((c) => typeof c.ok === 'boolean')).toBe(true);
     const commandChecks = checks.filter(
-      (c) => c.name === S.preflightGit || c.name === S.preflightPwsh,
+      (c) => c.name === S.preflightGit || c.name === S.preflightShellWin,
     );
     expect(commandChecks.every((c) => !c.ok)).toBe(true);
     // com execa falhando, warns de npm/python/pip falham sem derrubar o bloco

@@ -20,6 +20,7 @@ import {
   resolvePython,
   runStreamed,
   syncRepo,
+  type WinSetupShells,
 } from './utils/system.js';
 import type { CliState } from './artifacts.js';
 
@@ -47,6 +48,13 @@ export interface RunOptions {
   deniedScripts?: ReadonlySet<string>;
   runAfterSyncFailure?: boolean;
   state?: CliState['repos'];
+  /**
+   * Shells Windows verificadas pelo preflight (lf-0016): `ps` conduz a
+   * cadeia `.ps1`, `bash` (Git Bash verificado) a `.sh` com
+   * `install.windows.sh` primeiro. Ausente = rota indisponível;
+   * `undefined` mantém o legado só-PowerShell (não sondado).
+   */
+  winShells?: WinSetupShells;
 }
 
 export async function processRepo(
@@ -156,7 +164,7 @@ export async function processRepo(
   }
 
   const ran: string[] = [];
-  const script = skipScripts ? null : findSetupScript(repoDir);
+  const script = skipScripts ? null : findSetupScript(repoDir, process.platform, opts.winShells);
   if (script) {
     reporter.phase?.(`${S.phaseInstall} ${script.file}`);
     reporter.commandStart?.(script.file);

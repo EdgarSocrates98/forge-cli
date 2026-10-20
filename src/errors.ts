@@ -13,7 +13,15 @@ export type ForgeErrorCode =
   /** forge.json declara uma Forja diferente da que a estrutura indica. */
   | 'FORGE-SOURCE-CONFLICT'
   /** Bootstrap local executou mas a verificação pós-install falhou. */
-  | 'FORGE-INSTALL-VERIFICATION-FAILED';
+  | 'FORGE-INSTALL-VERIFICATION-FAILED'
+  /** Windows sem nenhuma shell de instalação (powershell/pwsh ausentes e Git Bash inexistente). */
+  | 'FORGE-SHELL-NOT-FOUND'
+  /** Shell candidata existe no disco mas não executa (bloqueio de política, quebrada). */
+  | 'FORGE-SHELL-UNAVAILABLE'
+  /** Alvo de escrita resolvido nega permissão — reporta alternativa concreta. */
+  | 'FORGE-INSTALL-PERMISSION-DENIED'
+  /** Persistência de ambiente (PATH, .env, registry) falhou na escrita. */
+  | 'FORGE-ENV-PERSISTENCE-FAILED';
 
 export class ForgeError extends Error {
   readonly code: ForgeErrorCode;

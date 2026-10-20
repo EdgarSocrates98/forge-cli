@@ -8,7 +8,7 @@ import { runPreflight } from '../preflight.js';
 import type { ForgeRepo } from '../types.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { resolveTargetDir } from '../utils/system.js';
+import { resolveTargetDir, type WinSetupShells } from '../utils/system.js';
 
 export const BANNER_LINE_DELAY_MS = 30;
 
@@ -21,9 +21,15 @@ export async function printBanner(): Promise<void> {
   }
 }
 
-export async function checkEnvironment(): Promise<void> {
+/**
+ * Gate fatal ANTES de mutação (inalterado): fatal → exit(1). Devolve as
+ * shells Windows sondadas pelo preflight para o chamador reutilizar na
+ * rota de setup — em POSIX devolve `undefined`.
+ */
+export async function checkEnvironment(): Promise<{ winShells?: WinSetupShells }> {
   log.step(`${icons.gear} ${S.preflightTitle}`);
-  const checks = await runPreflight();
+  const env: { winShells?: WinSetupShells } = {};
+  const checks = await runPreflight(process.platform, undefined, env);
   for (const check of checks) {
     const hint = !check.ok && check.hint ? ` ${theme.dim(`→ ${check.hint}`)}` : '';
     if (check.ok) {
@@ -38,6 +44,7 @@ export async function checkEnvironment(): Promise<void> {
     log.error(S.preflightFailed);
     process.exit(1);
   }
+  return env;
 }
 
 export function emitJson(data: unknown, exitCode = 0): never {

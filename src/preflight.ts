@@ -1,8 +1,9 @@
 import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { windowsSetupShells } from './env/shells.js';
 import type { PreflightCheck } from './types.js';
 import { S } from './ui/strings.js';
-import { cliHome, commandOutput, commandWorks } from './utils/system.js';
+import { cliHome, commandOutput, commandWorks, type WinSetupShells } from './utils/system.js';
 
 const MIN_NODE_MAJOR = 20;
 
@@ -87,13 +88,17 @@ export async function pythonToolchain(
 
 /**
  * Bloco de preflight do fluxo de instalação — roda ANTES de qualquer
- * mutação. cobre: git, Node>=20, npm, python3, pip/pipx/uv, writability de
- * ~/.forge-cli, OS/arch e instalações registry existentes. Fatal bloqueia;
- * warn vira relatório compacto com dica de remediação.
+ * mutação. cobre: git, Node>=20, npm, shell de setup (win32: powershell/
+ * pwsh/Git Bash verificados — lf-0016), python3, pip/pipx/uv, writability
+ * de ~/.forge-cli, OS/arch e instalações registry existentes. Fatal
+ * bloqueia; warn vira relatório compacto com dica de remediação.
+ * `out.winShells` recebe a rota sondada (win32) para o chamador reutilizar
+ * sem sondar de novo; em POSIX fica `{}`.
  */
 export async function runPreflight(
   platform: NodeJS.Platform = process.platform,
   home: string = cliHome(),
+  out?: { winShells?: WinSetupShells },
 ): Promise<PreflightCheck[]> {
   const checks: PreflightCheck[] = [
     {
@@ -125,16 +130,18 @@ export async function runPreflight(
     },
   ];
   if (platform === 'win32') {
+    // Rota de shell nativa (lf-0016): powershell.exe → pwsh → Git Bash
+    // verificado executando. Fatal só quando NENHUMA rota existe —
+    // powershell ausente com Git Bash presente não bloqueia mais.
+    const winShells = await windowsSetupShells(platform);
+    if (out) out.winShells = winShells;
+    const route = winShells.ps ?? (winShells.bash ? `Git Bash (${winShells.bash})` : null);
     checks.push({
-      name: S.preflightPwsh,
-      ok: await commandWorks('powershell.exe', [
-        '-NoProfile',
-        '-Command',
-        '$PSVersionTable.PSVersion | Out-Null',
-      ]),
-      detail: 'powershell.exe',
+      name: S.preflightShellWin,
+      ok: route !== null,
+      detail: route ?? 'powershell.exe|pwsh|Git Bash',
       severity: 'fatal',
-      hint: S.preflightHintPwsh,
+      hint: S.preflightHintShellWin,
     });
   }
   const py = await pythonVersion(platform);

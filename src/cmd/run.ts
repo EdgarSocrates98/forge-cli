@@ -67,7 +67,7 @@ export async function runInstallFlow(
   resolved: ResolvedCommand,
   cloneOnly: boolean,
 ): Promise<void> {
-  await checkEnvironment();
+  const env = await checkEnvironment();
 
   const interactive = !isNonInteractive(cli);
   // --yes nunca pergunta: sem seleção explícita (--all/--only/nomes) é erro
@@ -217,6 +217,9 @@ export async function runInstallFlow(
     runAfterSyncFailure: cli.runAfterSyncFailure,
     onlyChanged: effectiveCli.onlyChanged,
     state: effectiveCli.onlyChanged ? loadState(targetDir)?.repos : undefined,
+    // Rota de shell verificada pelo preflight (win32) — reusa a sonda já
+    // feita, sem spawn duplicado; em POSIX checkEnvironment devolve {}.
+    winShells: env.winShells,
   };
   const jobs = interactive ? 1 : effectiveCli.jobs;
   if (interactive && effectiveCli.jobs > 1) log.warn(S.jobsIgnored);

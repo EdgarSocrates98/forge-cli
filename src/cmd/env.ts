@@ -3,6 +3,8 @@ import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { catalogFor } from './shared.js';
 import type { CliOptions } from '../cli-args.js';
+import { discoverEnvironment, discoveryLines, pathTargetLines } from '../env/discover.js';
+import { resolveWriteTargets } from '../env/paths.js';
 import { envDoctor } from '../envintel/doctor.js';
 import { inspectEnv } from '../envintel/inspect.js';
 import {
@@ -22,7 +24,17 @@ import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { resolveTargetDir } from '../utils/system.js';
 
-const VERBS = new Set(['inspect', 'plan', 'init', 'validate', 'migrate', 'doctor', 'wizard']);
+const VERBS = new Set([
+  'inspect',
+  'plan',
+  'init',
+  'validate',
+  'migrate',
+  'doctor',
+  'wizard',
+  'discover',
+  'paths',
+]);
 
 /** Diretórios sob `dir` que contêm .env ou .env.example. */
 function envCandidates(dir: string): string[] {
@@ -68,6 +80,39 @@ function findingLines(findings: Finding[]): string[] {
   return findings.map((f) => `${f.key} — ${f.detail}`);
 }
 
+/**
+ * `env discover` / `env paths` — a descoberta de ambiente do lf-0016
+ * (`forge/EnvironmentDiscovery/v1`) e a matriz de alvos de escrita.
+ * `--json` emite o relatório puro; humano mostra o resumo PT-BR.
+ * Blockers/alvos negados → exit 1 (mesmo contrato de `doctor`).
+ */
+async function runEnvDiscoveryCommand(
+  cli: CliOptions,
+  verb: 'discover' | 'paths',
+): Promise<number> {
+  const workspace = cli.dir ? resolveTargetDir(cli.dir) : undefined;
+  if (verb === 'paths') {
+    const targets = resolveWriteTargets({ explicit: { workspaceDir: workspace } });
+    const denied = targets.filter((t) => t.denied !== null);
+    if (cli.jsonReport) {
+      console.log(JSON.stringify({ command: 'env paths', write_targets: targets }, null, 2));
+      return denied.length ? 1 : 0;
+    }
+    note(pathTargetLines(targets).join('\n'), S.envPathsTitle);
+    return denied.length ? 1 : 0;
+  }
+  const report = await discoverEnvironment({
+    workspace,
+    offline: cli.offline,
+  });
+  if (cli.jsonReport) {
+    console.log(JSON.stringify(report, null, 2));
+    return report.blockers.length ? 1 : 0;
+  }
+  note(discoveryLines(report).join('\n'), S.envDiscoverTitle);
+  return report.blockers.length ? 1 : 0;
+}
+
 export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<number> {
   const [verb, ...rest] = args;
   const flags = new Set(rest.filter((a) => a.startsWith('-')));
@@ -82,6 +127,12 @@ export async function runEnvCommand(cli: CliOptions, args: string[]): Promise<nu
   if (!verb || !VERBS.has(verb)) {
     log.error(`${S.errUnknownCommand}: env ${verb ?? ''}`.trim());
     return 2;
+  }
+
+  // discover/paths não precisam de Forja nem repoDir — a descoberta é do
+  // ambiente da máquina (shells, rotas, alvos de escrita).
+  if (verb === 'discover' || verb === 'paths') {
+    return runEnvDiscoveryCommand(cli, verb);
   }
 
   const targetDir = resolveTargetDir(cli.dir);
