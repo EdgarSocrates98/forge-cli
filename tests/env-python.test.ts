@@ -4,6 +4,7 @@
  * toca o host real. Cobre estágios, precedência explícita, vereditos,
  * piso, seleção e dedup determinístico.
  */
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PYTHON_FLOOR,
@@ -280,14 +281,19 @@ describe('vereditos — absent/unexecutable/store-stub', () => {
 
 describe('determinismo, dedup e orçamento', () => {
   it('candidatos saem na ordem dos estágios (PATH antes de managers/platform)', async () => {
-    const fs = fakeFs(['/home/x/.local/share/uv/python/cp/bin/python3'], {
-      '/home/x/.local/share/uv/python': ['cp'],
-    });
+    // O pipeline monta candidatos com o `path.join` do HOST — injetar
+    // `platform: 'linux'` não muda o separador. Literal POSIX aqui faria
+    // o fs fake nunca bater as chaves em win32 (`join` devolve `\`) e o
+    // candidato uv sumiria do relatório; path.join mantém o fixture
+    // hermético nos dois hosts.
+    const uvRoot = path.join('/home/x', '.local', 'share', 'uv', 'python');
+    const uvBin = path.join(uvRoot, 'cp', 'bin', 'python3');
+    const fs = fakeFs([uvBin], { [uvRoot]: ['cp'] });
     const run = fakeRun(
       { python3: '/usr/bin/python3' },
       {
         'python3 --version': ok('Python 3.12.0'),
-        '/home/x/.local/share/uv/python/cp/bin/python3 --version': ok('Python 3.13.0'),
+        [`${uvBin} --version`]: ok('Python 3.13.0'),
       },
     );
     const d = await discoverPythons(baseDeps({ ...fs, run }));

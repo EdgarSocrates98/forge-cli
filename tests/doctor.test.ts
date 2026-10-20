@@ -84,6 +84,15 @@ describe('runDoctor', () => {
   it('fails a repo whose verify passes but prereqs are unmet', async () => {
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
+      // lf-0017: `command -v` (POSIX) / `where.exe` (win32) resolve o
+      // nome antes do --version — o cenário é "encontrado mas abaixo do
+      // piso" (incompatible), não "ausente".
+      if (cmd === 'sh' && args[1] === 'command -v python') {
+        return proc({ stdout: '/usr/bin/python' });
+      }
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return proc({ stdout: 'C:\\Python310\\python.exe' });
+      }
       if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.10.4' });
       return proc({ stdout: '' });
     }) as never);
@@ -98,10 +107,14 @@ describe('runDoctor', () => {
   it('reports ok when verify and prereqs both pass', async () => {
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
-      // Pipeline lf-0017: `command -v` resolve o nome antes do --version;
-      // resposta vazia/outra coisa conta como `absent` (não executa).
+      // Pipeline lf-0017: `command -v` (POSIX) / `where.exe` (win32)
+      // resolve o nome antes do --version; resposta vazia/outra coisa
+      // conta como `absent` (não executa).
       if (cmd === 'sh' && args[1] === 'command -v python') {
         return proc({ stdout: '/usr/bin/python' });
+      }
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return proc({ stdout: 'C:\\Python314\\python.exe' });
       }
       if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.14.0' });
       return proc({ stdout: '' });

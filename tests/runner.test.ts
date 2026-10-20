@@ -52,10 +52,14 @@ function mockExeca(state: GitState = {}) {
       return state.pullFails ? proc(new Error('pull boom')) : proc({ stdout: '' });
     }
     if (cmd === 'verify-bad') return proc(new Error('verify boom'));
-    // Pipeline lf-0017: `command -v` resolve o nome no PATH antes do
-    // probe — o mock simula um `python3` que responde de verdade.
+    // Pipeline lf-0017: `command -v` (POSIX) / `where.exe` (win32)
+    // resolve o nome no PATH antes do probe — o mock simula um
+    // `python3` que responde de verdade nos dois hosts.
     if (cmd === 'sh' && args[1] === 'command -v python3') {
       return proc({ stdout: '/usr/bin/python3' });
+    }
+    if (cmd === 'where.exe' && args[0] === 'python3') {
+      return proc({ stdout: 'C:\\Python314\\python3.exe' });
     }
     if (joined === '--version' && cmd === 'python3') return proc({ stdout: 'Python 3.14.0' });
     return proc({ stdout: '' });
@@ -204,6 +208,15 @@ describe('processRepo', () => {
       const joined = args.join(' ');
       if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
       if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      // lf-0017: `where.exe` (win32) / `command -v` (POSIX) resolve o
+      // nome antes do --version — o cenário pretendido é "interpretador
+      // encontrado mas abaixo do piso", não "ausente".
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return proc({ stdout: 'C:\\Python310\\python.exe' });
+      }
+      if (cmd === 'sh' && args[1] === 'command -v python') {
+        return proc({ stdout: '/usr/bin/python' });
+      }
       if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.10.4' });
       if (joined === '-m pip --version') return proc({ stdout: 'pip 25.0' });
       return proc({ stdout: '' });
@@ -227,9 +240,13 @@ describe('processRepo', () => {
       const joined = args.join(' ');
       if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
       if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
-      // Pipeline lf-0017: `command -v` resolve o nome antes do --version.
+      // Pipeline lf-0017: `command -v` (POSIX) / `where.exe` (win32)
+      // resolve o nome antes do --version.
       if (cmd === 'sh' && args[1] === 'command -v python') {
         return proc({ stdout: '/usr/bin/python' });
+      }
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return proc({ stdout: 'C:\\Python314\\python.exe' });
       }
       if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.14.0' });
       return proc({ stdout: '' });

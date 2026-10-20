@@ -34,8 +34,14 @@ describe('install.windows.sh — artefato do lf-0018', () => {
 
   it('shebang bash + bit executável', () => {
     expect(src.startsWith('#!/usr/bin/env bash')).toBe(true);
-    // modo 0755 preservado (POSIX; no Windows o bit é irrelevante para bash)
-    expect(statSync(SCRIPT).mode & 0o111).not.toBe(0);
+    // Bits de modo POSIX não existem no fs do Windows (statSync devolve
+    // o mode sintetizado dos atributos do arquivo — 0o111 sai 0 para um
+    // .sh). O bit executável é mecânica POSIX: verificado onde existe;
+    // shebang e finais LF seguem valendo em qualquer host.
+    if (process.platform !== 'win32') {
+      // modo 0755 preservado (POSIX; no Windows o bit é irrelevante para bash)
+      expect(statSync(SCRIPT).mode & 0o111).not.toBe(0);
+    }
   });
 
   it('finais LF apenas — tolerância CRLF documentada no cabeçalho', () => {
@@ -95,21 +101,30 @@ describe('install.windows.sh — artefato do lf-0018', () => {
     expect(() => execFileSync('bash', ['-n', SCRIPT], { stdio: 'pipe' })).not.toThrow();
   });
 
-  it('fora do bash (dash interpretando) → FORGE-SHELL-UNAVAILABLE', (ctx) => {
-    // o shebang `#!/usr/bin/env bash` faz `sh script` cair em bash de
-    // novo — a guarda só é exercitada quando um interpretador não-bash
-    // lê o arquivo diretamente (dash cobre o caso "shell errada").
-    if (!hasCmd('dash')) {
-      ctx.skip();
-      return;
-    }
-    try {
-      execFileSync('env', ['-i', 'dash', SCRIPT], { stdio: 'pipe' });
-      expect.unreachable('o script deveria recusar fora do bash');
-    } catch (err) {
-      const e = err as { status?: number; stderr?: Buffer };
-      expect(e.status).toBe(2);
-      expect(String(e.stderr)).toContain('FORGE-SHELL-UNAVAILABLE');
-    }
-  });
+  // No Windows este caso não é alcançável: o dash que vem no usr/bin do
+  // Git for Windows é um binário MSYS — `env -i` apaga o PATH (env não
+  // resolve mais o dash) e o path win32 do script chega sem tradução
+  // POSIX ("can't open" → 127, nunca o guard-rail). A rota MSYS já é
+  // coberta pelo teste de MSYSTEM/OSTYPE acima; aqui o alvo é só o
+  // interpretador não-bash POSIX, então o teste é POSIX-only de verdade.
+  it.skipIf(process.platform === 'win32')(
+    'fora do bash (dash interpretando) → FORGE-SHELL-UNAVAILABLE',
+    (ctx) => {
+      // o shebang `#!/usr/bin/env bash` faz `sh script` cair em bash de
+      // novo — a guarda só é exercitada quando um interpretador não-bash
+      // lê o arquivo diretamente (dash cobre o caso "shell errada").
+      if (!hasCmd('dash')) {
+        ctx.skip();
+        return;
+      }
+      try {
+        execFileSync('env', ['-i', 'dash', SCRIPT], { stdio: 'pipe' });
+        expect.unreachable('o script deveria recusar fora do bash');
+      } catch (err) {
+        const e = err as { status?: number; stderr?: Buffer };
+        expect(e.status).toBe(2);
+        expect(String(e.stderr)).toContain('FORGE-SHELL-UNAVAILABLE');
+      }
+    },
+  );
 });
