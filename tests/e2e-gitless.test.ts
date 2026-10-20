@@ -112,7 +112,7 @@ function gitRepoOps(): string[] {
   return readFileSync(gitLog, 'utf8')
     .split(/\r?\n/)
     .filter((l) => l.trim())
-    .filter((l) => !/^git --(exec-path|version)/.test(l.trim()));
+    .filter((l) => !/^git "?--(exec-path|version)/.test(l.trim()));
 }
 
 describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 300_000 }, () => {
