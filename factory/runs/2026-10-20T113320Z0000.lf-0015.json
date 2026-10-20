@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0015.implement.claude.md)"
+  ],
+  "created_at": "2026-10-20T11:33:20+00:00",
+  "id": "lf-0015",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0015.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0015.md",
+  "spec_sha256": "866636af546d9ce643c817a2c7ac86eec693ad99556f799a05a7d245b28da2b3",
+  "status": "planned",
+  "title": "Gitless forge detection + directory states + install semantics without .git"
+}
