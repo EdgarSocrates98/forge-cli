@@ -195,7 +195,7 @@ export function isNonInteractive(cli: CliOptions): boolean {
 /** Bloco contextual por comando — `forge-cli <cmd> --help` / `help <cmd>`. */
 const COMMAND_USAGE: Record<string, string> = {
   install:
-    '\ninstall <forjas> — git clone + setup (default) ou PyPI+venv (--method registry).\n' +
+    '\ninstall <forjas> — PyPI+venv (default) ou git clone + setup (--method git).\n' +
     '  --plan só mostra o plano; --ref/--version fixa UMA Forja; --all/--only selecionam.',
   update:
     '\nupdate [forjas] — pull + setup. --check só verifica; --method registry usa o receipt.\n' +

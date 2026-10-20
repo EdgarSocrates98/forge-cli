@@ -710,3 +710,55 @@ describe('review-11 — hardening', () => {
     expect(res).toMatchObject({ stage: 'incomplete' });
   });
 });
+
+describe('launchers (~/.forge-cli/bin)', () => {
+  it('install emite shim POSIX apontando para o bin da venv', async () => {
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      fetchImpl: fetchOk,
+      platform: 'linux',
+    });
+    expect(res).not.toHaveProperty('stage');
+    if ('stage' in res) return;
+    expect(res.shim).toBe(path.join(tmp, '.forge-cli', 'bin', 'apiforge'));
+    const body = readFileSync(res.shim!, 'utf8');
+    expect(body).toContain(`exec "${res.bin}"`);
+    expect(statSync(res.shim!).mode & 0o111).not.toBe(0);
+    // shim gravado no state.json — lifecycle lê de lá
+    expect(loadForgeState(tmp).forges['api-forge'].shim).toBe(res.shim);
+  });
+
+  it('install emite shim .cmd no Windows', async () => {
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      fetchImpl: fetchOk,
+      platform: 'win32',
+    });
+    expect(res).not.toHaveProperty('stage');
+    if ('stage' in res) return;
+    expect(res.shim).toBe(path.join(tmp, '.forge-cli', 'bin', 'apiforge.cmd'));
+    expect(readFileSync(res.shim!, 'utf8')).toBe(`@echo off\r\n"${res.bin}" %*\r\n`);
+  });
+
+  it('uninstall remove o shim junto da venv', async () => {
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      fetchImpl: fetchOk,
+      platform: 'linux',
+    });
+    if ('stage' in res) throw new Error('setup falhou');
+    expect(existsSync(res.shim!)).toBe(true);
+    const out = registryUninstall({ name: 'api-forge' }, { home: tmp, platform: 'linux' });
+    expect(out.shimRemoved).toBe(true);
+    expect(existsSync(res.shim!)).toBe(false);
+  });
+});

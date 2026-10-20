@@ -28,6 +28,7 @@ import {
   type LockError,
   type OfflineLock,
 } from './lock.js';
+import { emitForgeShim, removeForgeShim } from './shims.js';
 import { resolveRelease, type FetchLike, type ResolveError, type ResolvedRelease } from './pypi.js';
 import {
   compareVersions,
@@ -49,6 +50,10 @@ export interface RegistryInstallReceipt {
   source: ResolvedRelease['source'];
   venv: string;
   bin: string;
+  /** Launcher em `~/.forge-cli/bin/<cli>` — ausente se a emissão recusar. */
+  shim?: string;
+  /** Por que o shim não foi emitido (permissão, nome inseguro, …). */
+  shimRefused?: string;
   installedAt: string;
   verify: { command: string[]; ok: boolean };
   files: { filename: string; sha256?: string; packagetype?: string }[];
@@ -945,6 +950,17 @@ export async function registryInstall(
       const state = loadForgeState(deps.home);
       state.forges[entry.name] = receipt;
       saveForgeState(deps.home, state);
+      // Launcher em ~/.forge-cli/bin (dir já no PATH do self-install do
+      // forge-cli). Recusa não derruba a instalação — fica registrada no
+      // receipt e a nota final ainda mostra o bin da venv.
+      try {
+        receipt.shim = emitForgeShim(deps.home, binPath, platform);
+      } catch (shimError) {
+        receipt.shimRefused = shimError instanceof Error ? shimError.message : String(shimError);
+      }
+      writeFileAtomic(receiptPath(deps.home, entry.name), `${JSON.stringify(receipt, null, 2)}\n`);
+      state.forges[entry.name] = receipt;
+      saveForgeState(deps.home, state);
     } catch (error) {
       if (commitBackup) {
         rmSync(forgeDir, { recursive: true, force: true });
@@ -983,7 +999,13 @@ export interface RegistryUninstallDeps {
 export function registryUninstall(
   target: { name: string; dist?: string },
   deps: RegistryUninstallDeps,
-): { removed: boolean; receiptRemoved: boolean; cacheRemoved: boolean; refused?: string } {
+): {
+  removed: boolean;
+  receiptRemoved: boolean;
+  cacheRemoved: boolean;
+  shimRemoved?: boolean;
+  refused?: string;
+} {
   // name/dist podem vir de state.json (alvo fora do catálogo) — dado não
   // confiável. `resolveInside`/`isSafeRepoName` é a convenção do codebase
   // para caminhos destrutivos: recusa traversal em vez de rmSync cego.
@@ -1005,7 +1027,12 @@ export function registryUninstall(
   // own-property: state é dado não confiável — 'constructor' e afins
   // não podem casar membros do Object.prototype.
   const hadReceipt = Object.hasOwn(state.forges, target.name);
+  const shimRemoved = removeForgeShim(
+    deps.home,
+    hadReceipt ? state.forges[target.name].bin : undefined,
+    deps.platform ?? process.platform,
+  );
   if (hadReceipt) delete state.forges[target.name];
   saveForgeState(deps.home, state);
-  return { removed, receiptRemoved: hadReceipt, cacheRemoved };
+  return { removed, receiptRemoved: hadReceipt, cacheRemoved, shimRemoved };
 }

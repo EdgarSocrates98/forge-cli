@@ -447,7 +447,18 @@ async function main(): Promise<void> {
     log.error(S.errReinstallNeedsNames);
     process.exit(2);
   }
-  if (resolved.command === 'install' && cli.method === 'registry') {
+  // §7.3: `install` é registry-first (PyPI+venv). Checkout git só entra por
+  // opt-in explícito (`--method git` ou o comando `clone`); `install` sem
+  // nomes em TTY cai no wizard, que já abre no método registry.
+  const installWantsRegistry =
+    resolved.command === 'install' &&
+    cli.method !== 'git' &&
+    (cli.method === 'registry' ||
+      resolved.names.length > 0 ||
+      cli.all === true ||
+      (cli.only?.length ?? 0) > 0 ||
+      isNonInteractive(cli));
+  if (installWantsRegistry) {
     const names = resolved.names.length
       ? resolved.names
       : cli.all

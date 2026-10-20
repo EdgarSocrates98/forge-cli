@@ -486,9 +486,15 @@ export async function runRegistryInstall(
   if (results.some((r) => !r.ok)) process.exit(1);
   const bins = results.map((r) => {
     const inst = loadForgeState(home).forges[r.forge];
-    return inst ? `${r.forge} → ${inst.bin}` : '';
+    if (!inst) return '';
+    return inst.shim
+      ? `${r.forge} → ${path.basename(inst.shim)} (em ${path.dirname(inst.shim)})`
+      : `${r.forge} → ${inst.bin}`;
   });
-  note(bins.filter(Boolean).join('\n'), 'Para usar, adicione ao PATH ou invoque o caminho');
+  note(
+    bins.filter(Boolean).join('\n'),
+    'Launchers em ~/.forge-cli/bin (no PATH do forge-cli); sem shim, invoque o caminho da venv',
+  );
   outro(`${icons.ok} instalação registry-first concluída`);
   return results;
 }
