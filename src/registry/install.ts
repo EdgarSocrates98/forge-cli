@@ -1031,9 +1031,7 @@ export function registryUninstall(
   // launcher órfão em ~/.forge-cli/bin se derivássemos o nome dele.
   const shimRemoved = removeForgeShim(
     deps.home,
-    hadReceipt
-      ? (state.forges[target.name].shim ?? state.forges[target.name].bin)
-      : undefined,
+    hadReceipt ? (state.forges[target.name].shim ?? state.forges[target.name].bin) : undefined,
     deps.platform ?? process.platform,
   );
   if (hadReceipt) delete state.forges[target.name];
