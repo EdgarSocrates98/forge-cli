@@ -136,7 +136,16 @@ export interface RegistryInstallReceipt {
 export interface LocalInstallReceipt {
   forge: string;
   method: 'local';
-  /** Campo pedido pelo spec: discriminador estável do método local. */
+  /**
+   * Campo pedido pelo spec: discriminador estável do método local.
+   * Mapeamento do contrato compartilhado (lf-0018): o bootstrap
+   * `forge/InstallReceipt/v1` emite `install_method` com valores de
+   * ROTA DE INSTALAÇÃO (`wheel`, `editable`) — semântica distinta do
+   * discriminador de MÉTODO local/pypi usado aqui. O nome foi mantido
+   * porque receipts persistidos nas duas superfícies já o leem; quem
+   * cruza os dois formatos resolve `method` (forge-cli) ↔
+   * `install_method` (bootstrap) pela tabela, nunca por renomeação.
+   */
   install_method: 'local';
   dist: string;
   version: string;
