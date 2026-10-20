@@ -1,17 +1,22 @@
 # Solução de problemas
 
-Falhas comuns do forge-cli e como resolver cada uma.
+Falhas comuns do forge-cli e como resolver cada uma. Para os códigos de
+recusa `FORGE-*` (fonte local, shells, Python, permissões), a tabela
+completa está em [troubleshooting.md](troubleshooting.md) — cada código
+carrega causa e remédio acionável. O guia por cenário de instalação
+(PyPI, git, ZIP, Git Bash, Python fora do PATH, offline) está em
+[installation.md](installation.md).
 
 ## O preflight falha
 
 O preflight roda antes de qualquer prompt e encerra com código `1`
 quando algo falta:
 
-| Falha                         | Causa                               | Correção                                               |
-| ----------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| `git` indisponível            | Git não instalado ou fora do `PATH` | Instale o Git e abra um terminal novo                  |
-| `Node.js >= 20` falha         | Versão antiga                       | Atualize via [nodejs.org](https://nodejs.org) ou `nvm` |
-| `powershell.exe` indisponível | Somente Windows; fora do `PATH`     | Reinstale o PowerShell ou ajuste o `PATH`              |
+| Falha                             | Causa                                               | Correção                                                                                        |
+| --------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `git` indisponível                | Git não instalado ou fora do `PATH`                 | Instale o Git e abra um terminal novo                                                           |
+| `Node.js >= 20` falha             | Versão antiga                                       | Atualize via [nodejs.org](https://nodejs.org) ou `nvm`                                          |
+| shell de instalação ausente (Win) | `powershell.exe`/`pwsh` fora do PATH e sem Git Bash | Instale Git for Windows (o Git Bash cobre a rota `install.windows.sh`) ou habilite o PowerShell |
 
 ## Falha no clone/pull (`[ERRO]`)
 
@@ -33,10 +38,12 @@ quando algo falta:
 
 ## O script de instalação falha
 
-- **Windows**: o CLI executa
-  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1`.
-  Se a política de execução estiver restrita demais ou o PowerShell for
-  o Core (`pwsh`), ajuste o script ou o ambiente.
+- **Windows**: o CLI executa `.ps1` via `powershell.exe -NoProfile
+-ExecutionPolicy Bypass` (ou `pwsh` quando o 5.1 está ausente). Sem
+  nenhum PowerShell, o Git Bash executa `install.windows.sh`/`setup.sh`
+  — a rota é escolhida pelo que executa, não pelo PATH declarado. Se a
+  política de execução estiver restrita demais, ajuste o script ou o
+  ambiente (`FORGE-SHELL-UNAVAILABLE`).
 - **Linux/macOS**: o CLI executa `chmod +x install.sh && ./install.sh`.
   Confirme que o script é válido para o seu shell.
 - **Sem script para o SO**: o repositório sai como `[AVISO]`, não

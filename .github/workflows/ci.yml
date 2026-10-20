@@ -19,7 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        # windows-latest = rótulo pedido pelo lf-0019 (hoje resolve para
+        # windows-2025 — mesma imagem, mantém o gate sobre a linha móvel).
+        os: [ubuntu-24.04, windows-latest, macos-15]
         node: [20.x, 22.x, 24.x]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -34,3 +36,35 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run coverage
+      # lf-0019 B1 — o shim Git Bash das Forjas é bash puro: syntax check
+      # em todos os OSes (no Windows o `shell: bash` já é o Git Bash).
+      - name: bash -n install.windows.sh
+        shell: bash
+        run: bash -n install.windows.sh
+      # lf-0019 B1 — SIMULAÇÃO do cenário corporativo sem PowerShell:
+      # PATH reduzido remove powershell.exe (System32\WindowsPowerShell)
+      # e pwsh (Program Files\PowerShell) da resolução de nomes; o probe
+      # de arquivo continua vendo-os no disco. A rota tem de cair para
+      # git_bash com install.windows.sh primeiro na cadeia. Não é E2E de
+      # hardware Windows+AD — é gate de seleção de rota no runner real.
+      - name: rota Git Bash com PowerShell fora do PATH (simulada)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -u
+          NODE_DIR="$(dirname "$(command -v node)")"
+          REPORT="$RUNNER_TEMP/env-discover-nops.json"
+          mkdir -p "$RUNNER_TEMP/forge-home"
+          PATH="$NODE_DIR:/c/Program Files/Git/cmd:/c/Program Files/Git/bin:/c/Program Files/Git/usr/bin:/c/Windows/System32:/c/Windows:/usr/bin" \
+          FORGE_CLI_HOME="$RUNNER_TEMP/forge-home" \
+            node --import tsx src/index.ts env discover --json > "$REPORT" || true
+          node -e '
+            const d = require(process.argv[1]);
+            const assert = require("node:assert");
+            assert.strictEqual(d.shells.powershell.present, false, "powershell.exe deveria estar fora do PATH");
+            assert.strictEqual(d.shells.pwsh.present, false, "pwsh deveria estar fora do PATH");
+            assert.strictEqual(d.shells.git_bash.present, true, "Git Bash precisa executar no runner");
+            assert.strictEqual(d.route.selected, "git_bash", `rota=${d.route.selected}`);
+            assert.strictEqual(d.route.script_chain[0], "install.windows.sh");
+            console.log("no-PowerShell → git_bash:", JSON.stringify(d.route));
+          ' "$REPORT"

@@ -470,6 +470,23 @@ function noScriptFailure(
 }
 
 /**
+ * A rota local precisa de `forge_id` para nomear o receipt — só sai de
+ * um forge.json válido. `GIT_REPOSITORY`/`GIT_WORKTREE` sem manifesto
+ * não são recusa do DETECTOR (o fluxo git cuida deles), mas para a rota
+ * local são fonte sem identidade: recusar ANTES de provisionar/rodar
+ * qualquer script (sem a guarda, o bootstrap rodava e a escrita do
+ * receipt quebrava com `forge: undefined` — mutação sem nome).
+ */
+function missingIdentityFailure(det: SourceDetection): LocalFailure {
+  return {
+    code: 'FORGE-SOURCE-INVALID',
+    cause: `${det.path}: fonte ${det.state} sem forge.json válido — a rota local exige a identidade declarada (forge_id)`,
+    remedy:
+      'adicione forge.json com forge_id à fonte, ou use o fluxo git (`clone`/`update`) para checkouts sem manifesto',
+  };
+}
+
+/**
  * `install <dir>` — classifica, confirma fonte parcial quando exigido,
  * provisiona .env/configs, roda o bootstrap no lugar e persiste o
  * receipt auditável. Recusas (estados não-instaláveis, sem script,
@@ -479,6 +496,7 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
   const run = deps.run ?? execaRun;
   const det = detectSource(dir);
   if (det.refusal) return fail(det.refusal, det);
+  if (!det.forge_id) return fail(missingIdentityFailure(det), det);
   const gate = await partialGate(det, deps);
   if (gate) return fail(gate, det);
   const prior = loadForgeState(deps.home).forges[det.forge_id!];
@@ -576,7 +594,8 @@ export async function localUpdate(dir: string, deps: LocalDeps): Promise<LocalOu
   const run = deps.run ?? execaRun;
   const det = detectSource(dir);
   if (det.refusal) return fail(det.refusal, det);
-  const forgeId = det.forge_id!;
+  if (!det.forge_id) return fail(missingIdentityFailure(det), det);
+  const forgeId = det.forge_id;
   const prior = loadForgeState(deps.home).forges[forgeId];
   if (!prior || prior.method !== 'local') {
     return fail(

@@ -19,10 +19,15 @@ feedback visual em tempo real.
 - **Provisionamento de `.env`**: antes de qualquer script de
   instalação, copia `.env.example` para `.env` ou cria um modelo com
   comentários. Um `.env` existente nunca é sobrescrito.
-- **Scripts por sistema operacional**: `install.ps1` no Windows e
-  `install.sh` no Linux/macOS, detectados automaticamente.
+- **Scripts por sistema operacional**: `install.ps1`/`setup.ps1` no
+  Windows (powershell.exe → pwsh → Git Bash via `install.windows.sh`) e
+  `install.sh`/`setup.sh` no Linux/macOS, detectados automaticamente.
+- **Fonte local (gitless)**: `install <dir>` instala de ZIP extraído,
+  pasta copiada ou diretório sem `.git` — detecção por filesystem, sem
+  spawn de git e sem rede no caminho gitless.
 - **Verificação de ambiente (preflight)**: confirma `git`, Node.js
-  > = 20 e `powershell.exe` (Windows) antes de qualquer alteração.
+  > = 20 e uma shell de instalação no Windows (powershell.exe, pwsh ou
+  > Git Bash) antes de qualquer alteração.
 - **Isolamento de falhas**: o erro em um repositório não interrompe os
   demais; o relatório final mostra `[OK]`, `[AVISO]` ou `[ERRO]` por
   item, com tempo de execução.
@@ -31,13 +36,17 @@ feedback visual em tempo real.
 
 ## Requisitos
 
-| Requisito       | Versão           | Observação                       |
-| --------------- | ---------------- | -------------------------------- |
-| Node.js         | >= 20            | Verificado no preflight          |
-| npm             | >= 10            | Gerenciador de pacotes fixo      |
-| Git             | qualquer recente | Precisa estar no `PATH`          |
-| PowerShell      | qualquer         | Somente Windows — `install.ps1`  |
-| Credenciais Git | —                | Acesso aos repositórios privados |
+| Requisito              | Versão           | Observação                                       |
+| ---------------------- | ---------------- | ------------------------------------------------ |
+| Node.js                | >= 20            | Verificado no preflight                          |
+| npm                    | >= 10            | Gerenciador de pacotes fixo                      |
+| Git                    | qualquer recente | Precisa estar no `PATH`                          |
+| PowerShell ou Git Bash | qualquer         | Somente Windows — `.ps1` ou `install.windows.sh` |
+| Credenciais Git        | —                | Acesso aos repositórios privados                 |
+
+> PowerShell **não** é obrigatório no Windows: sem `powershell.exe`/`pwsh`
+> o Git Bash executa `install.windows.sh`. WSL nunca substitui shell
+> nativo — detalhes em [docs/installation.md](docs/installation.md).
 
 ## Instalação
 
@@ -119,6 +128,17 @@ recusado antes de qualquer mutação.
 - `uninstall --method registry` remove venv + receipt com plano e
   confirmação (`--yes`); `--all`/`--only` resolvem o conjunto instalado.
 
+## Fonte local (ZIP, pasta copiada, sem `.git`)
+
+`forge-cli install <dir>` instala direto de um diretório — ZIP do GitHub
+extraído, pasta copiada ou checkout sem `.git`. O bootstrap roda no
+lugar, sem `git init`/clone/pull e sem rede; `update <dir-novo>`
+reconcilia arquivos na fonte registrada, `reinstall <nome>` re-executa
+o bootstrap e `uninstall <nome>` remove só os artefatos gerenciados
+(a fonte e os arquivos do usuário nunca são apagados). Guia completo
+por cenário: [docs/installation.md](docs/installation.md); códigos de
+recusa: [docs/troubleshooting.md](docs/troubleshooting.md).
+
 ## Independência
 
 O forge-cli é uma conveniência opcional: nenhuma Forja depende dele e remover o CLI (`self uninstall`) não afeta Forjas já instaladas. Instalações feitas à mão são reconhecidas (`forge-cli status`) sem precisar reinstalar. Estes cenários estão cobertos em `tests/independence.test.ts`.
@@ -127,6 +147,8 @@ O forge-cli é uma conveniência opcional: nenhuma Forja depende dele e remover 
 
 ```bash
 forge-cli install api-forge platform-forge   # instala Forjas escolhidas
+forge-cli install ./minha-fonte              # fonte local (ZIP/cópia/sem .git)
+forge-cli update ./minha-fonte-nova          # update por diretório mais novo
 forge-cli install                            # fluxo interativo
 forge-cli clone api-forge                    # só clona/sincroniza, sem scripts
 forge-cli status                             # estado local (clonado, versão, alterações)
@@ -164,8 +186,9 @@ Execute `npm run dev` (ou `forge-cli`, se instalado globalmente) e siga
 o fluxo interativo:
 
 1. **Banner e verificação de ambiente.** O CLI exibe o banner do Forge
-   e valida `git`, a versão do Node.js e o `powershell.exe` (no
-   Windows). Falhas encerram o processo antes de qualquer prompt.
+   e valida `git`, a versão do Node.js e uma shell de instalação no
+   Windows (`powershell.exe`, `pwsh` ou Git Bash). Falhas encerram o
+   processo antes de qualquer prompt.
 2. **Diretório de instalação.** Informe onde os repositórios serão
    clonados. O padrão é `./forge-workspace`; o caminho é convertido
    para absoluto e o diretório criado se não existir.
@@ -263,6 +286,8 @@ factory/             # fluxo spec-driven (Loop Factory)
 
 - [Arquitetura e decisões de design](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/arquitetura.md)
 - [Matriz de capacidades das Forjas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md)
+- [Guia de instalação por cenário](docs/installation.md)
+- [Códigos FORGE-* de recusa](docs/troubleshooting.md)
 - [Solução de problemas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/solucao-de-problemas.md)
 - [Como contribuir](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/CONTRIBUTING.md)
 - [Registro de mudanças](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/CHANGELOG.md)
