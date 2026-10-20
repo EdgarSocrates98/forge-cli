@@ -3,6 +3,11 @@
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.2.4] - 2026-10-20
+
+### Changed
+- Cycle 12.1 local-source + environment discovery: gitless forge detection (`GITLESS_*` states, A/B/C identity), `local install|update|repair|uninstall` bound to managed artifacts, `forge/LocalForgeSourceDetection/v1` + `forge/EnvironmentDiscovery/v1` contracts, deterministic shell + python pipelines (`env discover`, `env paths`), FORGE-PYTHON/FORGE-SHELL refusal codes, `install.windows.sh` routed when PowerShell is unavailable, ubuntu+windows+macos CI matrix with a simulated no-PowerShell gate.
+
 ## [0.2.3] - 2026-10-20
 
 ### Changed
