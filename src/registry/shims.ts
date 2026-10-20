@@ -20,8 +20,21 @@ function shimName(bin: string, platform: NodeJS.Platform): string {
 }
 
 /**
+ * Escapa `bin` para interpolação dentro de aspas duplas no shell POSIX
+ * (`"`, `\`, `$`, backtick recebem backslash). Newline nunca é válido.
+ */
+function shQuote(bin: string): string {
+  if (bin.includes('\n') || bin.includes('\r')) {
+    throw new Error(`bin com newline não pode virar shim: ${JSON.stringify(bin)}`);
+  }
+  return bin.replace(/(["\\$`])/g, '\\$1');
+}
+
+/**
  * Emite o launcher do `bin` instalado. Retorna o caminho do shim; falha
  * de escrita lança — o chamador decide se degrada ou registra.
+ * Constraint: no Windows `.cmd` não há escape confiável para `"` — bin
+ * com `"`/newline recusa em vez de emitir script corrompido.
  */
 export function emitForgeShim(home: string, bin: string, platform: NodeJS.Platform): string {
   const dir = shimsDir(home);
@@ -31,9 +44,15 @@ export function emitForgeShim(home: string, bin: string, platform: NodeJS.Platfo
   }
   mkdirSync(dir, { recursive: true });
   if (platform === 'win32') {
+    if (bin.includes('"') || bin.includes('\n') || bin.includes('\r')) {
+      throw new Error(`bin não expressável em .cmd: ${JSON.stringify(bin)}`);
+    }
     writeFileSync(target, `@echo off\r\n"${bin}" %*\r\n`, 'utf8');
   } else {
-    writeFileSync(target, `#!/bin/sh\nexec "${bin}" "$@"\n`, { encoding: 'utf8', mode: 0o755 });
+    writeFileSync(target, `#!/bin/sh\nexec "${shQuote(bin)}" "$@"\n`, {
+      encoding: 'utf8',
+      mode: 0o755,
+    });
     chmodSync(target, 0o755);
   }
   return target;

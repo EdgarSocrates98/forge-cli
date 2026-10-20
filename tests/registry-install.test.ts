@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -29,6 +30,7 @@ import {
   type RunResult,
 } from '../src/registry/install.js';
 import type { FetchLike } from '../src/registry/pypi.js';
+import { emitForgeShim } from '../src/registry/shims.js';
 import { parseVersion } from '../src/registry/versions.js';
 
 let tmp: string;
@@ -760,5 +762,24 @@ describe('launchers (~/.forge-cli/bin)', () => {
     const out = registryUninstall({ name: 'api-forge' }, { home: tmp, platform: 'linux' });
     expect(out.shimRemoved).toBe(true);
     expect(existsSync(res.shim!)).toBe(false);
+  });
+
+  it('shim POSIX escapa aspas/$ no caminho do bin', () => {
+    const bin = path.join(tmp, 'we"ird$dir', 'apiforge');
+    const shim = emitForgeShim(tmp, bin, 'linux');
+    const body = readFileSync(shim, 'utf8');
+    const escaped = bin.replace(/(["\\$`])/g, '\\$1');
+    expect(body).toContain(`exec "${escaped}" "$@"`);
+    expect(body).not.toContain(`exec "${bin}"`);
+  });
+
+  it('shim .cmd recusa bin com aspas/newline', () => {
+    // `"` corromperia o .cmd — nunca pode virar shim (recusa em qualquer camada)
+    expect(() => emitForgeShim(tmp, 'C:\\ba"d\\cli.exe', 'win32')).toThrow();
+    expect(() => emitForgeShim(tmp, 'C:\\ok\\cli.exe\n', 'win32')).toThrow();
+    const dir = path.join(tmp, '.forge-cli', 'bin');
+    expect(existsSync(dir) ? readdirSync(dir) : []).not.toContainEqual(
+      expect.stringMatching(/cli\.cmd/),
+    );
   });
 });
