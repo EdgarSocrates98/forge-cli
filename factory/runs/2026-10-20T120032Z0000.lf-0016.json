@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0016.implement.claude.md)"
+  ],
+  "created_at": "2026-10-20T12:00:32+00:00",
+  "id": "lf-0016",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0016.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0016.md",
+  "spec_sha256": "0263f74813ef5f61d6e2f61160f3ea5d73c4fffb2c961fc1aac59dd1535a0a7e",
+  "status": "planned",
+  "title": "Shell/environment discovery + preflight 2.0 (forge/EnvironmentDiscovery/v1)"
+}
