@@ -730,7 +730,10 @@ describe('launchers (~/.forge-cli/bin)', () => {
     // o shim escapa `\`, `"`, `$`, backtick dentro das aspas — a asserção
     // replica o escape do shQuote (Windows CI passa um path com `\`)
     expect(body).toContain(`exec "${res.bin.replace(/(["\\$`])/g, '\\$1')}"`);
-    expect(statSync(res.shim!).mode & 0o111).not.toBe(0);
+    // bits POSIX não existem no fs do host Windows — só asseríveis em POSIX real
+    if (process.platform !== 'win32') {
+      expect(statSync(res.shim!).mode & 0o111).not.toBe(0);
+    }
     // shim gravado no state.json — lifecycle lê de lá
     expect(loadForgeState(tmp).forges['api-forge'].shim).toBe(res.shim);
   });
