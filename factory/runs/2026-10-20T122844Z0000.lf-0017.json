@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0017.implement.claude.md)"
+  ],
+  "created_at": "2026-10-20T12:28:44+00:00",
+  "id": "lf-0017",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0017.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0017.md",
+  "spec_sha256": "df59485ed3bd39768c7344ef9b1eac53600543d74b66f66a99fe39d428c2fd67",
+  "status": "planned",
+  "title": "Universal Python discovery + interpreter validation + explicit selection"
+}
