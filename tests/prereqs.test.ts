@@ -118,6 +118,11 @@ describe('checkRepoPrereqs', () => {
     writePy(dir, '>=3.11');
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
+      // Pipeline lf-0017: nomes do PATH resolvem via where.exe antes do
+      // probe `--version` — sem resolução o nome conta como `absent`.
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return okOut('C:\\Python314\\python.exe');
+      }
       if (joined === '--version' && cmd === 'python') return okOut('Python 3.14.0');
       if (joined === '--version' && cmd !== 'python') return failOut();
       if (joined === '-m pip --version') return okOut('pip 25.0');
@@ -134,6 +139,9 @@ describe('checkRepoPrereqs', () => {
     writePy(dir, '>=3.12');
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
+      if (cmd === 'where.exe' && args[0] === 'python') {
+        return okOut('C:\\Python310\\python.exe');
+      }
       if (joined === '--version' && cmd === 'python') return okOut('Python 3.10.4');
       if (joined === '-m pip --version') return okOut('pip 25.0');
       if (joined === '-c import venv') return okOut('');
@@ -197,6 +205,8 @@ describe('checkRepoPrereqs', () => {
     writePy(dir, '>=3.12');
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
+      // `py` precisa resolver no PATH (where.exe) antes dos probes -3.x.
+      if (cmd === 'where.exe' && args[0] === 'py') return okOut('C:\\Windows\\py.exe');
       if (cmd === 'py' && joined === '-3.12 -m pip --version') return okOut('pip 25.0');
       if (cmd === 'py' && joined === '-3.12 -c import venv') return okOut('');
       if (cmd === 'py' && joined === '-3.12 --version') return okOut('Python 3.12.4');

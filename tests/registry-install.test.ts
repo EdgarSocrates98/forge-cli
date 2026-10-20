@@ -150,7 +150,9 @@ describe('registryInstall', () => {
       fetchImpl: async () => ({ status: 200, body: JSON.stringify(payload) }),
     });
     if ('stage' in res) throw new Error('unexpected failure');
-    expect(res.python).toBe('3.12.1');
+    // lf-0017: `python` é a proveniência {source, version, executable,
+    // selection_reason} — a versão é a que o interpretador executou.
+    expect(res.python).toMatchObject({ version: '3.12.1', executable: 'python3' });
   });
 
   it('python incompatível → erro honesto antes de criar venv', async () => {
@@ -302,7 +304,7 @@ describe('segurança e edge cases do install', () => {
     });
     expect(res).not.toHaveProperty('stage');
     if ('stage' in res) return;
-    expect(res.python).toBe('3.12.4');
+    expect(res.python).toMatchObject({ version: '3.12.4', executable: 'python3' });
     expect(calls[0][0]).toBe('python3');
   });
 

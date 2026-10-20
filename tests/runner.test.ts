@@ -52,6 +52,12 @@ function mockExeca(state: GitState = {}) {
       return state.pullFails ? proc(new Error('pull boom')) : proc({ stdout: '' });
     }
     if (cmd === 'verify-bad') return proc(new Error('verify boom'));
+    // Pipeline lf-0017: `command -v` resolve o nome no PATH antes do
+    // probe — o mock simula um `python3` que responde de verdade.
+    if (cmd === 'sh' && args[1] === 'command -v python3') {
+      return proc({ stdout: '/usr/bin/python3' });
+    }
+    if (joined === '--version' && cmd === 'python3') return proc({ stdout: 'Python 3.14.0' });
     return proc({ stdout: '' });
   }) as never);
 }
@@ -221,6 +227,10 @@ describe('processRepo', () => {
       const joined = args.join(' ');
       if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
       if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      // Pipeline lf-0017: `command -v` resolve o nome antes do --version.
+      if (cmd === 'sh' && args[1] === 'command -v python') {
+        return proc({ stdout: '/usr/bin/python' });
+      }
       if (joined === '--version' && cmd === 'python') return proc({ stdout: 'Python 3.14.0' });
       return proc({ stdout: '' });
     }) as never);

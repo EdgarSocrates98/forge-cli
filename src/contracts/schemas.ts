@@ -769,6 +769,9 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                   'FORGE-SHELL-UNAVAILABLE',
                   'FORGE-INSTALL-PERMISSION-DENIED',
                   'FORGE-ENV-PERSISTENCE-FAILED',
+                  'FORGE-PYTHON-NOT-FOUND',
+                  'FORGE-PYTHON-INCOMPATIBLE',
+                  'FORGE-PYTHON-UNEXECUTABLE',
                 ],
               },
               cause: {
@@ -808,11 +811,79 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
             type: ['string', 'null'],
           },
           source: {
-            const: 'pythonCandidates',
+            type: ['string', 'null'],
+          },
+          selection_reason: {
+            type: ['string', 'null'],
           },
           pipeline: {
             type: 'string',
             minLength: 1,
+          },
+          candidates_total: {
+            type: 'number',
+            min: 0,
+          },
+          candidates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['executable', 'source', 'version', 'valid', 'verdict'],
+              properties: {
+                executable: {
+                  type: 'string',
+                  minLength: 1,
+                },
+                source: {
+                  type: 'string',
+                  minLength: 1,
+                },
+                version: {
+                  type: ['string', 'null'],
+                },
+                valid: {
+                  type: 'boolean',
+                },
+                verdict: {
+                  enum: ['ok', 'absent', 'unexecutable', 'incompatible', 'store-stub'],
+                },
+                code: {
+                  enum: [
+                    'FORGE-PYTHON-NOT-FOUND',
+                    'FORGE-PYTHON-INCOMPATIBLE',
+                    'FORGE-PYTHON-UNEXECUTABLE',
+                    null,
+                  ],
+                  type: ['string', 'null'],
+                },
+                note: {
+                  type: ['string', 'null'],
+                },
+              },
+              additionalProperties: true,
+            },
+          },
+          refusal: {
+            type: ['object', 'null'],
+            required: ['code', 'cause', 'remedy'],
+            properties: {
+              code: {
+                enum: [
+                  'FORGE-PYTHON-NOT-FOUND',
+                  'FORGE-PYTHON-INCOMPATIBLE',
+                  'FORGE-PYTHON-UNEXECUTABLE',
+                ],
+              },
+              cause: {
+                type: 'string',
+                minLength: 1,
+              },
+              remedy: {
+                type: 'string',
+                minLength: 1,
+              },
+            },
+            additionalProperties: true,
           },
         },
         additionalProperties: true,
@@ -938,6 +1009,9 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                     'FORGE-SHELL-UNAVAILABLE',
                     'FORGE-INSTALL-PERMISSION-DENIED',
                     'FORGE-ENV-PERSISTENCE-FAILED',
+                    'FORGE-PYTHON-NOT-FOUND',
+                    'FORGE-PYTHON-INCOMPATIBLE',
+                    'FORGE-PYTHON-UNEXECUTABLE',
                   ],
                 },
                 cause: {
@@ -1012,6 +1086,9 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                 'FORGE-SHELL-UNAVAILABLE',
                 'FORGE-INSTALL-PERMISSION-DENIED',
                 'FORGE-ENV-PERSISTENCE-FAILED',
+                'FORGE-PYTHON-NOT-FOUND',
+                'FORGE-PYTHON-INCOMPATIBLE',
+                'FORGE-PYTHON-UNEXECUTABLE',
               ],
             },
             message: {
@@ -1046,6 +1123,9 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                 'FORGE-SHELL-UNAVAILABLE',
                 'FORGE-INSTALL-PERMISSION-DENIED',
                 'FORGE-ENV-PERSISTENCE-FAILED',
+                'FORGE-PYTHON-NOT-FOUND',
+                'FORGE-PYTHON-INCOMPATIBLE',
+                'FORGE-PYTHON-UNEXECUTABLE',
               ],
             },
             message: {
@@ -1080,6 +1160,9 @@ export const SCHEMAS: Record<string, Record<string, unknown>> = {
                 'FORGE-SHELL-UNAVAILABLE',
                 'FORGE-INSTALL-PERMISSION-DENIED',
                 'FORGE-ENV-PERSISTENCE-FAILED',
+                'FORGE-PYTHON-NOT-FOUND',
+                'FORGE-PYTHON-INCOMPATIBLE',
+                'FORGE-PYTHON-UNEXECUTABLE',
               ],
             },
             message: {

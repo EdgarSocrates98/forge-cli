@@ -9,7 +9,8 @@ import { confirm, isCancel } from '@clack/prompts';
 import { log, note, outro, spinner } from '@clack/prompts';
 import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
-import { pythonCandidates } from '../preflight.js';
+import { discoverPythons, type PythonDiscovery, type PythonRefusal } from '../env/python.js';
+import type { ProbeRun } from '../env/shells.js';
 import { isSafeRepoName, redactSecrets, writeFileAtomic } from '../safety.js';
 import { registryEntry, REGISTRY_PACKAGES, type RegistryEntry } from '../registry/catalog.js';
 import {
@@ -38,7 +39,7 @@ import {
 import { FORGE_REPOS } from '../constants/repos.js';
 import { resolveRelease, type FetchLike, type ResolveError } from '../registry/pypi.js';
 import { generateOfflineLock, type OfflineLock } from '../registry/lock.js';
-import { compareVersions, parseVersion, type ParsedVersion } from '../registry/versions.js';
+import { compareVersions, type ParsedVersion } from '../registry/versions.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { cliHome, commandOutput } from '../utils/system.js';
@@ -48,26 +49,78 @@ export interface ProbedPython {
   exe: string[];
   version: string;
   parsed: ParsedVersion;
+  /** Origem no pipeline lf-0017 ('env', 'flag', 'venv', 'path', …). */
+  source?: string;
+  /** Por que este candidato foi produzido — vai ao receipt. */
+  selection_reason?: string;
 }
 
-/** Prova todos os candidatos documentados; dedup por versão, mais novo primeiro. */
-export async function probePythons(
-  platform: NodeJS.Platform = process.platform,
-  probe: (exe: string, args: string[]) => Promise<string | null> = commandOutput,
-): Promise<ProbedPython[]> {
+/** Candidatos válidos do pipeline → forma ProbedPython (dedup por versão, mais novo primeiro). */
+export function probedFromDiscovery(discovery: PythonDiscovery): ProbedPython[] {
   const seen = new Set<string>();
   const out: ProbedPython[] = [];
-  for (const c of pythonCandidates(platform)) {
-    const raw = await probe(c.exe, [...c.args, '--version']);
-    const m = raw?.match(/Python\s+(\d+\.\d+\.\d+(?:[a-z]+\d+)?)/);
-    if (!m) continue;
-    const parsed = parseVersion(m[1]);
-    if (!parsed || seen.has(m[1])) continue;
-    seen.add(m[1]);
-    out.push({ exe: [c.exe, ...c.args], version: m[1], parsed });
+  for (const c of discovery.candidates) {
+    if (!c.valid || !c.parsed || c.version === null || seen.has(c.version)) continue;
+    seen.add(c.version);
+    out.push({
+      exe: c.argv,
+      version: c.version,
+      parsed: c.parsed,
+      source: c.source,
+      selection_reason:
+        c.stage <= 1
+          ? `seleção explícita (${c.source === 'env' ? 'FORGE_PYTHON' : '--python'}) — vence a descoberta automática`
+          : `descoberta automática — estágio '${c.source}' do pipeline lf-0017`,
+    });
   }
   out.sort((a, b) => compareVersions(b.parsed, a.parsed));
   return out;
+}
+
+/**
+ * Sonda compatível com o formato legado `(exe, args) → string|null` por
+ * cima do pipeline lf-0017 — candidatos de TODOS os estágios, validados
+ * por execução; dedup por versão, mais novo primeiro.
+ */
+export async function probePythons(
+  platform: NodeJS.Platform = process.platform,
+  probe: (exe: string, args: string[]) => Promise<string | null> = commandOutput,
+  opts: { explicit?: string; env?: NodeJS.ProcessEnv } = {},
+): Promise<ProbedPython[]> {
+  const run: ProbeRun = async (cmd, args) => {
+    // O probe legado só sabe responder `<exe> --version` — a resolução
+    // de nome (`command -v`/`where.exe`) responde o próprio nome e deixa
+    // a sonda --version decidir (mesma semântica da sonda legada).
+    if (cmd === 'sh' && args[0] === '-c' && /^command -v \S+$/.test(args[1] ?? '')) {
+      return { ok: true, output: (args[1] ?? '').replace('command -v ', ''), timed_out: false };
+    }
+    if (cmd === 'where.exe') {
+      return { ok: true, output: args[0] ?? null, timed_out: false };
+    }
+    const out = await probe(cmd, args);
+    return { ok: out !== null, output: out, timed_out: false };
+  };
+  const discovery = await discoverPythons({
+    platform,
+    run,
+    explicit: opts.explicit,
+    env: opts.env,
+  });
+  return probedFromDiscovery(discovery);
+}
+
+/**
+ * Interpretadores do fluxo registry via pipeline lf-0017. Seleção
+ * explícita (`--python`/`FORGE_PYTHON`) inválida volta em `refusal`
+ * (FORGE-PYTHON-*) — nunca fallback silencioso para a auto-descoberta.
+ */
+async function registryPythons(
+  cli: CliOptions,
+  injected: ProbedPython[] | undefined,
+): Promise<{ pythons: ProbedPython[]; refusal: PythonRefusal | null }> {
+  if (injected !== undefined) return { pythons: injected, refusal: null };
+  const discovery = await discoverPythons({ explicit: cli.python });
+  return { pythons: probedFromDiscovery(discovery), refusal: discovery.refusal };
 }
 
 function describeResolveError(e: ResolveError): string {
@@ -318,12 +371,18 @@ export async function runRegistryInstall(
   // Pin com 'v' prefixo (`--version v0.2.0`) — PyPI usa a chave sem 'v'.
   const pin = cli.ref?.replace(/^v(?=\d)/, '');
 
-  const pythons = deps.pythons ?? (await probePythons());
-  if (!pythons.length) {
-    const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
-    reportTo({ error: msg, warnings });
+  const { pythons, refusal } = await registryPythons(cli, deps.pythons);
+  if (refusal || !pythons.length) {
+    // Recusa FORGE-PYTHON-* nomeada (explicit inválido, nada compatível,
+    // zero candidatos) — causa + remédio PT-BR, nunca mensagem muda.
+    const code = refusal?.code ?? 'FORGE-PYTHON-NOT-FOUND';
+    const msg = refusal
+      ? `${refusal.code}: ${refusal.cause}`
+      : 'FORGE-PYTHON-NOT-FOUND: nenhum interpretador Python detectado — instale Python ≥3.10';
+    reportTo({ error: msg, warnings, code });
     if (quiet) emitJson({ error: msg, warnings }, 1);
     log.error(msg);
+    if (refusal) log.info(`→ ${refusal.remedy}`);
     process.exit(1);
   }
   if (!quiet) log.info(`Python detectado: ${pythons.map((p) => p.version).join(', ')}`);
@@ -543,12 +602,16 @@ export async function runRegistryLock(
     log.error(msg);
     process.exit(2);
   }
-  const pythons = deps.pythons ?? (await probePythons());
-  if (!pythons.length) {
-    const msg = 'Nenhum interpretador Python detectado — instale Python ≥3.10';
-    reportTo({ error: msg });
+  const { pythons, refusal } = await registryPythons(cli, deps.pythons);
+  if (refusal || !pythons.length) {
+    const code = refusal?.code ?? 'FORGE-PYTHON-NOT-FOUND';
+    const msg = refusal
+      ? `${refusal.code}: ${refusal.cause}`
+      : 'FORGE-PYTHON-NOT-FOUND: nenhum interpretador Python detectado — instale Python ≥3.10';
+    reportTo({ error: msg, code });
     if (quiet) emitJson({ error: msg }, 1);
     log.error(msg);
+    if (refusal) log.info(`→ ${refusal.remedy}`);
     process.exit(1);
   }
   const pin = cli.ref?.replace(/^v(?=\d)/, '');
@@ -1195,7 +1258,15 @@ async function runRegistryLifecycle(
     }
   }
 
-  const pythons = deps.pythons ?? (await probePythons());
+  const { pythons, refusal } = await registryPythons(cli, deps.pythons);
+  if (refusal) {
+    const msg = `${refusal.code}: ${refusal.cause}`;
+    reportTo({ error: msg, code: refusal.code });
+    if (quiet) emitJson({ error: msg }, 1);
+    log.error(msg);
+    log.info(`→ ${refusal.remedy}`);
+    process.exit(1);
+  }
   const results = [];
   for (const i of actionable) {
     const spin = spinner();
@@ -1303,7 +1374,15 @@ export async function runRegistryReinstall(
     );
     return;
   }
-  const pythons = deps.pythons ?? (await probePythons());
+  const { pythons, refusal } = await registryPythons(cli, deps.pythons);
+  if (refusal) {
+    const msg = `${refusal.code}: ${refusal.cause}`;
+    reportTo({ error: msg, code: refusal.code });
+    if (quiet) emitJson({ error: msg }, 1);
+    log.error(msg);
+    log.info(`→ ${refusal.remedy}`);
+    process.exit(1);
+  }
   const results = [];
   for (const t of targets) {
     const spin = spinner();
@@ -1418,7 +1497,15 @@ export async function runRegistryRollback(
     process.exit(1);
     return;
   }
-  const pythons = deps.pythons ?? (await probePythons());
+  const { pythons, refusal } = await registryPythons(cli, deps.pythons);
+  if (refusal) {
+    const msg = `${refusal.code}: ${refusal.cause}`;
+    reportTo({ error: msg, code: refusal.code });
+    if (quiet) emitJson({ error: msg }, 1);
+    log.error(msg);
+    log.info(`→ ${refusal.remedy}`);
+    process.exit(1);
+  }
   const results = [];
   for (const p of actionable) {
     const spin = spinner();

@@ -15,16 +15,28 @@
  *     agregado nunca para no primeiro bloqueio).
  *
  * Nenhum probe toca a rede (`network.status` é declaração, não sonda) e
- * todo spawn é inofensivo com timeout ≤ 5 s. O resumo de Python sai do
- * probe `pythonCandidates` já existente — o pipeline completo é lf-0017.
+ * todo spawn é inofensivo com timeout ≤ 5 s. A seção `python` é o
+ * pipeline universal do lf-0017: estágios FORGE_PYTHON → --python →
+ * py-launcher → PATH → venv → managers → plataforma → convencional,
+ * cada candidato validado por `--version` executado com veredito
+ * FORGE-PYTHON-* — rejeitados permanecem no relatório.
  */
 import { accessSync, constants } from 'node:fs';
 import os from 'node:os';
 import type { ForgeErrorCode } from '../errors.js';
-import { isNodeSupported, pythonInfo, pythonToolchain, type PythonInfo } from '../preflight.js';
+import { isNodeSupported, pythonToolchain, type PythonInfo } from '../preflight.js';
 import { loadForgeState, type ForgeState } from '../registry/install.js';
-import { cliHome, commandOutput, type CommandProbeResult } from '../utils/system.js';
+import { parseVersion } from '../registry/versions.js';
+import { cliHome, commandOutput, commandProbe, type CommandProbeResult } from '../utils/system.js';
 import { resolveWriteTargets, type WriteTarget } from './paths.js';
+import {
+  DEFAULT_PYTHON_FLOOR,
+  discoverPythons,
+  type ProbedPythonCandidate,
+  type PythonDeps,
+  type PythonDiscovery,
+  type PythonRefusal,
+} from './python.js';
 import {
   discoverShells,
   windowsRoute,
@@ -34,6 +46,8 @@ import {
 } from './shells.js';
 
 export const ENVIRONMENT_DISCOVERY_SCHEMA = 'forge/EnvironmentDiscovery/v1' as const;
+/** Teto da lista de candidatos no relatório — a descoberta capa em 32. */
+export const PYTHON_REPORT_MAX = 24;
 
 /** Achado do agregado — blocker impede instalação; warning degrada. */
 export interface EnvFinding {
@@ -63,9 +77,24 @@ export interface EnvironmentDiscovery {
     args: string[];
     version: string | null;
     toolchain: string | null;
-    /** Sonda usada hoje — pipeline completo fica para lf-0017. */
-    source: 'pythonCandidates';
-    pipeline: string;
+    /** Origem do selecionado ('env', 'flag', 'venv', 'path', …) ou null. */
+    source: string | null;
+    /** Por que o selecionado venceu — receipt `selection_reason`. */
+    selection_reason: string | null;
+    pipeline: 'lf-0017';
+    /** Candidatos sondados (após dedup/cap) — os rejeitados ficam listados. */
+    candidates_total: number;
+    candidates: {
+      executable: string;
+      source: string;
+      version: string | null;
+      valid: boolean;
+      verdict: string;
+      code?: ForgeErrorCode | null;
+      note?: string | null;
+    }[];
+    /** Recusa FORGE-PYTHON-* quando nenhum interpretador é selecionável. */
+    refusal: PythonRefusal | null;
   };
   git: { present: boolean; version: string | null; executable: string | null };
   /** Declaração, nunca sonda: 'off' = --offline do chamador, senão 'unknown'. */
@@ -102,7 +131,16 @@ export interface DiscoverDeps extends ShellDeps {
   now?: () => string;
   /** --offline do chamador → network.status 'off'. */
   offline?: boolean;
+  /** Pipeline lf-0017 injetável — default `discoverPythons`. */
+  pythonDiscovery?: (deps: PythonDeps) => Promise<PythonDiscovery>;
+  /**
+   * Sonda legada (`{exe,args,version}|null`) — compatibilidade de testes
+   * anteriores ao lf-0017; convertida numa descoberta sintética de um
+   * único candidato válido (ou recusa FORGE-PYTHON-NOT-FOUND).
+   */
   pythonProbe?: (platform: NodeJS.Platform) => Promise<PythonInfo | null>;
+  /** `--python` do chamador — entra como estágio 1 do pipeline. */
+  pythonExplicit?: string;
   toolchainProbe?: (platform: NodeJS.Platform) => Promise<string | null>;
   gitProbe?: () => Promise<CommandProbeResult | null>;
   forgesProbe?: (home: string) => ForgeState;
@@ -143,6 +181,65 @@ function routeOf(platform: NodeJS.Platform, shells: ShellDiscovery): Environment
     selected: route.route,
     shell: route.route === 'git_bash' ? (route.bash ?? null) : (route.ps ?? null),
     script_chain: chain,
+  };
+}
+
+/**
+ * Adapta a sonda legada (`pythonProbe`) a uma PythonDiscovery sintética:
+ * um candidato 'path' válido quando ela responde, recusa NOT-FOUND senão.
+ * Mantém fixtures de teste anteriores ao lf-0017 funcionando sem tocar
+ * no pipeline real.
+ */
+async function legacyPythonDiscovery(
+  platform: NodeJS.Platform,
+  probe: (platform: NodeJS.Platform) => Promise<PythonInfo | null>,
+): Promise<PythonDiscovery> {
+  const info = await probe(platform);
+  const version = info?.version.replace(/^Python\s+/i, '') ?? null;
+  const parsed = version ? parseVersion(version) : null;
+  const base: Pick<PythonDiscovery, 'explicit_requested' | 'floor' | 'floor_known' | 'truncated'> =
+    {
+      explicit_requested: false,
+      floor: DEFAULT_PYTHON_FLOOR,
+      floor_known: true,
+      truncated: 0,
+    };
+  if (!info || !version || !parsed) {
+    return {
+      ...base,
+      candidates: [],
+      selected: null,
+      refusal: {
+        code: 'FORGE-PYTHON-NOT-FOUND',
+        cause: 'nenhum interpretador Python respondeu à sonda injetada',
+        remedy: 'instale Python 3.10+ (python.org ou pyenv/uv)',
+      },
+    };
+  }
+  const candidate: ProbedPythonCandidate = {
+    argv: [info.exe, ...info.args],
+    executable: [info.exe, ...info.args].join(' '),
+    source: 'path',
+    stage: 3,
+    version,
+    parsed,
+    valid: true,
+    verdict: 'ok',
+    code: null,
+    note: 'sonda legada (pythonProbe injetado)',
+  };
+  return {
+    ...base,
+    candidates: [candidate],
+    selected: {
+      argv: candidate.argv,
+      executable: candidate.executable,
+      source: candidate.source,
+      version,
+      parsed,
+      selection_reason: 'sonda legada pythonProbe — candidato único injetado',
+    },
+    refusal: null,
   };
 }
 
@@ -194,8 +291,58 @@ export async function discoverEnvironment(deps: DiscoverDeps = {}): Promise<Envi
     executable: gitProbe?.output ? 'git' : null,
   };
 
-  const py = await (deps.pythonProbe ?? pythonInfo)(platform);
-  const toolchain = await (deps.toolchainProbe ?? pythonToolchain)(platform);
+  // Pipeline lf-0017 completo — `run`/`exists`/`env`/`platform` são os
+  // MESMOS da sonda de shells: um fake único controla a descoberta toda.
+  // `pythonProbe` legado (testes pré-lf-0017) vira descoberta sintética.
+  const pyDiscovery = deps.pythonDiscovery
+    ? await deps.pythonDiscovery({
+        platform,
+        env: deps.env,
+        run: deps.run,
+        exists: deps.exists,
+        osHome: deps.osHome,
+        cwd: deps.cwd,
+        targetDir: deps.workspace,
+        explicit: deps.pythonExplicit,
+      })
+    : deps.pythonProbe
+      ? await legacyPythonDiscovery(platform, deps.pythonProbe)
+      : await discoverPythons({
+          platform,
+          env: deps.env,
+          run: deps.run,
+          exists: deps.exists,
+          osHome: deps.osHome,
+          cwd: deps.cwd,
+          targetDir: deps.workspace,
+          explicit: deps.pythonExplicit,
+        });
+  const pySelected = pyDiscovery.selected;
+  // Interpretador já selecionado alimenta a sonda de toolchain — sem
+  // segunda descoberta (o `-m pip` dela roda no interpretador escolhido).
+  const pyInfo: PythonInfo | null = pySelected
+    ? {
+        exe: pySelected.argv[0],
+        args: pySelected.argv.slice(1),
+        version: `Python ${pySelected.version}`,
+      }
+    : null;
+  let toolchain = deps.toolchainProbe
+    ? await deps.toolchainProbe(platform)
+    : await pythonToolchain(platform, pyInfo);
+  if (!toolchain && pySelected) {
+    // Interpretador fora do PATH (venv/manager/explícito) — o `pip` dele
+    // não aparece na sonda por nome; probe direto `<sel> -m pip --version`.
+    const sel = pySelected.argv;
+    const pip = deps.run
+      ? await deps.run(sel[0], [...sel.slice(1), '-m', 'pip', '--version'])
+      : await commandProbe(sel[0], [...sel.slice(1), '-m', 'pip', '--version']).then((r) => ({
+          ok: r.output !== null && !r.timedOut,
+          output: r.output,
+          timed_out: r.timedOut,
+        }));
+    if (pip.ok) toolchain = 'pip';
+  }
   const forges = (deps.forgesProbe ?? loadForgeState)(home).forges;
   const names = Object.keys(forges).sort();
   const byMethod = { local: 0, pypi: 0, unknown: 0 };
@@ -269,15 +416,17 @@ export async function discoverEnvironment(deps: DiscoverDeps = {}): Promise<Envi
     });
   }
 
-  if (!py) {
+  if (!pySelected) {
     warnings.push({
       id: 'python',
+      code: pyDiscovery.refusal?.code ?? 'FORGE-PYTHON-NOT-FOUND',
       message:
-        'nenhum interpretador Python encontrado via pythonCandidates — método registry indisponível',
-      remedy: 'instale Python 3.10+ (python.org, pyenv ou winget install Python.Python.3.13)',
+        pyDiscovery.refusal?.cause ??
+        'nenhum interpretador Python válido — método registry indisponível',
+      remedy: pyDiscovery.refusal?.remedy ?? 'instale Python 3.10+ (python.org ou pyenv/uv)',
     });
   }
-  if (py && !toolchain) {
+  if (pySelected && !toolchain) {
     warnings.push({
       id: 'python-toolchain',
       message: 'Python presente mas nenhum instalador (pip/pipx/uv) respondeu',
@@ -320,13 +469,27 @@ export async function discoverEnvironment(deps: DiscoverDeps = {}): Promise<Envi
     shells,
     route,
     python: {
-      present: py !== null,
-      exe: py?.exe ?? null,
-      args: py?.args ?? [],
-      version: py?.version ?? null,
+      present: pySelected !== null,
+      exe: pySelected?.argv[0] ?? null,
+      args: pySelected?.argv.slice(1) ?? [],
+      version: pySelected?.version ?? null,
       toolchain,
-      source: 'pythonCandidates',
+      source: pySelected?.source ?? null,
+      selection_reason: pySelected?.selection_reason ?? null,
       pipeline: 'lf-0017',
+      candidates_total: pyDiscovery.candidates.length + pyDiscovery.truncated,
+      candidates: pyDiscovery.candidates
+        .slice(0, PYTHON_REPORT_MAX)
+        .map((c: ProbedPythonCandidate) => ({
+          executable: c.executable,
+          source: c.source,
+          version: c.version,
+          valid: c.valid,
+          verdict: c.verdict,
+          ...(c.code ? { code: c.code } : {}),
+          ...(c.note ? { note: c.note } : {}),
+        })),
+      refusal: pyDiscovery.refusal,
     },
     git,
     network: {
@@ -361,7 +524,7 @@ export function discoveryLines(report: EnvironmentDiscovery): string[] {
       return `shell ${name}: ${detail}`;
     }),
     `rota: ${report.route.selected}${report.route.shell ? ` (${report.route.shell})` : ''} — ${report.route.script_chain.join(' → ') || 'nenhuma cadeia'}`,
-    `python: ${report.python.present ? `${report.python.version} (${report.python.exe})` : 'ausente'} — fonte ${report.python.source}, pipeline ${report.python.pipeline}`,
+    `python: ${report.python.present ? `${report.python.version} (${report.python.exe})` : 'ausente'} — fonte ${report.python.source ?? 'nenhuma'}, pipeline ${report.python.pipeline} · ${report.python.candidates_total} candidato(s) sondado(s)`,
     `git: ${report.git.present ? (report.git.version ?? 'presente') : 'ausente'}`,
     `rede: ${report.network.status} (nunca sondada)`,
     `alvos graváveis: ${report.write_targets.filter((t) => t.writable !== false).length}/${report.write_targets.length} — negados: ${report.permissions.denied.join(', ') || 'nenhum'}`,

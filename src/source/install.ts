@@ -31,9 +31,27 @@ import {
   type RunLike,
 } from '../registry/install.js';
 import { emitForgeShim, removeForgeShim } from '../registry/shims.js';
+import { parseVersion, satisfiesRequiresPython } from '../registry/versions.js';
 import { resolveInside, writeFileAtomic } from '../safety.js';
+import { normalizePythonFloor } from '../env/python.js';
 import { errorDetail, findSetupScript, type WinSetupShells } from '../utils/system.js';
 import { detectSource, type SourceDetection } from './detect.js';
+
+/**
+ * Interpretador para o bootstrap Python — seleção do pipeline lf-0017
+ * (`discoverPythons().selected`) ou injeção direta em testes. `argv` é
+ * o único campo exigido; `version` ausente = não sondado (sem prova).
+ */
+export interface LocalPython {
+  argv: string[];
+  /** Versão executada (`--version`); null/undefined = injetado sem sonda. */
+  version?: string | null;
+  /** Origem no pipeline ('env', 'flag', 'venv', 'path'…). */
+  source?: string;
+  /** Forma de exibição — default `argv.join(' ')`. */
+  executable?: string;
+  selection_reason?: string;
+}
 
 export interface LocalDeps {
   home: string;
@@ -48,11 +66,16 @@ export interface LocalDeps {
    */
   winShells?: WinSetupShells;
   /**
-   * Interpretador (argv) para o fallback `scripts/forge_bootstrap.py` —
-   * o instalador nativo real das Forjas que roda sem `.git` desde que
-   * forge.json seja válido. `null`/ausente = fallback indisponível.
+   * Interpretador selecionado (pipeline lf-0017) para o fallback
+   * `scripts/forge_bootstrap.py` — o instalador nativo real das Forjas
+   * que roda sem `.git` desde que forge.json seja válido.
+   * `null`/ausente = fallback indisponível (descoberta recusou).
+   * `string[]` (argv nu) permanece aceito — testes e chamadores legados
+   * injetam `['python3']` sem sonda (normalizado por {@link localPythonOf}).
    */
-  python?: string[] | null;
+  python?: LocalPython | string[] | null;
+  /** Detalhe da recusa da descoberta — enriquece o relatório/falha. */
+  pythonIssue?: { code?: string; cause: string; remedy?: string } | null;
   /** Confirmação interativa para fonte parcial — omitida = não-interativo. */
   confirm?: () => Promise<boolean>;
   /** `--yes` já é a confirmação explícita do spec. */
@@ -191,6 +214,15 @@ export function snapshotSourceFiles(dir: string, managedTop: Set<string>): strin
 }
 
 /**
+ * Normaliza a injeção de interpretador: `LocalPython` do pipeline ou
+ * argv nu legado (`['python3']` — sem versão/origem, nunca sondado).
+ */
+function localPythonOf(python: LocalPython | string[] | null | undefined): LocalPython | null {
+  if (Array.isArray(python)) return python.length ? { argv: python } : null;
+  return python ?? null;
+}
+
+/**
  * Seleção do script de bootstrap — o MESMO caminho do fluxo git:
  * `findSetupScript` (POSIX setup.sh/install.sh via `sh -c`; Windows:
  * `.ps1` via powershell/pwsh quando `winShells.ps` existe, senão `.sh`
@@ -201,20 +233,46 @@ export function snapshotSourceFiles(dir: string, managedTop: Set<string>): strin
 export function selectSetup(
   det: SourceDetection,
   platform: NodeJS.Platform,
-  python?: string[] | null,
+  python?: LocalPython | string[] | null,
   winShells?: WinSetupShells,
 ): { file: string; command: string; args: string[] } | null {
   const script = findSetupScript(det.path, platform, winShells);
   if (script) return script;
   const bootstrap = path.join('scripts', 'forge_bootstrap.py');
-  if (python?.length && existsSync(path.join(det.path, bootstrap))) {
+  const argv = localPythonOf(python)?.argv;
+  if (argv?.length && existsSync(path.join(det.path, bootstrap))) {
     return {
       file: bootstrap,
-      command: python[0],
-      args: [...python.slice(1), bootstrap],
+      command: argv[0],
+      args: [...argv.slice(1), bootstrap],
     };
   }
   return null;
+}
+
+/**
+ * Piso do manifesto: forge.json `python` (`'>=3.10'` ou `'3.11'` nu)
+ * contra a versão EXECUTADA do interpretador selecionado. `null` =
+ * satisfeito/indeterminado; recusa nomeada quando provado incompatível.
+ */
+export function pythonFloorFailure(
+  det: SourceDetection,
+  python: LocalPython | string[] | null | undefined,
+): LocalFailure | null {
+  const spec = det.manifest?.python?.trim();
+  const py = localPythonOf(python);
+  const version = py?.version;
+  if (!spec || !version) return null;
+  const parsed = parseVersion(version);
+  if (!parsed) return null;
+  const floor = normalizePythonFloor(spec);
+  if (satisfiesRequiresPython(floor, parsed) !== false) return null;
+  return {
+    code: 'FORGE-PYTHON-INCOMPATIBLE',
+    cause: `${det.path}: forge.json exige python ${spec} mas o interpretador selecionado é ${version} (${py?.executable ?? py?.argv.join(' ')})`,
+    remedy:
+      'aponte um interpretador compatível com --python/FORGE_PYTHON ou corrija o campo `python` do forge.json',
+  };
 }
 
 /**
@@ -281,13 +339,25 @@ function buildReceipt(
   const cliName = manifest?.cli;
   const binCandidate = venv && cliName ? path.join(venvBin(venv, platform), cliName) : undefined;
   const bin = binCandidate && existsSync(binCandidate) ? binCandidate : cliName;
+  const py = localPythonOf(deps.python);
   return {
     forge: det.forge_id!,
     method: 'local',
     install_method: 'local',
     dist: manifest?.distribution ?? manifest?.package ?? det.forge_id!,
     version: manifest?.version ?? prior?.version ?? '0.0.0-local',
-    ...(deps.python?.length ? { python: deps.python.join(' ') } : {}),
+    // Objeto de proveniência lf-0017 — mesma forma do receipt registry.
+    ...(py?.argv.length
+      ? {
+          python: {
+            source: py.source ?? 'manual',
+            version: py.version ?? null,
+            executable: py.executable ?? py.argv.join(' '),
+            selection_reason:
+              py.selection_reason ?? 'interpretador injetado pelo chamador (sem sonda do pipeline)',
+          },
+        }
+      : {}),
     ...(venv ? { venv } : {}),
     ...(bin ? { bin } : {}),
     installedAt: prior?.installedAt ?? now,
@@ -376,14 +446,25 @@ function noScriptFailure(
   det: SourceDetection,
   platform: NodeJS.Platform,
   winShells: WinSetupShells | undefined,
+  pythonIssue?: { code?: string; cause: string; remedy?: string } | null,
 ): LocalFailure {
   if (platform === 'win32' && winShells !== undefined && !winShells.ps && !winShells.bash) {
     return winShellNotFound(det.path);
   }
+  // A recusa da descoberta de Python vai junto: "sem bootstrap" causado
+  // por pipeline FORGE-PYTHON-* é diagnóstico distinto de fonte quebrada.
+  const pythonDetail = pythonIssue
+    ? ` — descoberta de interpretador: ${pythonIssue.code ? `${pythonIssue.code}: ` : ''}${pythonIssue.cause}`
+    : '';
   return {
-    code: 'FORGE-SOURCE-INVALID',
-    cause: `${det.path}: sem script de setup executável (${platform === 'win32' ? 'setup.ps1/install.ps1/install.windows.sh' : 'setup.sh/install.sh'}) e sem fallback scripts/forge_bootstrap.py + interpretador`,
+    // O código FORGE-PYTHON-* da descoberta é preservado quando existe —
+    // "sem bootstrap porque nenhum python executa" não é fonte inválida.
+    code: (pythonIssue?.code as LocalFailure['code']) ?? 'FORGE-SOURCE-INVALID',
+    cause:
+      `${det.path}: sem script de setup executável (${platform === 'win32' ? 'setup.ps1/install.ps1/install.windows.sh' : 'setup.sh/install.sh'}) e sem fallback scripts/forge_bootstrap.py + interpretador` +
+      pythonDetail,
     remedy:
+      pythonIssue?.remedy ??
       'forneça o script de setup na fonte ou instale manualmente via scripts/forge_bootstrap.py',
   };
 }
@@ -411,6 +492,10 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
       det,
     );
   }
+  // Piso do manifesto contra o interpretador SELECIONADO (lf-0017) —
+  // antes de provisionar/escrever qualquer byte.
+  const floorFailure = pythonFloorFailure(det, deps.python);
+  if (floorFailure) return fail(floorFailure, det);
 
   const before = topLevelEntries(det.path);
   const envFailure = await provisionOrRefuse(det.path, det.forge_id);
@@ -419,7 +504,7 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
   const platform = deps.platform ?? process.platform;
   const script = selectSetup(det, platform, deps.python, deps.winShells);
   if (!script) {
-    return fail(noScriptFailure(det, platform, deps.winShells), det);
+    return fail(noScriptFailure(det, platform, deps.winShells, deps.pythonIssue), det);
   }
   const res = await run(script.command, script.args, {
     cwd: det.path,
@@ -552,6 +637,8 @@ async function runUpdateAt(
   // Re-detecta na fonte que recebe o bootstrap (a registrada, já reconciliada).
   const det = detectSource(dir);
   if (det.refusal) return fail(det.refusal, det);
+  const floorFailure = pythonFloorFailure(det, deps.python);
+  if (floorFailure) return fail(floorFailure, det);
   const before = topLevelEntries(det.path);
   const envFailure = await provisionOrRefuse(det.path, det.forge_id);
   if (envFailure) return fail(envFailure, det);
@@ -568,9 +655,14 @@ async function runUpdateAt(
     }
     return fail(
       {
-        code: 'FORGE-SOURCE-INVALID',
-        cause: `${det.path}: fonte atualizada sem script de setup executável`,
+        code: (deps.pythonIssue?.code as LocalFailure['code']) ?? 'FORGE-SOURCE-INVALID',
+        cause:
+          `${det.path}: fonte atualizada sem script de setup executável` +
+          (deps.pythonIssue
+            ? ` — descoberta de interpretador: ${deps.pythonIssue.code ? `${deps.pythonIssue.code}: ` : ''}${deps.pythonIssue.cause}`
+            : ''),
         remedy:
+          deps.pythonIssue?.remedy ??
           'a fonte nova precisa de install.sh/setup.sh/install.windows.sh (ou scripts/forge_bootstrap.py + python)',
       },
       det,
@@ -661,6 +753,8 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
   if (det.refusal) return fail(det.refusal, det);
   const gate = await partialGate(det, deps);
   if (gate) return fail(gate, det);
+  const floorFailure = pythonFloorFailure(det, deps.python);
+  if (floorFailure) return fail(floorFailure, det);
   // Artefatos gerenciados quebrados (venv parcial etc.) saem antes do
   // bootstrap — só o que o RECEIPT registrou; arquivo do usuário não
   // listado permanece mesmo dentro da fonte.
@@ -684,9 +778,14 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
     }
     return fail(
       {
-        code: 'FORGE-SOURCE-INVALID',
-        cause: `${dir}: sem script de setup para o repair`,
+        code: (deps.pythonIssue?.code as LocalFailure['code']) ?? 'FORGE-SOURCE-INVALID',
+        cause:
+          `${dir}: sem script de setup para o repair` +
+          (deps.pythonIssue
+            ? ` — descoberta de interpretador: ${deps.pythonIssue.code ? `${deps.pythonIssue.code}: ` : ''}${deps.pythonIssue.cause}`
+            : ''),
         remedy:
+          deps.pythonIssue?.remedy ??
           'restaure install.sh/setup.sh/install.windows.sh na fonte ou reinstale com `install <dir>`',
       },
       det,

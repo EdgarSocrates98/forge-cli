@@ -23,8 +23,9 @@ import {
   type LocalOutcome,
 } from '../source/install.js';
 import { windowsSetupShells } from '../env/shells.js';
+import { discoverPythons } from '../env/python.js';
 import { icons, theme } from '../ui/theme.js';
-import { cliHome, resolvePython } from '../utils/system.js';
+import { cliHome } from '../utils/system.js';
 import { emitJson } from './shared.js';
 import { mkdirSync } from 'node:fs';
 
@@ -37,6 +38,42 @@ function reportTo(cli: CliOptions, doc: unknown): void {
   const file = path.resolve(cli.reportPath);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileAtomic(file, redactSecrets(JSON.stringify(doc, null, 2)));
+}
+
+/**
+ * Interpretador do bootstrap Python pelo pipeline lf-0017 — explícito
+ * (`--python`/`FORGE_PYTHON`) inválido é recusa DURA (exit 1, nunca
+ * fallback silencioso); descoberta automática vazia só desativa o
+ * fallback `forge_bootstrap.py` — a cadeia de shell ainda pode instalar.
+ */
+async function resolveBootstrapPython(
+  cli: CliOptions,
+  deps: LocalDeps,
+  targetDir: string | undefined,
+): Promise<void> {
+  const discovery = await discoverPythons({ explicit: cli.python, targetDir });
+  deps.python = discovery.selected;
+  deps.pythonIssue = discovery.refusal
+    ? {
+        code: discovery.refusal.code,
+        cause: discovery.refusal.cause,
+        remedy: discovery.refusal.remedy,
+      }
+    : null;
+  if (!discovery.refusal) return;
+  if (discovery.explicit_requested) {
+    const msg = `${discovery.refusal.code}: ${discovery.refusal.cause}`;
+    reportTo(cli, { error: msg });
+    if (quiet(cli)) emitJson({ error: msg }, 1);
+    log.error(msg);
+    log.info(`→ ${discovery.refusal.remedy}`);
+    process.exit(1);
+  }
+  if (!quiet(cli)) {
+    log.warn(
+      `${discovery.refusal.code}: ${discovery.refusal.cause} — ${discovery.refusal.remedy} (fallback forge_bootstrap.py indisponível)`,
+    );
+  }
 }
 
 async function depsFor(cli: CliOptions, home: string): Promise<LocalDeps> {
@@ -139,7 +176,7 @@ export async function runLocalInstallCommand(cli: CliOptions, dirs: string[]): P
   const home = cliHome();
   if (cli.plan || cli.check) planDetections(cli, dirs, 'install');
   const deps = await depsFor(cli, home);
-  deps.python = await resolvePython();
+  await resolveBootstrapPython(cli, deps, dirs[0] ? path.resolve(dirs[0]) : undefined);
   const results: Record<string, unknown>[] = [];
   let refusals = 0;
   let failures = 0;
@@ -210,7 +247,7 @@ export async function runLocalUpdateCommand(cli: CliOptions, dirs: string[]): Pr
   const home = cliHome();
   if (cli.plan || cli.check) planDetections(cli, dirs, 'update');
   const deps = await depsFor(cli, home);
-  deps.python = await resolvePython();
+  await resolveBootstrapPython(cli, deps, dirs[0] ? path.resolve(dirs[0]) : undefined);
   const results: Record<string, unknown>[] = [];
   let refusals = 0;
   let failures = 0;
@@ -277,8 +314,12 @@ export async function runLocalLifecycleCommand(
 ): Promise<void> {
   const home = cliHome();
   const deps = await depsFor(cli, home);
-  deps.python = await resolvePython();
   const state = loadForgeState(home).forges;
+  // repair re-executa o bootstrap DENTRO do source_dir registrado — o
+  // primeiro alvo conhecido orienta os estágios venv/convencional.
+  const firstSource = names.map((n) => state[n]).find((r) => r?.method === 'local')?.source_dir;
+  // Só o repair executa bootstrap — uninstall não precisa sondar Python.
+  if (op === 'repair') await resolveBootstrapPython(cli, deps, firstSource);
 
   if (cli.plan || cli.check) {
     const doc = {

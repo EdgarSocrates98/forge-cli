@@ -1,5 +1,6 @@
 import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { discoverPythons } from './env/python.js';
 import { windowsSetupShells } from './env/shells.js';
 import type { PreflightCheck } from './types.js';
 import { S } from './ui/strings.js';
@@ -17,6 +18,11 @@ export interface PythonCandidate {
   args: string[];
 }
 
+/**
+ * Ordem legada de sondagem por nome no PATH — documentação da ordem em
+ * que nomes são tentados primeiro; a SELEÇÃO real passou a ser o pipeline
+ * lf-0017 (`discoverPythons`), que estes nomes cobrem só no estágio PATH.
+ */
 const PYTHON_MINORS = [14, 13, 12, 11, 10] as const;
 
 export function pythonCandidates(platform: NodeJS.Platform = process.platform): PythonCandidate[] {
@@ -41,14 +47,21 @@ export interface PythonInfo {
   version: string;
 }
 
+/**
+ * Interpretador "de referência" da máquina — seleção do pipeline lf-0017
+ * (`discoverPythons().selected`), nunca mais a lista fixa acima. A saída
+ * mantém o formato legado (`version` como `Python X.Y.Z`).
+ */
 export async function pythonInfo(
   platform: NodeJS.Platform = process.platform,
 ): Promise<PythonInfo | null> {
-  for (const candidate of pythonCandidates(platform)) {
-    const out = await commandOutput(candidate.exe, [...candidate.args, '--version']);
-    if (out) return { exe: candidate.exe, args: candidate.args, version: out };
-  }
-  return null;
+  const selected = (await discoverPythons({ platform })).selected;
+  if (!selected) return null;
+  return {
+    exe: selected.argv[0],
+    args: selected.argv.slice(1),
+    version: `Python ${selected.version}`,
+  };
 }
 
 export async function pythonVersion(
@@ -71,13 +84,15 @@ function nearestExisting(dir: string): string {
 /**
  * Probe de ferramenta de pacotes Python: pipx → uv → `python -m pip` →
  * `pip3`/`pip`. Devolve o nome que respondeu (evidência), nunca só ok.
+ * `py` opcional = interpretador já selecionado (evita segunda descoberta).
  */
 export async function pythonToolchain(
   platform: NodeJS.Platform = process.platform,
+  py?: PythonInfo | null,
 ): Promise<string | null> {
   if (await commandOutput('pipx', ['--version'])) return 'pipx';
   if (await commandOutput('uv', ['--version'])) return 'uv';
-  const py = await pythonInfo(platform);
+  py ??= await pythonInfo(platform);
   if (py && (await commandOutput(py.exe, [...py.args, '-m', 'pip', '--version']))) {
     return 'pip';
   }
@@ -144,15 +159,16 @@ export async function runPreflight(
       hint: S.preflightHintShellWin,
     });
   }
-  const py = await pythonVersion(platform);
+  const py = await pythonInfo(platform);
   checks.push({
     name: S.preflightPython,
     ok: py !== null,
-    detail: py ?? S.pythonNotFound,
+    detail: py?.version ?? S.pythonNotFound,
     severity: 'warn',
     hint: S.preflightHintPython,
   });
-  const toolchain = await pythonToolchain(platform);
+  // Reusa a seleção já sondada — toolchain não redescobre interpretador.
+  const toolchain = await pythonToolchain(platform, py);
   checks.push({
     name: S.preflightPyTool,
     ok: toolchain !== null,

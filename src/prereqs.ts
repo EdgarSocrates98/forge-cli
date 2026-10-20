@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { pythonCandidates, pythonInfo, type PythonCandidate } from './preflight.js';
+import { discoverPythons } from './env/python.js';
+import { compareVersions as compareParsed, type ParsedVersion } from './registry/versions.js';
 import type { PrereqCheck } from './types.js';
 import { S } from './ui/strings.js';
 import { commandOutput, commandWorks } from './utils/system.js';
@@ -85,33 +86,34 @@ export async function checkRepoPrereqs(
 
   if (py !== null) {
     const spec = parseRequiresPython(py);
-    let probe: PythonCandidate | null = null;
+    // Pipeline lf-0017: seleção por `--version` executado contra o spec
+    // do pyproject (FORGE_PYTHON/--python implícito via env também valem);
+    // candidates mantêm os rejeitados como evidência do veredito.
+    const discovery = await discoverPythons({
+      platform,
+      floor: spec ?? undefined,
+      targetDir: repoDir,
+    });
+    const selected = discovery.selected;
+    // Melhor interpretador EXECUTADO (mesmo abaixo do piso) — evidência
+    // do "achei X" no check e base real das sondas pip/venv seguintes.
+    const executed = discovery.candidates
+      .filter((c) => c.version !== null && c.parsed !== null)
+      .sort((a, b) => compareParsed(b.parsed as ParsedVersion, a.parsed as ParsedVersion));
+    const best = selected ?? executed[0] ?? null;
+    const probe = best ? { exe: best.argv[0], args: best.argv.slice(1) } : null;
     if (spec) {
-      for (const candidate of pythonCandidates(platform)) {
-        const version = await commandOutput(candidate.exe, [...candidate.args, '--version']);
-        if (version && satisfiesVersion(version, spec)) {
-          probe = candidate;
-          checks.push({
-            name: `Python ${spec}`,
-            ok: true,
-            detail: `${candidate.exe} ${candidate.args.join(' ')} (${version})`.trim(),
-          });
-          break;
-        }
-      }
-      if (!probe) {
-        const pyInfo = await pythonInfo(platform);
-        probe = pyInfo ? { exe: pyInfo.exe, args: pyInfo.args } : null;
-        checks.push({
-          name: `Python ${spec}`,
-          ok: false,
-          detail: pyInfo ? `${S.prereqFound}: ${pyInfo.version}` : S.pythonNotFound,
-        });
-      }
+      checks.push({
+        name: `Python ${spec}`,
+        ok: selected !== null,
+        detail: selected
+          ? `${selected.argv.join(' ')} (Python ${selected.version})`
+          : best?.version
+            ? `${S.prereqFound}: Python ${best.version}`
+            : S.pythonNotFound,
+      });
     } else {
       checks.push({ name: 'Python', ok: true, detail: S.prereqNotDeclared });
-      const pyInfo = await pythonInfo(platform);
-      probe = pyInfo ? { exe: pyInfo.exe, args: pyInfo.args } : null;
     }
     const base = probe?.exe ?? (platform === 'win32' ? 'python' : 'python3');
     const baseArgs = probe?.args ?? [];

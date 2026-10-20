@@ -38,6 +38,45 @@ import {
   type ParsedVersion,
 } from './versions.js';
 
+/**
+ * Interpretador que instalou a Forja (lf-0017) — proveniência da
+ * seleção, não só a versão: de onde veio (env/flag/venv/pyenv/path…),
+ * o executável invocado e por que venceu. Receipts legados gravavam
+ * `python` como string de versão — normalizados na leitura
+ * ({@link receiptPythonInfo}); nunca regravados à força.
+ */
+export interface PythonReceiptInfo {
+  source: string;
+  /** Versão EXECUTADA pelo pipeline (X.Y.Z); `null` = legado/injetado sem sonda. */
+  version: string | null;
+  /** Invocação resolvida ('/usr/bin/python3.12', 'py -3.11'); `null` = desconhecido. */
+  executable: string | null;
+  selection_reason: string;
+}
+
+/** `python` de receipt lido do disco pode ser string (legado) ou objeto. */
+export function receiptPythonInfo(value: unknown): PythonReceiptInfo | undefined {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const o = value as Partial<PythonReceiptInfo>;
+    return {
+      source: typeof o.source === 'string' ? o.source : 'desconhecido',
+      version: typeof o.version === 'string' ? o.version : null,
+      executable: typeof o.executable === 'string' ? o.executable : null,
+      selection_reason:
+        typeof o.selection_reason === 'string' ? o.selection_reason : 'receipt legado',
+    };
+  }
+  if (typeof value === 'string' && value) {
+    return {
+      source: 'receipt-legado',
+      version: value,
+      executable: null,
+      selection_reason: 'campo python string (receipt anterior ao lf-0017) normalizado na leitura',
+    };
+  }
+  return undefined;
+}
+
 export interface RegistryInstallReceipt {
   forge: string;
   method: 'pypi';
@@ -46,7 +85,8 @@ export interface RegistryInstallReceipt {
   extras?: string[];
   version: string;
   requiresPython?: string;
-  python: string;
+  /** lf-0017 grava o objeto de proveniência; `string` = receipt legado (normalize na leitura). */
+  python: PythonReceiptInfo | string;
   source: ResolvedRelease['source'];
   venv: string;
   bin: string;
@@ -100,7 +140,8 @@ export interface LocalInstallReceipt {
   install_method: 'local';
   dist: string;
   version: string;
-  python?: string;
+  /** lf-0017 grava o objeto de proveniência; `string` = receipt legado (normalize na leitura). */
+  python?: PythonReceiptInfo | string;
   venv?: string;
   bin?: string;
   shim?: string;
@@ -177,6 +218,14 @@ export function loadForgeState(home: string): ForgeState {
     for (const [k, v] of Object.entries(raw.forges)) {
       if (v && typeof v === 'object' && !Array.isArray(v)) forges[k] = v;
     }
+    // Receipts legados têm `python` como string — normaliza NA LEITURA
+    // para o objeto lf-0017 {source, version, executable,
+    // selection_reason}; o arquivo em disco só muda na próxima escrita.
+    for (const receipt of Object.values(forges)) {
+      const normalized = receiptPythonInfo(receipt.python);
+      if (normalized) receipt.python = normalized;
+      else delete (receipt as { python?: unknown }).python;
+    }
     return { ...raw, forges };
   } catch {
     // Leitura é pura: NUNCA grava aqui — um load em --plan/--check não pode
@@ -192,11 +241,14 @@ export function loadForgeState(home: string): ForgeState {
  * do interpretador que instalou (único com prova de compatibilidade).
  */
 export function ghostEntry(name: string, receipt: RegistryInstallReceipt): RegistryEntry {
+  const pyVersion = receiptPythonInfo(receipt.python)?.version ?? null;
   return {
     name,
     dist: receipt.dist,
     bin: path.basename(receipt.bin).replace(/\.exe$/i, ''),
-    minPython: receipt.python.split('.').slice(0, 2).join('.'),
+    // Piso derivado do interpretador que instalou (única prova real de
+    // compatibilidade); receipt sem versão registra o piso default.
+    minPython: pyVersion ? pyVersion.split('.').slice(0, 2).join('.') : '3.10',
     origin: 'official',
     // Extras instalados junto — reinstall/update/rollback do ghost pedem o
     // mesmo `dist[extra]` do receipt em vez de regredir para a dist nua.
@@ -548,6 +600,10 @@ export interface ProbedInterpreter {
   exe: string[];
   version: string;
   parsed: ParsedVersion;
+  /** Origem do candidato no pipeline lf-0017 ('path', 'venv', 'env'…). */
+  source?: string;
+  /** Por que venceu — vai ao receipt `python.selection_reason`. */
+  selection_reason?: string;
 }
 
 export interface RegistryInstallDeps {
@@ -997,7 +1053,16 @@ export async function registryInstall(
       ...(entryExtras(entry).length ? { extras: entryExtras(entry) } : {}),
       version: resolved.version,
       requiresPython: resolved.requiresPython,
-      python: python.version,
+      // Objeto de proveniência lf-0017 — quem foi selecionado, de onde
+      // veio e por que (receipts legados tinham só a string de versão).
+      python: {
+        source: python.source ?? 'path',
+        version: python.version,
+        executable: python.exe.join(' '),
+        selection_reason:
+          python.selection_reason ??
+          `maior versão compatível com ${resolved.requiresPython ?? `>=${entry.minPython}`} entre ${deps.pythons.length} interpretador(es) sondado(s)`,
+      },
       source: resolved.source,
       venv: venvDir,
       bin: binPath,

@@ -555,6 +555,11 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  if (cli.python !== undefined) {
+    // --python é honrado pelos fluxos registry e fonte local; o fluxo
+    // git/clone não sonda interpretador — flag ignorada nunca é muda.
+    log.warn('--python não se aplica ao fluxo git/clone — ignorado');
+  }
   await runInstallFlow(cli, resolved, cloneOnly);
 }
 

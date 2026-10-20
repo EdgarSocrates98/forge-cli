@@ -104,6 +104,10 @@ async function runEnvDiscoveryCommand(
   const report = await discoverEnvironment({
     workspace,
     offline: cli.offline,
+    // --python entra como estágio 1 do pipeline — o relatório mostra a
+    // seleção como um install a faria (explícito inválido aparece como
+    // recusa FORGE-PYTHON-*, nunca cai para auto).
+    pythonExplicit: cli.python,
   });
   if (cli.jsonReport) {
     console.log(JSON.stringify(report, null, 2));

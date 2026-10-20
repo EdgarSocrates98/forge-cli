@@ -44,6 +44,8 @@ export interface CliOptions {
   versionFlag?: boolean;
   /** `--out <path>` — destino do `registry lock` (arquivo ou dir). */
   out?: string;
+  /** `--python <exe>` — interpretador explícito (FORGE_PYTHON também vale). */
+  python?: string;
   profile?: string;
   scope?: string;
   components?: string;
@@ -104,6 +106,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
         lock: { type: 'string' },
         'no-color': { type: 'boolean' },
         out: { type: 'string' },
+        python: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -172,6 +175,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     noColor: values['no-color'] ?? false,
     versionFlag,
     out: values.out,
+    python: values.python,
     host: values.host,
     gatewayProfile: values['gateway-profile'],
     verbose: values.verbose ?? false,
@@ -205,7 +209,9 @@ const COMMAND_USAGE: Record<string, string> = {
   registry:
     '\nregistry [list|install|lock] — catálogo PyPI + receipts.\n' +
     '  registry install <f> --offline --lock <arquivo>: instalação travada (--no-index).\n' +
-    '  registry lock <f> [--out <arq|dir>]: gera <forja>.offline-lock.json (online, pip>=23).',
+    '  registry lock <f> [--out <arq|dir>]: gera <forja>.offline-lock.json (online, pip>=23).\n' +
+    '  --python <exe>: interpretador explícito (FORGE_PYTHON vale igual; explícito\n' +
+    '  inválido recusa com FORGE-PYTHON-* e nunca cai para a descoberta automática).',
   mcp:
     '\nmcp [forja…] — argv MCP por Forja (clone ou venv registry).\n' +
     '  --verify: handshake real — níveis INSTALLED→EXECUTABLE→INITIALIZED→\n' +

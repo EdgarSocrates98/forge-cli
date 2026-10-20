@@ -8,6 +8,10 @@ import { predictCompatibility } from '../src/intel/predict.js';
 import type { ForgeRepo } from '../src/types.js';
 import { commandOutput, commandWorks, resolvePython } from '../src/utils/system.js';
 
+vi.mock('execa', () => ({ execa: vi.fn() }));
+import { execa } from 'execa';
+const mockedExeca = vi.mocked(execa);
+
 /**
  * §6.5 — predictive compatibility. Every rule: positive case with evidence
  * plus the silence case (no evidence → no finding). Hermetic probes.
@@ -32,6 +36,17 @@ beforeEach(() => {
   vi.mocked(commandWorks).mockResolvedValue(false);
   vi.mocked(commandOutput).mockResolvedValue(null);
   vi.mocked(resolvePython).mockResolvedValue(null);
+  // Pipeline lf-0017 (execa real → mock): o único interpretador do
+  // "host" é `python3` → Python 3.12.1; todo o resto falha/ausente.
+  mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+    if (cmd === 'sh' && args[1] === 'command -v python3') {
+      return Promise.resolve({ exitCode: 0, stdout: '/usr/bin/python3', stderr: '' });
+    }
+    if (cmd === 'python3' && args.join(' ') === '--version') {
+      return Promise.resolve({ exitCode: 0, stdout: 'Python 3.12.1', stderr: '' });
+    }
+    return Promise.resolve({ exitCode: 1, stdout: '', stderr: '' });
+  }) as never);
 });
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -139,6 +154,18 @@ describe('§6.5 — runtime-incompat', () => {
   });
 
   it('flags the manifest python floor against the detected interpreter', async () => {
+    // Pipeline lf-0017: o interpretador "detectado" sai de
+    // `discoverPythons` (execa) — `command -v python3` resolve o nome e
+    // `python3 --version` executa e responde a versão.
+    mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
+      if (cmd === 'sh' && args[1] === 'command -v python3') {
+        return Promise.resolve({ exitCode: 0, stdout: '/usr/bin/python3', stderr: '' });
+      }
+      if (cmd === 'python3' && args.join(' ') === '--version') {
+        return Promise.resolve({ exitCode: 0, stdout: 'Python 3.12.1', stderr: '' });
+      }
+      return Promise.resolve({ exitCode: 1, stdout: '', stderr: '' });
+    }) as never);
     vi.mocked(commandOutput).mockImplementation(async (cmd, args = []) => {
       const a = args.join(' ');
       if (a.includes('-m pip')) return 'pip 24.0';

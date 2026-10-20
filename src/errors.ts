@@ -21,7 +21,13 @@ export type ForgeErrorCode =
   /** Alvo de escrita resolvido nega permissão — reporta alternativa concreta. */
   | 'FORGE-INSTALL-PERMISSION-DENIED'
   /** Persistência de ambiente (PATH, .env, registry) falhou na escrita. */
-  | 'FORGE-ENV-PERSISTENCE-FAILED';
+  | 'FORGE-ENV-PERSISTENCE-FAILED'
+  /** Nenhum interpretador Python utilizável — descoberta não achou nada ou só aliases Store. */
+  | 'FORGE-PYTHON-NOT-FOUND'
+  /** Candidatos executaram mas todos abaixo do piso exigido (requires_python/manifesto). */
+  | 'FORGE-PYTHON-INCOMPATIBLE'
+  /** Candidato existe no disco/PATH mas `--version` falha, expira ou não parseia. */
+  | 'FORGE-PYTHON-UNEXECUTABLE';
 
 export class ForgeError extends Error {
   readonly code: ForgeErrorCode;

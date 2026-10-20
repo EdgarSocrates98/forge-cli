@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
+import { discoverPythons } from '../env/python.js';
 import { isLinkOrJunction, isSafeRepoUrl, redactSecrets, resolveInside } from '../safety.js';
 import type { ForgeRepo, SetupScript, SyncFailure, SyncResult } from '../types.js';
 
@@ -131,12 +132,16 @@ export async function commandWorks(
   }
 }
 
-/** Resolve o interpretador Python disponível (python3, python, py -3). */
+/**
+ * Resolve o interpretador Python disponível — agora delega ao pipeline
+ * lf-0017 (`discoverPythons`): FORGE_PYTHON, venvs, managers e locais
+ * de plataforma entram, e toda seleção foi validada por `--version`.
+ * `null` = nenhum interpretador válido (a recusa detalhada vive no
+ * relatório de descoberta — `env discover` a expõe).
+ */
 export async function resolvePython(): Promise<string[] | null> {
-  for (const candidate of [['python3'], ['python'], ['py', '-3']]) {
-    if (await commandWorks(candidate[0], [...candidate.slice(1), '--version'])) return candidate;
-  }
-  return null;
+  const discovery = await discoverPythons({});
+  return discovery.selected?.argv ?? null;
 }
 
 export async function commandOutput(
