@@ -1,0 +1,94 @@
+# Existing Contracts — Cross-Forge Integration Audit (lf-0026, Phase 0)
+
+Every contract actually found in the repos. Direction is producer→consumer.
+Core paths under `the-forge/src/theforge/`; specialist paths under each repo.
+
+## 1. Forge Protocol transport (the wire everything else rides)
+
+| Contract | Defined at | Producer | Consumer | Direction |
+|---|---|---|---|---|
+| `forge/v1` envelope (`PROTOCOL = "forge/v1"`; `<argv> <op>` subprocess, canonical JSON stdin→`Response` stdout) | `the-forge/protocol/transport.py:70-113`; adapter impl `adapters/sparkforge_aws/src/theforge_sparkforge_aws/_shell.py` (byte-identical across all adapters, test-enforced) | adapters (ops `describe\|health\|execute`) | the-forge core | provider↔core |
+| `theforge/ForgeManifest/v1` (incl. `Capability` actions/state/operation_class/signals/relations) | `contracts/manifest.py:16,96-144,155-209` | adapter `describe` | registry validation `registry/registry.py:206-280` | provider→core |
+| Refusal vocabulary `ADAPTER-*` (`-OP-UNSUPPORTED`, `-PROTOCOL-UNSUPPORTED`, `-REQUEST-INVALID`, `-CAPABILITY-UNSUPPORTED`, `-ACTION-UNSUPPORTED`, `-INTERNAL`, `-OUTPUT-TOO-LARGE`, `-NATIVE-TIMEOUT`) | `_shell.py` constants block (audit-data §1, §6) | adapters | core + callers | provider→core |
+
+## 2. the-forge core contracts
+
+| Contract | Defined at | Producer | Consumer | Direction |
+|---|---|---|---|---|
+| `forge/SpecialistLifecycleState/v1` + `TRANSITIONS` (16 states, ContractError on invalid) | `contracts/specialist.py:12,19-57,80-118`; collector `specialists.py:151-268` | `specialists.collect()` | lifecycle consumers, portal adapter | core→consumers |
+| `forge/SpecialistAgenticManifest/v1` (`AgenticManifest`: provider/version/cli/cli_entry/workflows/skills/agents/coordinators/mcp_command/mcp_verify_tool/host_adapters/requires_*/read_only_default) | `contracts/specialist.py:13,139-165`; loaded `specialists.py:123-134` | each specialist ships `forge.agentic.json` | the-forge install/discovery/delegation | repo→core (file) |
+| `forge/SpecialistDelegationRequest/v1` (task_id, intent, provider, execution_mode, target, command argv, constraints, permissions, budget, expected_outputs, verification) | `contracts/specialist.py:14,168-187`; exec `delegation.py:68-121` | the-forge CLI/task layer | `delegation.execute` → specialist CLI argv | core→specialist |
+| `forge/SpecialistDelegationResult/v1` (stage PREPARED…BLOCKED; COMPLETED requires `exit_code`) | `contracts/specialist.py:15,68-75,190-213`; produced `delegation.py:110-121`; persisted `cli/commands.py:1802-1810` | delegation executor | task layer, `.forge/delegations/<task-id>.json` | specialist→core |
+| `forge/HostActivationPlan|Receipt/v1` (approval_required=True; outcome ACTIVE_NOW/RESTART_REQUIRED/UNSUPPORTED) | `contracts/specialist.py:16-17,216-246`; `cli/commands.py:1724-1793` | host activation flow | CLI, receipts | core↔host |
+| `theforge/Handoff/v1` — plan-node evidence bus (typed items evidence/finding/artifact/decision/constraint/assumption/verification; origin, epistemic status, provenance, dedup, no file content) | `contracts/handoff.py:1-98` (schema :26); `planning/handoff.py` | plan executor nodes | sibling nodes; adapters `handoff.py` translate to upstream-facts | core-internal → adapter |
+| `theforge/ExecutionPlan/v1` + `PlanState/v1` + `PlanResult/v1` + `SemanticPlanProposal/v1` + `DecisionRecord/v1` | `contracts/plan.py:27-30,266` | planner | plan executor, RunStore | core-internal |
+| `theforge/ExecutionResult/v1` (findings, evidence, artifacts, metrics, limitations, unknowns, provider_economy, native_trace, provider_receipt) | `contracts/result.py:38,139-168` | adapter `execute` | core, RunStore | provider→core |
+| `theforge/ExecutionReceipt/v1` (binds input/provider/result/plan hashes, surface fingerprints, kind run\|plan, parent linkage) | `contracts/receipt.py:17,94-144`; verified vs artifact hashes `runs/store.py:227-268` | core after each run | RunStore, consumers | core→disk |
+| `theforge/CapabilityGraph/v1` + `theforge/CapabilityRelation/v1` | `contracts/capability_graph.py:20,152` | capability graph builder | router/consumers | core-internal |
+| `theforge/CapabilityRequirement/v1` + `CapabilityOffer/v1` + `CapabilityNegotiationResult/v1` (FULL/PARTIAL/UNSUPPORTED/INCOMPATIBLE/UNRESOLVED; undeclared dims degrade to PARTIAL) | `contracts/negotiation.py:29-31`; `negotiation.py:1-15` | router/negotiation | discovery, routing decision | core-internal |
+| `theforge/RoutingDecision/v1` (ambiguity→literal `"ambiguous"`) | `contracts/routing.py:10`; `routing/router.py:45-78,234-319,476-518` | router | task planner | core-internal |
+| `theforge/McpServerEntry/v1` + `McpRegistryDocument/v1` (`mcp_requires`; stdio probe) | `contracts/mcp.py:16-17`; `registry/mcp.py`; `interop/mcp.py`; `discovery.py:355-436` | registry sources | MCP discovery/consumers | source→core |
+| `theforge/ForgeRegistryEntry/v1` + `RegistryDocument/v1` + `RemoteProviderCandidate/v1`; sha256-bound `RegistryCache/v2` | `contracts/registry.py:23-24,167`; `registry/registry.py:419-461` | registry sources (`providers.toml`, remotes) | discovery `registry/discovery.py`, `sources.py` | source→core |
+| `theforge/RemoteExecutionRequest|Receipt/v1` (receipt hash-binds the request) | `contracts/remote.py:16-17`; policy `remote.py:27-51` | remote exec path | remote provider | core→remote |
+| `theforge/InstallationPlan/v1` + `/v2` (`InstallApproval`, `planning_only=True` contractual) | `contracts/installation.py:18,49,74-121`; `registry/install_plan.py` | installer | approval gate → exec | core-internal |
+| `theforge/AgentSpec/v1` + authority gate (`UNIVERSAL_FORBIDDEN`, ceilings) | `contracts/agent.py:22`; `agents.py:33-87`; `agentic/agents/*.toml` | agent registry | every agent dispatch | core-internal |
+| `theforge/RunBudget/v1` (`wall_time_s` per execute) | `contracts/budget.py:15,30`; `economy.py:104` | budget planner | transport/execute | core→provider |
+| `theforge/ProviderEconomyReceipt/v1` + `EconomyRollup/v1` | `contracts/economy.py:33-34` | providers/core | economy report | provider→core |
+| `theforge/RunTelemetry/v1` (`correlation_id` exists here only) | `contracts/telemetry.py:182-185` | run instrumentation | telemetry consumers | core-internal |
+| `theforge/ContextPack/v1` (adapter `stage_context` copies only sha256-matching files inside workspace root) | `contracts/context.py:14`; `_shell.py` | core context broker | provider workspace | core→provider |
+| `theforge/FederatedCapabilityDescriptor/v1` | `contracts/excellence.py:14` | federation layer | portal/consumers | core→consumers |
+| `theforge/TaskSpec/v1` | `contracts/task.py` | task intake | planner | core-internal |
+| `forge/BenchmarkSuite/v1` + `forge/BenchmarkResult/v1` + `forge/MultiForgeScenario/v1` | `contracts/benchmark.py:25-26,268` | benchmark runner | eval consumers | core-internal |
+| `forge/ForgeGraphView/v1` + `forge/GraphDescriptor/v1` | `contracts/graphview.py:17-18` | graph projection | portal Federated Graph | core→portal |
+| `theforge/ForgeKnowledge/v1` (`forge-knowledge/*.json` bundled packages: intents, technologies, install recipe, adapter path) | `contracts/knowledge.py:22`; `specialists.py:59-91` | bundled knowledge packs | `specialists.collect()` | package→core |
+
+## 3. forge-cli contracts (TypeScript, draft-07 schemas in `contracts/schemas/*.json`)
+
+| Contract | Defined at | Producer | Consumer | Direction |
+|---|---|---|---|---|
+| `forge/ForgeDescriptor|ForgeCapability|ForgeInstallContract|ForgeEnvironmentSchema|ForgeHostDescriptor|ForgeOperationPlan|ForgeOperationReceipt|ForgeHealthReport/v1` | `forge-cli/contracts/schemas/*.json`; `contracts/CONTRACTS.md` | forge-cli / forge manifests | forge-cli pipeline, portal | cli↔repo |
+| `forge/EnvReport/v1` + `forge/EnvironmentDiscovery/v1` (bounded env scan; 8-stage interpreter pipeline, every candidate verified by `--version`) | `src/discovery.ts:19-53,86-135,488-552`; `src/env/discover.ts:1-22`; `src/env/python.ts:1-33` | forge-cli discovery | doctor/install flows | cli-internal |
+| `negotiateCapabilities` result (`granted|granted_unverified|refused|unknown`, `ok`/`complete`); `resolveDiscovery` precedence `manifest > forja-discovery > catalog > remote-registry > fallback`, 7 `DiscoveryState`s | `src/contracts/negotiate.ts:20-60,67-114` | forge-cli contracts layer | install/doctor/MCP flows | cli-internal |
+| `forge-cli/RegistryState/v1` (`~/.forge-cli/forges/state.json` + per-forge `install.json` receipts) | `src/registry/install.ts:80-198,200-245` | forge-cli (only writer) | the-forge `specialists.py:37-56` bridge; portal `forge_portal.py:375-417` (read-only) | cli→core/portal (file) |
+| `mcp_safe_tools` maintainer allowlist + MCP probe levels INSTALLED→…→SAFE_TOOL_CALLED | `src/registry/catalog.ts:24-28`; `src/mcp/handshake.ts:13-41` | forge-cli catalog | MCP verifier | cli→specialist |
+
+## 4. Specialist contracts (peer-facing)
+
+| Contract | Defined at | Producer | Consumer | Direction |
+|---|---|---|---|---|
+| `sparkforge_aws/upstream-facts/v1` (`UPSTREAM_SCHEMA`; `upstream:` ids, `upstream.` kinds, `_FORBIDDEN_KEYS`, 256KiB/128-fact bounds) | `spark-forge-aws/sparkforge_aws/adapters/upstream.py` | the-forge adapter `handoff.py` (`theforge/Handoff/v1`→upstream translation) | `analyze_pyspark(upstream=…)`, case intake — facts output, never judge input | adapter→specialist (file) |
+| `sparkforge_azure/upstream-facts/v1` (same design, documented parity) | `spark-forge-azure/sparkforge_azure/adapters/upstream.py:44` | same | `run_case` upstream bundle | adapter→specialist (file) |
+| `apiforge/upstream-facts/v1` (3-layer intake: ≤256KiB/≤128 items `AF-UPSTREAM-LIMIT`, schema `AF-UPSTREAM-INVALID`, `_check_upstream` marking + `_FORBIDDEN_KEYS` `AF-UPSTREAM-FORBIDDEN`) | `api-forge/src/apiforge/cli.py:468-505`; `application/analyze.py:69-169` | the-forge adapter `apiforge/handoff.py` | `analyze --upstream` → persisted `CasePayload` | adapter→specialist (file) |
+| `apiforge/forge-capability-descriptor/v1` … `ForgeHandoff` (`forge-protocol/v1` family; `ForgeHandoff` carries `handoff_id`, no hop fields) | `api-forge/src/apiforge/contracts/forge_protocol.py`; `forge/protocol.py:91-104,198-235`; `docs/contracts/ForgeHandoff-v1.md` | `apiforge forge capabilities|submit|attach|inspect|result|evidence|handoff|health` | the-forge adapter `apiforge`; engines `[spark-forge, the-forger]` (`rules/forge_protocol.yaml:8`) | specialist↔core |
+| `apiforge/tool-risk/v1` (role profiles, permission sets, `delegates_to` edges, `delegated_from/scope` checks) | `api-forge/rules/tool_risk.yaml` (+`:698`); `trust/tools.py:54-231` | static policy | `authorize()` per tool call | specialist-internal |
+| `forge/ForgeTask`/`ForgeResult`/`ForgeEvidenceBundle`/`ForgeTaskStatus` (`accepted/running/succeeded/failed/blocked/unresolved`) | `spark-forge-aws/sparkforge_aws/protocols/forge.py` | specialist runtime | adapter/MCP surface | specialist↔core |
+| `handoff-bundle@1` (deterministic, no timestamps) | `forge-doctor-data/src/forge_doctor_data/core/handoff.py` | Doctor Data (`scan --emit`) | Sentinel `import doctor-bundle` | doctor-data→sentinel (file) |
+| `scan-json@3.0` (`-f agent` compact JSON; `FormatOpt`/`MACHINE_FORMATS`) | `forge-doctor-data/output/agent_renderer.py`; `cli/common.py:77-78,370-371` | Doctor Data `scan -f agent` | Sentinel importer; agents | doctor-data→consumers |
+| `forge-contracts/1` shared vocabulary (`FORGE_CONTRACTS_1`) | `data-sentinel-forge/src/data_sentinel/core/contracts/interop.py`; `forge-doctor-api/src/forge_doctor_api/contracts/{models,adapters,schemas,validate}.py` | Sentinel exporter, both doctors | Sentinel doctor importer | doctor↔sentinel (file) |
+| `DiagnosticReport` + `Evidence`; `CapabilityDescriptor`; `InteropEvidence` (content hashes, never auto-CONFIRMED) | `data-sentinel-forge/src/data_sentinel/core/contracts/`; `interop.py` | Sentinel (`report show/export`, `capabilities --descriptors`) | exporters, orchestrators (declared, no in-repo consumer for descriptors) | sentinel→consumers |
+| `ApiHandoffBundle` v2, content-addressed (`handoff_id`=sha256 body, `analysis_rev`, `domain_sha256`, `doctor://` refs, `budget_exceeded` UnknownFacts) | `forge-doctor-api/src/forge_doctor_api/handoff/model.py:107-175`; `boundary.py:45-141` | Doctor API `DoctorBoundary.handle()/envelope()/endpoint_dict()` | consumers via the-forge `doctorapi` adapter | doctor-api→consumers |
+| Doctor wire protocol v2 (`PROTOCOL_VERSION=2`, `_SUPPORTED_VERSIONS=(1,2)`, strict unknown-field reject, `ProtocolError`; `ForgeRequest` = capabilities+context_refs+delta, no hop fields) | `forge-doctor-api/src/forge_doctor_api/handoff/protocol.py:23-51` | consumers emit `ForgeRequest`; doctor emits `ForgeHandoff` | `DoctorBoundary` | consumer→doctor-api→consumer |
+| `ForgerRoute`/`chain` route declarations (`_DOMAIN_HANDLERS={"api":"api-forge","data":"data-doctor"}`; never executed by the doctor) | `forge-doctor-api/src/forge_doctor_api/handoff/routing.py:19-84` | Doctor API | The Forger (declared target) | doctor-api→declared |
+| `--format agent` line schema `id\|sev\|conf\|subject[:line]\|desc`, `UNKNOWN\|subject\|missing` (frozen) | `forge-doctor-api/output/writers.py:109-132`; `docs/output-contract.md` | Doctor API `scan`/`diagnose` | any consumer (no parser exists in api-forge today — gap G8) | doctor-api→consumers |
+| `platformforge/capability-manifest/v4` (`capability manifest`; `cloud_mutation` false; `required_evidence` tiers 0-5; `_supported_versions` evidence-bound) | `platform-forge/platformforge/forge/manifest.py` (`:22-26,39-40,94-106`) | PlatformForge | PF `forge collect` of siblings; the-forge adapter | specialist→consumers |
+| `platformforge/a2a-envelope/v1` (`delegation_id`, `created_at`; **no hop count/visited set**) + `platformforge/result-receipt/v1` (`result`, `evidence_facts`, `unresolved`, `receipt_id`) | `platform-forge/platformforge/forge/delegate.py:38-77` | inbound delegations / PF responses | `verify_envelope`, `validate_delegate_request` (`ops/registry.py:78-110`) | peer→platformforge→peer |
+| `delegation_contract()` — accepts 6 request kinds, refuses direct-execution/approval-minting/shell-command/generic-provider-call/full-fleet-dump/credential-transfer (`PF-OPS-CROSSFORGE-REFUSED`) | `platform-forge/platformforge/ops/registry.py:63-110` | PF ops registry | cross-forge callers | contract (policy) |
+| `platformforge/economy-validation-receipt/v1` (freshness HEAD/HEAD~1) | `platform-forge/platformforge/economy/doctor.py:22,132-158` | PF economy doctor | consumers | specialist→consumers |
+| Install receipts — `~/.forge/installations/*.json` (bootstrap), `~/.forge-cli/forges/{install.json,state.json}` (forge-cli), `.sparkforge_aws/receipts` (`sparkforge_aws/install/lifecycle.py:25-48`), `data_sentinel/installation/contracts.py` | cited paths | each installer | `doctor`/`status` verbs; the-forge `specialists.py:37-56` bridges both CLI formats | installer→consumers (file) |
+
+## 5. Portal contracts
+
+| Contract | Defined at | Producer | Consumer | Direction |
+|---|---|---|---|---|
+| `forge/PortalApi/1` envelope `{schema, correlation_id, data\|error}` (client enforces schema before unwrap) | `portal_core/forge_portal.py:38-47,553-559`; `src/app/core/api/api.client.ts:55-66` | portal server | Angular client | server→client |
+| `forge/PortalEvent/1` (bounded in-process buffer: op start/end/refusal, timestamps, correlation/span ids; opt-in `event_sink`) | `portal_core/telemetry.py`; `forge_portal.py:769-834` | portal server | telemetry/explorer overlays | server-internal→consumers |
+| `forge/FederatedGraph/v1` overlay (`forge→capability`, `agent→skill`, `mcp→host`, `task→forge`, `entity→entity`; declared vs observed) | `forge-portal/src/app/core/graph/federated.ts:1-40` | adapter+observed events | Graph Studio | adapter→client |
+| HMAC one-time plan token (plan→confirm→execute; 15min max age; anti-replay) | `forge_portal.py:433-453`; `registry_ops.py:104-158` | portal server | mutating ops | server-internal |
+
+## 6. Contracts the spec asks for that do NOT exist
+
+| Spec contract | Status | Nearest existing |
+|---|---|---|
+| `forge/SpecialistCapability/v1` | ABSENT | `Capability` in `theforge/ForgeManifest/v1` (`contracts/manifest.py:96-144`); `forge/ForgeCapability/v1` (`forge-cli/contracts/schemas/ForgeCapability.v1.json`); `apiforge/forge-capability-descriptor/v1`; `platformforge/capability-manifest/v4`; sentinel `CapabilityDescriptor` |
+| `forge/SpecialistDelegation/v1` (declarative consumer→provider intents+policy) | ABSENT | imperative `forge/SpecialistDelegationRequest|Result/v1` (`contracts/specialist.py:168-213`) |
+| `forge/EvidenceHandoff/v1` (correlation id, idempotency, provider versions, confidence, redaction) | ABSENT | `theforge/Handoff/v1` plan-node bus (`contracts/handoff.py`); `upstream-facts/v1` intakes; doctor `ApiHandoffBundle` v2 |
