@@ -31,8 +31,8 @@ classification, receipt marking, or forge-cli path to it.
 
 ## Per-scenario evidence
 
-1. **PyPI**: all 8 dists live (theforge-core 0.5.4, theforge-cli 0.2.4
-   npm, apiforge-af 0.1.4, platformforge 0.1.4, sparkforge-aws 0.5.4,
+1. **PyPI**: all 8 dists live (theforge-core 0.5.5, theforge-cli 0.2.4
+   npm, apiforge-af 0.1.4, platformforge 0.1.4, sparkforge-aws 0.5.5,
    sparkforge-azure 0.1.4, forge-doctor-api 0.2.4, forge-doctor-data 1.0.4).
    forge-cli `--method registry` = default for `install`.
 2. **git clone**: `syncRepo` clone/pull + `findSetupScript` →

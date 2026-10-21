@@ -3,6 +3,12 @@
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.2.5] - 2026-10-21
+
+### Changed
+
+- Cycle 13 (graph): Loop Factory lf-0020→lf-0025 — Graph Studio P0 physics fix, scalable visualization modes (overview/explore/full), navigation and inspectors, Forge Portal Graph Explorer with CLI/portal `ForgeGraphView/v1` parity, federation merge/projection, performance baseline, security/a11y/reliability hardening, packaging verification and final homologation report (`docs/graph/final-report.md`).
+
 ## [0.2.4] - 2026-10-20
 
 ### Changed
