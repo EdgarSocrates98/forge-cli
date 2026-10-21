@@ -290,7 +290,8 @@ describe('P0-002: consultas read-only → zero mutação em home e workspace', (
     const code = await silent(() => runHostsCommand(cli(), ['list'], home));
     expect(code).toBe(0);
     expect(snapshot(home)).toBe(before);
-  });
+    // descoberta real de hosts pode exceder 30s num runner Windows frio
+  }, 120_000);
 
   it('doctor: relatório de diagnóstico sem mutação residual', async () => {
     const before = { home: snapshot(home), ws: snapshot(ws) };
