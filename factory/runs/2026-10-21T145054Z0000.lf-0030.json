@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0030.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T14:50:54+00:00",
+  "id": "lf-0030",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0030.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0030.md",
+  "spec_sha256": "545159b88d07b346cfe08b278ca4843b5679ba3d3c3f0d18c53fd945bd4c0be3",
+  "status": "planned",
+  "title": "Integrations: API Forge -> Doctor API + Sentinel<->Doctor Data bundles"
+}

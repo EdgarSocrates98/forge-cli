@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0028.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T14:19:34+00:00",
+  "id": "lf-0028",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0028.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0028.md",
+  "spec_sha256": "76206b6fe1bce4092476429ffbe271e9bc3e17ae234752e64738080198994352",
+  "status": "planned",
+  "title": "Integrations: SpecialistDelegation/v1 + EvidenceHandoff/v1 + governance"
+}
