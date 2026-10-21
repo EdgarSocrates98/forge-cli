@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0023.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T03:37:11+00:00",
+  "id": "lf-0023",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0023.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0023.md",
+  "spec_sha256": "a6ac48e55ad43ae9dcb2324a4785014ea543f2255c2f04a2e9d764266f07a2ac",
+  "status": "planned",
+  "title": "Cycle 13 Forge Portal Graph Explorer + UI parity"
+}
