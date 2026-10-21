@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0024.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T05:21:40+00:00",
+  "id": "lf-0024",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0024.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0024.md",
+  "spec_sha256": "e1ea9ced6969d63225edb4dc2432db46f01e5473bd5efd85b2e3f58bce53a929",
+  "status": "planned",
+  "title": "Cycle 13 perf engineering + automated tests + security/a11y/reliability"
+}
