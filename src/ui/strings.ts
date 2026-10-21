@@ -379,6 +379,10 @@ export const S = {
   recoveredRun: 'Execução anterior interrompida recuperada do estado persistido',
   breakingTitle: 'Análise de breaking changes',
   rollbackScopeNote: 'Rollback cobre apenas efeitos reversíveis documentados',
+  integrationsTitle: 'Integrações opcionais',
+  integrationsOffer: 'Integrações opcionais — marque para instalar (nada entra sem sua seleção)',
+  integrationNoInstallRoute:
+    'sem dist no catálogo registry — instale via git (`--method git`) ou pelo método do repositório',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:

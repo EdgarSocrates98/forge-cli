@@ -67,10 +67,10 @@ describe('CLI ponta a ponta (processo real, diretórios temporários)', { timeou
     expect(bogus.out).toContain('Comando desconhecido');
   });
 
-  it('status lista as 8 Forjas como não clonadas sem criar nada', async () => {
+  it('status lista as 9 Forjas como não clonadas sem criar nada', async () => {
     const res = await cli('status', '--dir', ws);
     expect(res.code).toBe(0);
-    expect(res.out.match(/não clonado/g)).toHaveLength(8);
+    expect(res.out.match(/não clonado/g)).toHaveLength(9);
     expect(readdirSync(ws)).toEqual([]);
   });
 
@@ -160,7 +160,7 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
     const res = await cli('status', '--json', '--dir', ws);
     expect(res.code).toBe(0);
     const data = JSON.parse(res.out);
-    expect(data).toHaveLength(8);
+    expect(data).toHaveLength(9);
     expect(data[0]).toMatchObject({ name: 'the-forge', phase: 'not-installed', dirty: false });
   });
 

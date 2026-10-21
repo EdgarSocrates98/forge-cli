@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
-import { confirm, isCancel } from '@clack/prompts';
+import { confirm, isCancel, multiselect } from '@clack/prompts';
 import { log, note, outro, spinner } from '@clack/prompts';
 import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
@@ -42,8 +42,15 @@ import { generateOfflineLock, type OfflineLock } from '../registry/lock.js';
 import { compareVersions, type ParsedVersion } from '../registry/versions.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { cliHome, commandOutput } from '../utils/system.js';
+import { cliHome, commandOutput, resolveTargetDir } from '../utils/system.js';
 import { emitJson } from './shared.js';
+import {
+  askOptionalIntegrations,
+  classifyIntegrations,
+  defaultWhich,
+  pendingIntegrations,
+  type IntegrationStatus,
+} from '../integrations.js';
 
 export interface ProbedPython {
   exe: string[];
@@ -322,7 +329,15 @@ function writeRegistryReport(reportPath: string, doc: unknown): void {
 export async function runRegistryInstall(
   cli: CliOptions,
   names: string[],
-  deps: { home?: string; pythons?: ProbedPython[]; fetchImpl?: FetchLike; run?: RunLike } = {},
+  deps: {
+    home?: string;
+    pythons?: ProbedPython[];
+    fetchImpl?: FetchLike;
+    run?: RunLike;
+    which?: (bin: string) => Promise<string | null>;
+    /** Guard anti-recursão — a oferta pós-install roda só uma vez. */
+    skipIntegrations?: boolean;
+  } = {},
 ): Promise<RegistryInstallResult[]> {
   const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
@@ -531,7 +546,20 @@ export async function runRegistryInstall(
     });
   }
 
-  const doc = { method: 'pypi', results, warnings };
+  // lf-0031: integrações opcionais — classificadas por evidência (receipt /
+  // checkout / PATH), reportadas no doc JSON e oferecidas com consentimento
+  // explícito no modo interativo. Nunca instalam sozinhas.
+  const integrationStatuses = deps.skipIntegrations
+    ? []
+    : await collectIntegrationStatuses(results, home, cli, deps.which);
+  const pending = pendingIntegrations(integrationStatuses);
+
+  const doc = {
+    method: 'pypi',
+    results,
+    warnings,
+    ...(pending.length ? { optional_integrations: pending.map(integrationJson) } : {}),
+  };
   reportTo(doc);
   if (cli.reportPath !== undefined) {
     log.info(`${S.reportSaved}: ${theme.dim(path.resolve(cli.reportPath))}`);
@@ -555,7 +583,74 @@ export async function runRegistryInstall(
     'Launchers em ~/.forge-cli/bin (no PATH do forge-cli); sem shim, invoque o caminho da venv',
   );
   outro(`${icons.ok} instalação registry-first concluída`);
+
+  // Oferta checkbox-style: só em TTY interativo e sem --yes — consentimento
+  // nunca é presumido. Nos demais modos a lista vira nota (opcional, informativa).
+  if (pending.length && !deps.skipIntegrations) {
+    const canAsk = !quiet && !cli.yes && process.stdout.isTTY && process.stdin.isTTY;
+    if (canAsk) {
+      const offer = await askOptionalIntegrations(pending, async (options) => {
+        const picked = await multiselect({
+          message: S.integrationsOffer,
+          options,
+          required: false,
+        });
+        if (isCancel(picked)) exitCancelled();
+        return picked;
+      });
+      for (const n of offer.notInstallable) {
+        log.warn(`${n}: ${S.integrationNoInstallRoute}`);
+      }
+      if (offer.installable.length) {
+        await runRegistryInstall(cli, offer.installable, { ...deps, skipIntegrations: true });
+      }
+    } else if (!quiet) {
+      note(
+        pending
+          .map(
+            (s) =>
+              `${s.integration.name} — ${s.integration.reason}${s.integration.installable ? '' : ` (${S.integrationNoInstallRoute})`}`,
+          )
+          .join('\n'),
+        S.integrationsTitle,
+      );
+    }
+  }
   return results;
+}
+
+function integrationJson(s: IntegrationStatus) {
+  return {
+    name: s.integration.name,
+    state: s.state,
+    adapter: s.integration.adapter,
+    installable: s.integration.installable,
+    reason: s.integration.reason,
+    evidence: s.evidence,
+  };
+}
+
+async function collectIntegrationStatuses(
+  results: RegistryInstallResult[],
+  home: string,
+  cli: CliOptions,
+  which?: (bin: string) => Promise<string | null>,
+): Promise<IntegrationStatus[]> {
+  const root = resolveTargetDir(cli.dir);
+  const bin = (n: string) => FORGE_REPOS.find((r) => r.name === n)?.verify?.[0];
+  const statuses: IntegrationStatus[] = [];
+  for (const r of results) {
+    if (!r.ok) continue;
+    statuses.push(
+      ...(await classifyIntegrations(r.forge, {
+        root,
+        home,
+        which: which ?? defaultWhich,
+        bin,
+      })),
+    );
+  }
+  return statuses;
 }
 
 /**

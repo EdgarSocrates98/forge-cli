@@ -1,5 +1,5 @@
 import type { ResolvedCommand } from '../commands.js';
-import { cancel, confirm, isCancel, log, note, outro } from '@clack/prompts';
+import { cancel, confirm, isCancel, log, multiselect, note, outro } from '@clack/prompts';
 import {
   failedRepoNames,
   loadState,
@@ -18,7 +18,14 @@ import { processPool, type RunOptions } from '../runner.js';
 import type { ForgeRepo, RepoResult } from '../types.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
-import { currentHead, hasGitRepo, resolveTargetDir } from '../utils/system.js';
+import { currentHead, hasGitRepo, resolveTargetDir, cliHome } from '../utils/system.js';
+import {
+  askOptionalIntegrations,
+  classifyIntegrations,
+  defaultWhich,
+  pendingIntegrations,
+  type IntegrationStatus,
+} from '../integrations.js';
 import { executeUninstall, planUninstall } from '../lifecycle.js';
 import { resolveInside } from '../safety.js';
 import { checkEnvironment, catalogFor, REFUSAL_TEXT } from './shared.js';
@@ -276,5 +283,69 @@ export async function runInstallFlow(
 
   const hasErrors = results.some((r) => r.status === 'error');
   outro(`${icons.rocket} ${hasErrors ? S.outroWithErrors : S.outroOk}`);
+
+  // lf-0031: integrações opcionais — oferta checkbox-style pós-install com
+  // consentimento explícito; nada instala sem marcação. Só install/clone
+  // (update/reinstall não surpreendem com siblings) e só sem erros.
+  if (!hasErrors && (resolved.command === 'install' || resolved.command === 'clone')) {
+    await offerOptionalIntegrations(cli, results, catalog, targetDir, opts, runLog, interactive);
+  }
   if (hasErrors) process.exitCode = 1;
+}
+
+async function offerOptionalIntegrations(
+  cli: CliOptions,
+  results: RepoResult[],
+  catalog: ForgeRepo[],
+  targetDir: string,
+  opts: RunOptions,
+  runLog: { write: (line: string) => void },
+  interactive: boolean,
+): Promise<void> {
+  const present = new Set(results.filter((r) => r.status !== 'error').map((r) => r.repo.name));
+  const statuses: IntegrationStatus[] = [];
+  for (const r of results) {
+    if (!present.has(r.repo.name)) continue;
+    statuses.push(
+      ...(await classifyIntegrations(r.repo.name, {
+        root: targetDir,
+        home: cliHome(),
+        which: defaultWhich,
+        bin: (n) => catalog.find((c) => c.name === n)?.verify?.[0],
+      })),
+    );
+  }
+  const pending = pendingIntegrations(statuses);
+  if (!pending.length) return;
+  if (interactive && !cli.yes) {
+    const offer = await askOptionalIntegrations(pending, async (options) => {
+      const picked = await multiselect({
+        message: S.integrationsOffer,
+        options,
+        required: false,
+      });
+      if (isCancel(picked)) {
+        cancel(S.cancelled);
+        return null;
+      }
+      return picked;
+    });
+    const selected = catalog.filter((c) => offer.consented.includes(c.name));
+    const unrouted = offer.consented.filter((n) => !catalog.some((c) => c.name === n));
+    for (const n of unrouted) log.warn(`${n}: ${S.integrationNoInstallRoute}`);
+    if (selected.length) {
+      const more = await processBatch(selected, targetDir, opts, runLog.write, 0, selected.length);
+      renderReport(more);
+    }
+  } else {
+    note(
+      pending
+        .map(
+          (s) =>
+            `${s.integration.name} — ${s.integration.reason}${catalog.some((c) => c.name === s.integration.name) ? '' : ` (${S.integrationNoInstallRoute})`}`,
+        )
+        .join('\n'),
+      S.integrationsTitle,
+    );
+  }
 }

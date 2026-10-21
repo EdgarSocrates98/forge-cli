@@ -15,6 +15,7 @@ import { inspectEnv } from '../envintel/inspect.js';
 import { deriveSchema } from '../envintel/schema.js';
 import type { HostDetection } from '../hosts/types.js';
 import { checkEnvLock, interruptedRuns, type EnvLock } from '../maintenance.js';
+import { classifyIntegrationsSync } from '../integrations.js';
 import { loadForgeState, type LocalInstallReceipt } from '../registry/install.js';
 import { resolveInside } from '../safety.js';
 import { hasGitRepo } from '../utils/system.js';
@@ -607,6 +608,80 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
           },
     ),
   );
+
+  // lf-0031: integrações opcionais por consumidor instalado — um check por
+  // Forja instalada cobrindo install/capability/version/executable-health/
+  // contract/delegation-adapter de cada especialista declarado. Ausência é
+  // opcional por construção: 'skip'/info — nunca falha a Forja principal.
+  const forgeState = loadForgeState(ctx.home).forges;
+  for (const repo of [...ctx.catalog].sort((a, b) => a.name.localeCompare(b.name))) {
+    const dir = resolveInside(ctx.root, repo.name);
+    const consumerPresent = (!!dir && hasGitRepo(dir)) || !!forgeState[repo.name];
+    if (!consumerPresent) continue;
+    const statuses = classifyIntegrationsSync(repo.name, { root: ctx.root, home: ctx.home });
+    if (!statuses.length) continue;
+    const lines = statuses.map((s) => {
+      const sdir = resolveInside(ctx.root, s.integration.name);
+      let contract = 'contract=não sondado';
+      if (sdir && existsSync(sdir)) {
+        const manifest = path.join(sdir, 'forge.json');
+        contract = !existsSync(manifest)
+          ? 'contract=sem forge.json'
+          : readJson(manifest).ok
+            ? 'contract=forge.json válido'
+            : 'contract=forge.json inválido';
+      } else if (s.state === 'verified' || s.state === 'installed') {
+        contract = 'contract=manifesto dentro da venv (não sondado)';
+      }
+      return (
+        `${s.integration.name}: state=${s.state} ` +
+        `capability=${s.integration.adapter ? 'derivável (adapter declarado)' : 'não declarada'} ` +
+        `adapter=${s.integration.adapter ? 'the-forge' : 'ausente'} ${contract}` +
+        ` [${s.evidence.join(' · ')}]`
+      );
+    });
+    const degraded = statuses.filter((s) => s.state === 'degraded').length;
+    const present = statuses.filter((s) => s.state !== 'absent').length;
+    // `adapter=ausente` fica em evidência mas não vira warn: especialistas
+    // não-adaptados (data-sentinel-forge) são gap documentado — a informação
+    // é reportada, não transformada em pendência de reparo.
+    checks.push(
+      mkCheck(
+        ctx.now,
+        degraded
+          ? {
+              id: `installation.integrations.${repo.name}`,
+              domain: 'installation',
+              result: 'warn',
+              severity: 'low',
+              diagnosis: `${degraded} integração(ões) opcional(is) degradada(s)`,
+              evidence: boundEntries(ctx, lines).shown,
+              correctiveAction: 'reinstall or verify degraded optional specialists',
+              reversible: true,
+            }
+          : present
+            ? {
+                id: `installation.integrations.${repo.name}`,
+                domain: 'installation',
+                result: 'pass',
+                severity: 'info',
+                diagnosis: `${present} integração(ões) opcional(is) presente(s) e saudável(is)`,
+                evidence: boundEntries(ctx, lines).shown,
+                reversible: null,
+              }
+            : {
+                id: `installation.integrations.${repo.name}`,
+                domain: 'installation',
+                result: 'skip',
+                severity: 'info',
+                diagnosis:
+                  'integrações opcionais ausentes — nada exigido, nunca falha a Forja principal',
+                evidence: boundEntries(ctx, lines).shown,
+                reversible: null,
+              },
+      ),
+    );
+  }
 
   return checks;
 }

@@ -142,6 +142,54 @@ forge-cli install <dir>                                   # fonte local: zero re
   negado sai como `FORGE-INSTALL-PERMISSION-DENIED` com o fallback.
 - Fonte local (`install <dir>`) não toca rede por definição.
 
+## 11. Integrações opcionais (pós-install)
+
+Depois que uma instalação termina com sucesso, o forge-cli lista as
+**integrações opcionais** declaradas para a(s) Forja(s) instalada(s) —
+especialistas que compõem com ela (verificadores independentes, delegates
+do orquestrador, fallbacks). Regras invioláveis:
+
+- **Consentimento explícito.** Em terminal interativo a lista é um
+  checkbox (`Espaço` marca, `Enter` confirma) sem nada pré-marcado;
+  seleção vazia = nada instalado. `--yes`, `--json` e pipes nunca
+  presumem consentimento — a lista sai como nota informativa (ou no
+  campo `optional_integrations` do relatório JSON).
+- **Nunca automático.** Nenhum fluxo instala uma Forja irmã como
+  dependência — composição é sempre opcional, nunca mandatória.
+- **Detecção por evidência.** Antes de oferecer, cada integração é
+  classificada: `verified` (receipt com verify ok), `installed`
+  (receipt sem prova ou binário no PATH), `checkout` (clone presente),
+  `degraded` (receipt com verify falho ou fonte ausente) e `absent`.
+  O que já está saudável não é oferecido de novo.
+- **Sem rota honesta.** Integração sem dist no PyPI (hoje:
+  `data-sentinel-forge`) aparece com a razão e o remédio correto
+  (`--method git` / método do repositório) — nunca é fingida instalável
+  nem instalada.
+
+```bash
+forge-cli install the-forge          # instala → oferece os delegates do orquestrador
+forge-cli install the-forge --yes    # instala → integrações saem como nota (nada extra entra)
+forge-cli install the-forge --json   # idem, no campo optional_integrations do documento
+```
+
+### Doctor — `installation.integrations.<forja>`
+
+`forge doctor` ganha um check por Forja instalada que declara
+integrações, cobrindo as dimensões exigidas pela lf-0031 em cada
+especialista: instalação (state), capability (`derivável`/declarada),
+versão (receipt), executable-health (verify do receipt), contract
+(`forge.json` do checkout) e delegation-adapter (`the-forge`/`ausente`).
+
+- `skip` — todas ausentes: opcionais, **nunca falham a Forja
+  principal** (e não entram no plano de `doctor --fix`);
+- `pass` — ao menos uma presente e nenhuma degradada;
+- `warn` (low) — alguma degradada (verify falho/fonte perdida);
+  reparo é `UNSUPPORTED` no heal — só diagnóstico.
+
+Especialistas sem adapter the-forge (hoje `data-sentinel-forge`)
+aparecem como `adapter=ausente`/`capability=não declarada` em evidência
+— gap documentado, reportado, nunca transformado em falha.
+
 ## Ciclo de vida da fonte local
 
 | Operação     | Comando                            | Comportamento                                                                                                                               |

@@ -10,11 +10,12 @@ const EXPECTED_NAMES = [
   'forge-doctor-api',
   'forge-doctor-data',
   'forge-portal',
+  'data-sentinel-forge',
 ];
 
 describe('FORGE_REPOS catalog', () => {
-  it('contains exactly the 8 Forge repositories', () => {
-    expect(FORGE_REPOS).toHaveLength(8);
+  it('contains exactly the 9 Forge repositories', () => {
+    expect(FORGE_REPOS).toHaveLength(9);
     expect(FORGE_REPOS.map((r) => r.name)).toEqual(EXPECTED_NAMES);
   });
 
@@ -47,11 +48,21 @@ describe('FORGE_REPOS catalog', () => {
     }
   });
 
-  it('marks repo kinds — 7 python + 1 node', () => {
+  it('marks repo kinds — 8 python + 1 node', () => {
     const kinds = FORGE_REPOS.map((r) => r.kind);
-    expect(kinds.filter((k) => k === 'python')).toHaveLength(7);
+    expect(kinds.filter((k) => k === 'python')).toHaveLength(8);
     expect(kinds.filter((k) => k === 'node')).toHaveLength(1);
     expect(FORGE_REPOS.find((r) => r.kind === 'node')?.name).toBe('forge-portal');
+  });
+
+  it('catalogs data-sentinel-forge as cloneable but without an install route', () => {
+    // lf-0031: o repositório é clonável (gap G7) mas não tem dist no PyPI
+    // nem script de bootstrap na fonte — sem nativeInstall, nenhum fluxo
+    // finge uma instalação que ainda não existe.
+    const sentinel = FORGE_REPOS.find((r) => r.name === 'data-sentinel-forge');
+    expect(sentinel).toBeDefined();
+    expect(sentinel?.kind).toBe('python');
+    expect(sentinel?.nativeInstall).toBeUndefined();
   });
 
   it('defines documented envKeys only for api-forge', () => {

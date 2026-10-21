@@ -116,4 +116,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['npx', '--no-install', 'ng', 'version'],
     nextSteps: ['npm start'],
   },
+  {
+    // lf-0031 (gap G7): o repositório existe e é clonável, mas ainda não tem
+    // rota de instalação — sem setup.sh/forge_bootstrap.py na fonte e sem
+    // dist no PyPI (verificado). Sem `nativeInstall`: o fluxo git reporta
+    // `noSetupSteps` honestamente; o registry recusa com "sem dist no
+    // catálogo". Nenhum caminho finge uma instalação que não existe.
+    name: 'data-sentinel-forge',
+    url: 'https://github.com/EdgarSocrates98/data-sentinel-forge',
+    description: 'Diagnóstico de runtime (logs/plans Spark, doctor-bundles)',
+    kind: 'python',
+    verify: ['data-sentinel', '--help'],
+    nextSteps: ['data-sentinel --help'],
+  },
 ];
