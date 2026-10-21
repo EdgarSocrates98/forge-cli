@@ -57,8 +57,14 @@ projetado (relatório mede `G.nodes`, os nós reais).
 |---|---|---|---|---|---|---|---|---|---|
 | graph_10000_chain | auto→overview | 250 clusters / 249 agg | STABLE | sim | 325 | 567 | 11,79 ms | 8,1 s | — |
 | graph_25000_chain | auto→overview | 250 clusters / 249 agg | STABLE | sim | 337 | 607 | 12,00 ms | 10,5 s | — |
-| graph_10000_chain | full | 10.000 nós / 9.999 arestas | PENDING | | | | | | |
-| graph_25000_chain | full | ≤10.000 nós (budget) | PENDING | | | | | | |
+| graph_10000_chain | full | 10.000 nós / 9.999 arestas | STABLE | sim | 352 | 9.665 | 118,9 ms* | 19,4 min | — |
+| graph_25000_chain | full | 10.000 nós / 9.999 arestas | STABLE | sim | 352 | 10.230 | 145,8 ms* | 25,5 min | `Truncated — showing 10000/25000 nodes, 9999/9999 edges · refine filters/search` |
+
+\* máquina sob load ~9 + draw via Proxy-stub que aloca closures — o número
+absoluto é um artefato do harness; o estrutural é `raf_frames ≫ lticks` (~29
+frames/tick → fatiamento real a `SIM_MS=8`), `non_finite=0`, `resets=0`,
+`max|coord|≈2,7k px` e `settled=true`. Em full-25k o notice de truncamento
+aparece exatamente como projetado.
 
 ## Checks de superfície (drivers custom, mesmo script verbatim)
 
