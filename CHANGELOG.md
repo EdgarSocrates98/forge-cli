@@ -3,6 +3,12 @@
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.2.6] - 2026-10-21
+
+### Added
+
+- Integrations cycle (lf-0031): `OPTIONAL_INTEGRATIONS` consent flow — evidence-based states (verified/installed/checkout/degraded/absent), interactive offer after install, honest no-route for data-sentinel-forge (cloneable only); `doctor` classifies optional integrations without failing the primary Forge; integration audit + cases A-H evidence under `docs/integration/`.
+
 ## [0.2.5] - 2026-10-21
 
 ### Changed
