@@ -1,0 +1,17 @@
+{
+ "base": "http://127.0.0.1:34405",
+ "api_nodes": 6,
+ "api_edges": 3,
+ "browser": {
+  "title": "ForgePortalApp",
+  "url": "http://127.0.0.1:34405/graph",
+  "canvas_count": 0,
+  "mentions_nodes": true,
+  "body_excerpt": "Pular para o conte\u00fado\nSpark Forge AWS\nengenharia agentic, simplificada\n\nVIS\u00c3O GERAL\n\nPainel\nGuia\n\nEXPLORAR\n\nAgents\nSkills\nMCP\nConhecimento\nCapacidades\n\nOPERAR\n\nTarefas\nInstala\u00e7\u00e3o\nPerfis\nHosts de IA\nConfigura\u00e7\u00e3o\n\nANALISAR\n\nGraph Studio\nObservabilidade\nExecu\u00e7\u00e3o\nLab\nVers\u00f5es\n\nCONFIGURA\u00c7\u00d5ES\n\nConfigura\u00e7\u00f5es\nlf0025-ws\nCtrl K\nPT\nGraph Studio\n\nGrafo real da Forja \u2014 n\u00f3s, arestas, evid\u00eancia e impacto.\n\nAtualizar\n\nO grafo mostra entidades e rela\u00e7\u00f5es observadas \u2014 selecione um n\u00f3 para ver origem, vizinhos e evid\u00eancias. Saiba mais\n\nspark-forge-aws \u00b7 codeintel-graph\n6 n\u00f3s \u00b7 3 arestas\nGrafo federado do ecossistema\nFederado\nFedera\u00e7\u00e3o\nVis\u00f5es do motor\nLista\nCanvas\nCapturar snapshot\nExportar grafo\nGET /api/v1/bootstrap\ncarregado\nGET /api/v1/graphs\ncarregado\nGET /api/v1/capabilities\ncarregado\nGET /api/v1/skills\ncarregado\nGET /api/v1/agents\ncarregado\nGET /api/v1/mcp/servers\ncarregado\nGET /api/v1/hosts\ncarregado",
+  "after_30s": {
+   "console_errors": 0,
+   "canvas_count": 0
+  }
+ },
+ "console_errors": []
+}

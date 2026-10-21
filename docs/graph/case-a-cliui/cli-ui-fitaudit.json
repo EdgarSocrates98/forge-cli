@@ -1,0 +1,21 @@
+{
+ "audit_after_fit": {
+  "non_finite": 0,
+  "inside": 250,
+  "render": 250,
+  "stats": "overview \u00b7 250 nodes \u00b7 33 edges \u00b7 33 drawn"
+ },
+ "drill": {
+  "clicked": {
+   "x": 682.0090383072006,
+   "y": 592.50360626961,
+   "id": "cl983",
+   "size": 1
+  },
+  "after_x": {
+   "render": 250,
+   "mode": "overview",
+   "stats": "overview \u00b7 250 nodes \u00b7 33 edges \u00b7 33 drawn"
+  }
+ }
+}

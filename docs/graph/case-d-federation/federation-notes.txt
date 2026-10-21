@@ -1,0 +1,6 @@
+  note: api-forge: refused AF-GRAPH-NOT-FOUND
+  note: data-sentinel-forge: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯
+  note: forge-doctor-api: producer exited 2 — cannot read path: view
+  note: forge-doctor-data: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯
+  note: platform-forge: refused PF-GRAPH-NOGRAPH
+  note: the-forge: no cli_entry declared

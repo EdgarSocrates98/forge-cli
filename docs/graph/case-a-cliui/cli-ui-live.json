@@ -1,0 +1,44 @@
+{
+ "surface": "sparkforge-aws graph ui (vendored _graphstudio, repo checkout)",
+ "base": "http://127.0.0.1:19777",
+ "dataset": {
+  "G.nodes": 5000,
+  "G.edges": 1194,
+  "render": 250,
+  "mode": "overview",
+  "stats": "overview \u00b7 250 nodes \u00b7 33 edges \u00b7 33 drawn"
+ },
+ "load_ms": 2893,
+ "settled": true,
+ "coordinate_audit": {
+  "non_finite": 0,
+  "inside": 113,
+  "render": 250,
+  "err": "",
+  "stats": "overview \u00b7 250 nodes \u00b7 33 edges \u00b7 33 drawn"
+ },
+ "fit_zoom": {
+  "before": {
+   "x": 5.962790271238574,
+   "y": 1.1056181061243056,
+   "s": 0.44147679405069085
+  },
+  "zoom_in": 0.5076983131582944,
+  "zoom_out": 0.4416975324477161,
+  "bounds": {
+   "s": 0.4416975324477161,
+   "min": 0.02,
+   "max": 8
+  }
+ },
+ "inspect": {
+  "clicked": "cl983",
+  "selected": "cl983",
+  "inspector_had_id": true
+ },
+ "search": {
+  "term": "graph",
+  "hits": 8
+ },
+ "console_errors": []
+}
