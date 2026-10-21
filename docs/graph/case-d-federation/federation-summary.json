@@ -1,69 +1,69 @@
 {
- "command": "theforge graph --federated --view --root /home/edgar/Documentos/projetos/forjas",
- "captured_at": "lf-0025 homologation (2026-10-21)",
- "views": [
-  {
-   "provider": "the-forge",
-   "graph_id": "capability-graph",
-   "nodes": 11,
-   "edges": 0,
-   "sample_node_ids": [
-    "repository:api-forge",
-    "repository:data-sentinel-forge",
-    "repository:forge-cli"
-   ]
-  },
-  {
-   "provider": "spark-forge-aws",
-   "graph_id": "codeintel-graph",
-   "nodes": 5000,
-   "edges": 1194,
-   "sample_node_ids": [
-    "node_11300df5c25be2708266b543e02678ae",
-    "node_b11d0a7a7483350143949755f9b70bd3",
-    "node_cb7f885f61d7e2e5bd0098a5a70cb152"
-   ]
-  },
-  {
-   "provider": "spark-forge-azure",
-   "graph_id": "azure-graph",
-   "nodes": 11995,
-   "edges": 35693,
-   "sample_node_ids": [
-    "code:class:examples/workspace/databricks/src/lakehouse/transforms.py::OrderWriter",
-    "code:class:scripts/check_knowledge.py::RootError",
-    "code:class:scripts/forge_bootstrap.py::Refusal"
-   ]
+  "command": "theforge graph --federated --view --root /home/edgar/Documentos/projetos/forjas",
+  "captured_at": "lf-0025 homologation (2026-10-21)",
+  "views": [
+    {
+      "provider": "the-forge",
+      "graph_id": "capability-graph",
+      "nodes": 11,
+      "edges": 0,
+      "sample_node_ids": [
+        "repository:api-forge",
+        "repository:data-sentinel-forge",
+        "repository:forge-cli"
+      ]
+    },
+    {
+      "provider": "spark-forge-aws",
+      "graph_id": "codeintel-graph",
+      "nodes": 5000,
+      "edges": 1194,
+      "sample_node_ids": [
+        "node_11300df5c25be2708266b543e02678ae",
+        "node_b11d0a7a7483350143949755f9b70bd3",
+        "node_cb7f885f61d7e2e5bd0098a5a70cb152"
+      ]
+    },
+    {
+      "provider": "spark-forge-azure",
+      "graph_id": "azure-graph",
+      "nodes": 11995,
+      "edges": 35693,
+      "sample_node_ids": [
+        "code:class:examples/workspace/databricks/src/lakehouse/transforms.py::OrderWriter",
+        "code:class:scripts/check_knowledge.py::RootError",
+        "code:class:scripts/forge_bootstrap.py::Refusal"
+      ]
+    }
+  ],
+  "notes": [
+    "api-forge: refused AF-GRAPH-NOT-FOUND",
+    "data-sentinel-forge: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯",
+    "forge-doctor-api: producer exited 2 — cannot read path: view",
+    "forge-doctor-data: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯",
+    "platform-forge: refused PF-GRAPH-NOGRAPH",
+    "the-forge: no cli_entry declared"
+  ],
+  "merged": {
+    "nodes": 17006,
+    "edges": 36887,
+    "nodes_by_source_provider": {
+      "the-forge": 11,
+      "spark-forge-aws": 5000,
+      "spark-forge-azure": 11995
+    },
+    "edges_by_provenance": {
+      "spark-forge-aws/observed": 1194,
+      "spark-forge-azure/static": 35693
+    },
+    "namespacing": "every provider node id is <provider>:<local-id>",
+    "sample_ids": [
+      "the-forge:repository:api-forge",
+      "the-forge:repository:data-sentinel-forge",
+      "spark-forge-azure:code:config:evals/token_efficient/fixtures/federated_graph_cases.yaml",
+      "spark-forge-azure:code:config:evals/token_efficient/fixtures/host_replay.yaml",
+      "spark-forge-azure:code:test:tests/test_workspace_semantic_graph.py",
+      "spark-forge-azure:data:notebook:examples/workspace/databricks/notebooks/silver_orders.py"
+    ]
   }
- ],
- "notes": [
-  "api-forge: refused AF-GRAPH-NOT-FOUND",
-  "data-sentinel-forge: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯",
-  "forge-doctor-api: producer exited 2 — cannot read path: view",
-  "forge-doctor-data: producer exited 2 — ╰──────────────────────────────────────────────────────────────────────────────╯",
-  "platform-forge: refused PF-GRAPH-NOGRAPH",
-  "the-forge: no cli_entry declared"
- ],
- "merged": {
-  "nodes": 17006,
-  "edges": 36887,
-  "nodes_by_source_provider": {
-   "the-forge": 11,
-   "spark-forge-aws": 5000,
-   "spark-forge-azure": 11995
-  },
-  "edges_by_provenance": {
-   "spark-forge-aws/observed": 1194,
-   "spark-forge-azure/static": 35693
-  },
-  "namespacing": "every provider node id is <provider>:<local-id>",
-  "sample_ids": [
-   "the-forge:repository:api-forge",
-   "the-forge:repository:data-sentinel-forge",
-   "spark-forge-azure:code:config:evals/token_efficient/fixtures/federated_graph_cases.yaml",
-   "spark-forge-azure:code:config:evals/token_efficient/fixtures/host_replay.yaml",
-   "spark-forge-azure:code:test:tests/test_workspace_semantic_graph.py",
-   "spark-forge-azure:data:notebook:examples/workspace/databricks/notebooks/silver_orders.py"
-  ]
- }
 }

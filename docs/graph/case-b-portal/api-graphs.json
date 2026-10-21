@@ -1,167 +1,163 @@
 {
- "schema": "forge/PortalApi/1",
- "correlation_id": "901106edc34c",
- "data": {
-  "availability": {
-   "state": "available"
-  },
-  "views": [
-   {
-    "schema": "forge/ForgeGraphView/v1",
-    "descriptor": {
-     "graph_id": "codeintel-graph",
-     "provider_id": "spark-forge-aws",
-     "domain": "code",
-     "graph_schema": "forge/GraphDescriptor/v1",
-     "snapshot_id": "",
-     "generated_at": "2026-10-21T08:18:35Z",
-     "node_count": 6,
-     "edge_count": 3,
-     "available_layers": [
-      "class",
-      "function",
-      "method"
-     ],
-     "available_queries": [],
-     "capabilities": [
-      "node_inspect",
-      "edge_inspect",
-      "neighbors",
-      "paths",
-      "dependency_traversal",
-      "impact_analysis",
-      "search",
-      "filter",
-      "export"
-     ],
-     "limitations": []
+  "schema": "forge/PortalApi/1",
+  "correlation_id": "901106edc34c",
+  "data": {
+    "availability": {
+      "state": "available"
     },
-    "nodes": [
-     {
-      "id": "node_8f7529ae5638116e7f0c1cd6bc524de9",
-      "kind": "class",
-      "label": "Alpha",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "alpha.py",
-       "line": 6
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     },
-     {
-      "id": "node_41c95c1f471b6a198f9f084f634b8b58",
-      "kind": "method",
-      "label": "Alpha.run",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "alpha.py",
-       "line": 7
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     },
-     {
-      "id": "node_f84b6bf965b34c0b939ee507780931d3",
-      "kind": "class",
-      "label": "Beta",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "beta.py",
-       "line": 6
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     },
-     {
-      "id": "node_646ec681b0825a28c60806eed2a40ea9",
-      "kind": "function",
-      "label": "alpha_fn",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "alpha.py",
-       "line": 3
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     },
-     {
-      "id": "node_33699f6e57b1a9b76cfb7388d1ad76d5",
-      "kind": "function",
-      "label": "beta_fn",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "beta.py",
-       "line": 3
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     },
-     {
-      "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
-      "kind": "function",
-      "label": "gamma_fn",
-      "domain": "code",
-      "source_provider": "spark-forge-aws",
-      "attributes": {
-       "file": "gamma.py",
-       "line": 4
-      },
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "snapshot_ref": ""
-     }
+    "views": [
+      {
+        "schema": "forge/ForgeGraphView/v1",
+        "descriptor": {
+          "graph_id": "codeintel-graph",
+          "provider_id": "spark-forge-aws",
+          "domain": "code",
+          "graph_schema": "forge/GraphDescriptor/v1",
+          "snapshot_id": "",
+          "generated_at": "2026-10-21T08:18:35Z",
+          "node_count": 6,
+          "edge_count": 3,
+          "available_layers": ["class", "function", "method"],
+          "available_queries": [],
+          "capabilities": [
+            "node_inspect",
+            "edge_inspect",
+            "neighbors",
+            "paths",
+            "dependency_traversal",
+            "impact_analysis",
+            "search",
+            "filter",
+            "export"
+          ],
+          "limitations": []
+        },
+        "nodes": [
+          {
+            "id": "node_8f7529ae5638116e7f0c1cd6bc524de9",
+            "kind": "class",
+            "label": "Alpha",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "alpha.py",
+              "line": 6
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          },
+          {
+            "id": "node_41c95c1f471b6a198f9f084f634b8b58",
+            "kind": "method",
+            "label": "Alpha.run",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "alpha.py",
+              "line": 7
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          },
+          {
+            "id": "node_f84b6bf965b34c0b939ee507780931d3",
+            "kind": "class",
+            "label": "Beta",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "beta.py",
+              "line": 6
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          },
+          {
+            "id": "node_646ec681b0825a28c60806eed2a40ea9",
+            "kind": "function",
+            "label": "alpha_fn",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "alpha.py",
+              "line": 3
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          },
+          {
+            "id": "node_33699f6e57b1a9b76cfb7388d1ad76d5",
+            "kind": "function",
+            "label": "beta_fn",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "beta.py",
+              "line": 3
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          },
+          {
+            "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
+            "kind": "function",
+            "label": "gamma_fn",
+            "domain": "code",
+            "source_provider": "spark-forge-aws",
+            "attributes": {
+              "file": "gamma.py",
+              "line": 4
+            },
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "snapshot_ref": ""
+          }
+        ],
+        "edges": [
+          {
+            "id": "node_41c95c1f471b6a198f9f084f634b8b58|calls|node_646ec681b0825a28c60806eed2a40ea9",
+            "source": "node_41c95c1f471b6a198f9f084f634b8b58",
+            "target": "node_646ec681b0825a28c60806eed2a40ea9",
+            "kind": "calls",
+            "direction": "directed",
+            "provenance": "observed",
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "temporal": {},
+            "attributes": {}
+          },
+          {
+            "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233|calls|node_8f7529ae5638116e7f0c1cd6bc524de9",
+            "source": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
+            "target": "node_8f7529ae5638116e7f0c1cd6bc524de9",
+            "kind": "calls",
+            "direction": "directed",
+            "provenance": "observed",
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "temporal": {},
+            "attributes": {}
+          },
+          {
+            "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233|calls|node_33699f6e57b1a9b76cfb7388d1ad76d5",
+            "source": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
+            "target": "node_33699f6e57b1a9b76cfb7388d1ad76d5",
+            "kind": "calls",
+            "direction": "directed",
+            "provenance": "observed",
+            "epistemic_state": "observed",
+            "evidence_refs": [],
+            "temporal": {},
+            "attributes": {}
+          }
+        ]
+      }
     ],
-    "edges": [
-     {
-      "id": "node_41c95c1f471b6a198f9f084f634b8b58|calls|node_646ec681b0825a28c60806eed2a40ea9",
-      "source": "node_41c95c1f471b6a198f9f084f634b8b58",
-      "target": "node_646ec681b0825a28c60806eed2a40ea9",
-      "kind": "calls",
-      "direction": "directed",
-      "provenance": "observed",
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "temporal": {},
-      "attributes": {}
-     },
-     {
-      "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233|calls|node_8f7529ae5638116e7f0c1cd6bc524de9",
-      "source": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
-      "target": "node_8f7529ae5638116e7f0c1cd6bc524de9",
-      "kind": "calls",
-      "direction": "directed",
-      "provenance": "observed",
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "temporal": {},
-      "attributes": {}
-     },
-     {
-      "id": "node_cfb73e9f4acd4a562e2e6a92e72e8233|calls|node_33699f6e57b1a9b76cfb7388d1ad76d5",
-      "source": "node_cfb73e9f4acd4a562e2e6a92e72e8233",
-      "target": "node_33699f6e57b1a9b76cfb7388d1ad76d5",
-      "kind": "calls",
-      "direction": "directed",
-      "provenance": "observed",
-      "epistemic_state": "observed",
-      "evidence_refs": [],
-      "temporal": {},
-      "attributes": {}
-     }
-    ]
-   }
-  ],
-  "studio_url": null
- }
+    "studio_url": null
+  }
 }

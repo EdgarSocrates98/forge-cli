@@ -28,15 +28,15 @@ canônico (`the-forge/src/theforge/graphstudio.py`, sha256 `a1cd735c…`):
 Cada wheel construído via `python -m build --wheel` no venv do repo e
 inspecionado por zipfile:
 
-| wheel | módulo | sha256 | refs externas |
-|---|---|---|---|
-| sparkforge_aws-0.5.4 | `sparkforge_aws/_graphstudio.py` | `a1cd735c…` | 0 |
-| sparkforge_azure-0.1.4 | `sparkforge_azure/_graphstudio.py` | `a1cd735c…` | 0 |
-| apiforge_af-0.1.4 | `apiforge/_graphstudio.py` | `a1cd735c…` | 0 |
-| platformforge-0.1.4 | `platformforge/_graphstudio.py` | `a1cd735c…` | 0 |
-| forge_doctor_api-0.2.4 | `forge_doctor_api/_graphstudio.py` | `a1cd735c…` | 0 |
-| forge_doctor_data-1.0.4 | `forge_doctor_data/_graphstudio.py` | `a1cd735c…` | 0 |
-| theforge_core-0.5.4 | `theforge/graphstudio.py` | `a1cd735c…` | 0 |
+| wheel                   | módulo                              | sha256      | refs externas |
+| ----------------------- | ----------------------------------- | ----------- | ------------- |
+| sparkforge_aws-0.5.4    | `sparkforge_aws/_graphstudio.py`    | `a1cd735c…` | 0             |
+| sparkforge_azure-0.1.4  | `sparkforge_azure/_graphstudio.py`  | `a1cd735c…` | 0             |
+| apiforge_af-0.1.4       | `apiforge/_graphstudio.py`          | `a1cd735c…` | 0             |
+| platformforge-0.1.4     | `platformforge/_graphstudio.py`     | `a1cd735c…` | 0             |
+| forge_doctor_api-0.2.4  | `forge_doctor_api/_graphstudio.py`  | `a1cd735c…` | 0             |
+| forge_doctor_data-1.0.4 | `forge_doctor_data/_graphstudio.py` | `a1cd735c…` | 0             |
+| theforge_core-0.5.4     | `theforge/graphstudio.py`           | `a1cd735c…` | 0             |
 
 54.896 bytes idênticos em todos — o sha256 do **módulo dentro do wheel** é
 o mesmo do checkout canônico.
@@ -148,16 +148,16 @@ workspace `/tmp/lf0025-ws` (índice construído pelo wheel instalado).
 Superficie de grafo por forja = módulo vendored + verbo `graph ui` +
 suíte de grafos própria. Evidência:
 
-| Forja | byte-paridade | serve-smoke (/_api_/405) | testes de grafo | `graph ui` no CLI |
-|---|---|---|---|---|
-| the-forge | canônico `a1cd735c…` | OK (100n) | 120 pass (graph*+studio+parity, e2e 4/4 separado) | `graph --view/--federated --ui` |
-| spark-forge-aws | ✓ | OK | **567 pass** (subset de grafos, 58 min) | `graph ui` |
-| spark-forge-azure | ✓ | OK | **163 pass** | `graph ui` |
-| api-forge | ✓ | OK | **137 pass** | `graph ui` |
-| platform-forge | ✓ | OK | **34 pass** | `graph ui` |
-| forge-doctor-api | ✓ | OK | **130 pass** | `graph ui` |
-| forge-doctor-data | ✓ | OK | 121 pass, 3 skip (`packaged _data ausente` — ambiente, pré-existente) | `graph ui` |
-| data-sentinel-forge | n/a — sem artefato vendored | n/a | n/a | **não aplicável** — grafo SVG independente, fora do contrato (read-only) |
+| Forja               | byte-paridade               | serve-smoke (/_api_/405) | testes de grafo                                                       | `graph ui` no CLI                                                        |
+| ------------------- | --------------------------- | ------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| the-forge           | canônico `a1cd735c…`        | OK (100n)                | 120 pass (graph*+studio+parity, e2e 4/4 separado)                     | `graph --view/--federated --ui`                                          |
+| spark-forge-aws     | ✓                           | OK                       | **567 pass** (subset de grafos, 58 min)                               | `graph ui`                                                               |
+| spark-forge-azure   | ✓                           | OK                       | **163 pass**                                                          | `graph ui`                                                               |
+| api-forge           | ✓                           | OK                       | **137 pass**                                                          | `graph ui`                                                               |
+| platform-forge      | ✓                           | OK                       | **34 pass**                                                           | `graph ui`                                                               |
+| forge-doctor-api    | ✓                           | OK                       | **130 pass**                                                          | `graph ui`                                                               |
+| forge-doctor-data   | ✓                           | OK                       | 121 pass, 3 skip (`packaged _data ausente` — ambiente, pré-existente) | `graph ui`                                                               |
+| data-sentinel-forge | n/a — sem artefato vendored | n/a                      | n/a                                                                   | **não aplicável** — grafo SVG independente, fora do contrato (read-only) |
 
 Serve-smoke: cada venv importou seu `*_graphstudio`, serviu um fixture
 `ForgeGraphView/v1` real pelo próprio `_handler` e respondeu
@@ -181,11 +181,11 @@ checkout. Fix: `cwd=checkout` + teste de regressão
 Antes: `theforge graph --federated --view` → 1 view (só the-forge), todas
 as 6+1 siblings recusando. Depois, contra o workspace real:
 
-| provider | nós | arestas | fonte |
-|---|---:|---:|---|
-| the-forge | 11 | 0 | capability_view (canônico, sem cli_entry) |
-| spark-forge-aws | 5.000 | 1.194 | índice codeintel real (16.658 nós no db; `--limit 5000` do `graph view`) |
-| spark-forge-azure | 11.995 | 35.693 | `graph build --root .` real |
+| provider          |    nós | arestas | fonte                                                                    |
+| ----------------- | -----: | ------: | ------------------------------------------------------------------------ |
+| the-forge         |     11 |       0 | capability_view (canônico, sem cli_entry)                                |
+| spark-forge-aws   |  5.000 |   1.194 | índice codeintel real (16.658 nós no db; `--limit 5000` do `graph view`) |
+| spark-forge-azure | 11.995 |  35.693 | `graph build --root .` real                                              |
 
 Total mesclado: **17.006 nós / 36.887 arestas**, proveniência preservada
 (`source_provider` em todo nó; `provenance` por aresta
@@ -203,35 +203,35 @@ test_portal_graph_parity.py` + `federated.spec.ts`/`graph.page.spec.ts`
 
 ## Checklist §FASE 13 — item a item
 
-| # | Critério | Status | Evidência |
-|---|---|---|---|
-| 1 | Bug de desaparecimento reproduzido ou causa comprovada | **verified** | `reproduction.md` (star/hubs NaN t7–t8); pós-fix STABLE |
-| 2 | Física corrigida | **verified** | `fix-verification.md` + `test_graphstudio_physics.py` verde |
-| 3 | Câmera corrigida | **verified** | `fitToView` no load/Escape/resize; e2e 3000/3000 inside após `f` |
-| 4 | Repulsão quadrática eliminada/limitada | **verified** | Barnes–Hut θ=0,9 N>500; 25k overview settle ~6,6 s |
-| 5 | Lookup repetido de arestas corrigido | **verified** | `G.byId` Map; audit.md→fix-verification.md |
-| 6 | Renderização não bloqueia | **verified** | `SIM_MS=8` time-slice; `raf_frames≫lticks` medido |
-| 7 | Layout estável | **verified** | `settled=true` em 13/13 topologias + baseline 100..25k |
-| 8 | Coordenadas finitas | **verified** | `non_finite=0` em todo run (harness+browser+live) |
-| 9 | Loops antigos cancelados | **verified** | `gen` counter + `cancelAnimationFrame`; teste de lifecycle |
-| 10 | Resize funciona | **verified** | `onresize` debounce → `fitToView`; teste de storm |
-| 11 | SQL e projeção de arestas consistentes | **verified** | `graphview.py` janela alinhada (`ORDER BY qualified_name,id` + filtro `keep`); `test_graphview.py` |
-| 12 | Vértices não desaparecem silenciosamente | **verified** | truncamento → `#notice`; resets contados no footer; auditoria 0/inside |
-| 13 | Modo overview existe | **verified** | `computeClusters` ≤250, auto >2000; matriz lf-0022 |
-| 14 | Expansão progressiva existe | **verified** | `exploreSet`/`expandNode`/`x` + drill breadcrumbs; testes de modo |
-| 15 | Inspector de vértices e arestas | **verified** | e2e click→`#ibody`; specs do portal; live Case A/B |
-| 16 | Busca e filtros funcionam | **verified** | `/`+Enter hits; kind checkboxes; e2e + portal specs |
-| 17 | Portal possui Graph Explorer integrado | **verified** | rota `/graph`, `graph.page.spec.ts` 33/33, live Case B |
-| 18 | Graph UI e Portal dados equivalentes | **verified** | paridade byte-a-byte (`test_portal_graph_parity.py` ×2 repos) |
-| 19 | Navegação funciona nos dois | **verified** | e2e CLI (pan/zoom/inspect/search) + specs portal (canvas/inspector) |
-| 20 | Grafos grandes testados | **verified** | baseline 100..25k (overview 25k settle ~6,6 s) + live 16,6k |
-| 21 | Testes Playwright passaram | **verified** | `test_graphstudio_e2e.py` 4/4 re-rodado nesta spec |
-| 22 | Screenshots e métricas armazenados | **verified** | `the-forge/e2e/artifacts/graph-studio/`, `docs/graph/*.json`, `case-*/` aqui |
-| 23 | Recursos frontend empacotados | **verified** | matriz de wheels 7/7 + guarda durável no artifact-contents |
-| 24 | Instalação wheel-only funciona | **verified** | venv limpo + `graph ui` servindo (ver FASE 11 acima) |
-| 25 | CI está verde | **simulated** | gates locais verdes nos repos tocados; CI real corre após push (não publicado) |
-| 26 | Documentação atualizada | **verified** | `docs/graph/*` (5 docs + este + final-report) + parity/perf docs no portal |
-| 27 | Nenhuma regressão nas demais forjas | **verified** | tabela do Caso C — 1.152 testes de grafo verdes nas 7 forjas |
+| #   | Critério                                               | Status        | Evidência                                                                                          |
+| --- | ------------------------------------------------------ | ------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | Bug de desaparecimento reproduzido ou causa comprovada | **verified**  | `reproduction.md` (star/hubs NaN t7–t8); pós-fix STABLE                                            |
+| 2   | Física corrigida                                       | **verified**  | `fix-verification.md` + `test_graphstudio_physics.py` verde                                        |
+| 3   | Câmera corrigida                                       | **verified**  | `fitToView` no load/Escape/resize; e2e 3000/3000 inside após `f`                                   |
+| 4   | Repulsão quadrática eliminada/limitada                 | **verified**  | Barnes–Hut θ=0,9 N>500; 25k overview settle ~6,6 s                                                 |
+| 5   | Lookup repetido de arestas corrigido                   | **verified**  | `G.byId` Map; audit.md→fix-verification.md                                                         |
+| 6   | Renderização não bloqueia                              | **verified**  | `SIM_MS=8` time-slice; `raf_frames≫lticks` medido                                                  |
+| 7   | Layout estável                                         | **verified**  | `settled=true` em 13/13 topologias + baseline 100..25k                                             |
+| 8   | Coordenadas finitas                                    | **verified**  | `non_finite=0` em todo run (harness+browser+live)                                                  |
+| 9   | Loops antigos cancelados                               | **verified**  | `gen` counter + `cancelAnimationFrame`; teste de lifecycle                                         |
+| 10  | Resize funciona                                        | **verified**  | `onresize` debounce → `fitToView`; teste de storm                                                  |
+| 11  | SQL e projeção de arestas consistentes                 | **verified**  | `graphview.py` janela alinhada (`ORDER BY qualified_name,id` + filtro `keep`); `test_graphview.py` |
+| 12  | Vértices não desaparecem silenciosamente               | **verified**  | truncamento → `#notice`; resets contados no footer; auditoria 0/inside                             |
+| 13  | Modo overview existe                                   | **verified**  | `computeClusters` ≤250, auto >2000; matriz lf-0022                                                 |
+| 14  | Expansão progressiva existe                            | **verified**  | `exploreSet`/`expandNode`/`x` + drill breadcrumbs; testes de modo                                  |
+| 15  | Inspector de vértices e arestas                        | **verified**  | e2e click→`#ibody`; specs do portal; live Case A/B                                                 |
+| 16  | Busca e filtros funcionam                              | **verified**  | `/`+Enter hits; kind checkboxes; e2e + portal specs                                                |
+| 17  | Portal possui Graph Explorer integrado                 | **verified**  | rota `/graph`, `graph.page.spec.ts` 33/33, live Case B                                             |
+| 18  | Graph UI e Portal dados equivalentes                   | **verified**  | paridade byte-a-byte (`test_portal_graph_parity.py` ×2 repos)                                      |
+| 19  | Navegação funciona nos dois                            | **verified**  | e2e CLI (pan/zoom/inspect/search) + specs portal (canvas/inspector)                                |
+| 20  | Grafos grandes testados                                | **verified**  | baseline 100..25k (overview 25k settle ~6,6 s) + live 16,6k                                        |
+| 21  | Testes Playwright passaram                             | **verified**  | `test_graphstudio_e2e.py` 4/4 re-rodado nesta spec                                                 |
+| 22  | Screenshots e métricas armazenados                     | **verified**  | `the-forge/e2e/artifacts/graph-studio/`, `docs/graph/*.json`, `case-*/` aqui                       |
+| 23  | Recursos frontend empacotados                          | **verified**  | matriz de wheels 7/7 + guarda durável no artifact-contents                                         |
+| 24  | Instalação wheel-only funciona                         | **verified**  | venv limpo + `graph ui` servindo (ver FASE 11 acima)                                               |
+| 25  | CI está verde                                          | **simulated** | gates locais verdes nos repos tocados; CI real corre após push (não publicado)                     |
+| 26  | Documentação atualizada                                | **verified**  | `docs/graph/*` (5 docs + este + final-report) + parity/perf docs no portal                         |
+| 27  | Nenhuma regressão nas demais forjas                    | **verified**  | tabela do Caso C — 1.152 testes de grafo verdes nas 7 forjas                                       |
 
 Itens §FASE-11 auxiliares: dependências locais ✓ (PyYAML+jsonschema);
 ausência de clone ✓; ausência de CDN ✓; suporte Windows/Git Bash
