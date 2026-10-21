@@ -1,0 +1,48 @@
+{
+  "status": "ok",
+  "schema": "sparkforge_aws/PeerDiscoveryReport/v1",
+  "generated_at": "2026-10-21T21:02:08.527673Z",
+  "probed": true,
+  "entries": [
+    {
+      "provider": "data-sentinel-forge",
+      "state": "NOT_INSTALLED",
+      "version": "unknown",
+      "checks": {
+        "handshake": "SKIP",
+        "manifest": "SKIP",
+        "health": "SKIP"
+      },
+      "sources": [],
+      "capabilities": [],
+      "declared_capabilities": [
+        "sentinel.log-analysis",
+        "sentinel.spark-explain",
+        "sentinel.sql-analyze",
+        "sentinel.lakehouse-metadata",
+        "sentinel.emr-analyze",
+        "sentinel.glue-inspect",
+        "sentinel.glue-runs",
+        "sentinel.glue-diagnose"
+      ],
+      "notes": [],
+      "limitations": []
+    },
+    {
+      "provider": "forge-doctor-data",
+      "state": "NOT_INSTALLED",
+      "version": "unknown",
+      "checks": {
+        "handshake": "SKIP",
+        "manifest": "SKIP",
+        "health": "SKIP"
+      },
+      "sources": [],
+      "capabilities": [],
+      "declared_capabilities": ["doctor.scan-project"],
+      "notes": [],
+      "limitations": []
+    }
+  ],
+  "limitations": []
+}

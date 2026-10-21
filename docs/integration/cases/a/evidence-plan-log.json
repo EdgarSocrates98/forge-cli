@@ -1,0 +1,35 @@
+{
+  "status": "planned",
+  "schema": "sparkforge_aws/DelegationPlan/v1",
+  "intent": "analyze the spark runtime log for oom",
+  "picks": [
+    {
+      "provider": "data-sentinel-forge",
+      "capability": "sentinel.log-analysis",
+      "capability_version": "0.1.0",
+      "risks": ["LOCAL_READ"],
+      "entrypoint": [
+        "{cli}",
+        "analyze",
+        "--file",
+        "{target}",
+        "--platform",
+        "{platform}",
+        "--json",
+        "--no-persist"
+      ],
+      "justification": [
+        "declared intent(s) matched the task: oom",
+        "capability 'sentinel.log-analysis': 4 intent token(s) matched id/description/intents",
+        "risk gate: all declared risk levels allowed by policy or authorization (risks: LOCAL_READ)",
+        "provider version 0.1.0, state VERIFIED"
+      ]
+    }
+  ],
+  "refusals": [],
+  "limitations": [
+    "forge-doctor-data: not delegated — no declared intent matched the task (router never fans out to all specialists)"
+  ],
+  "unknowns": [],
+  "fallback": "native-analysis"
+}

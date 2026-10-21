@@ -1,0 +1,13 @@
+{
+  "argv_prefix": [
+    "/home/edgar/Documentos/projetos/forjas/forge-doctor-api/.venv/bin/forge-doctor-api"
+  ],
+  "binary": "/home/edgar/Documentos/projetos/forjas/forge-doctor-api/.venv/bin/forge-doctor-api",
+  "cli_version": "0.2.5",
+  "detail": "",
+  "package_version": null,
+  "provider": "forge-doctor-api",
+  "schema": "apiforge/doctor-discovery/v1",
+  "state": "verified",
+  "version": 1
+}

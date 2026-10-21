@@ -1,0 +1,67 @@
+{
+  "status": "ok",
+  "schema": "sparkforge_aws/PeerDiscoveryReport/v1",
+  "generated_at": "2026-10-21T20:46:45.207158Z",
+  "probed": true,
+  "entries": [
+    {
+      "provider": "data-sentinel-forge",
+      "state": "VERIFIED",
+      "version": "0.1.0",
+      "checks": {
+        "handshake": "PASS",
+        "manifest": "SKIP",
+        "health": "PASS"
+      },
+      "sources": [
+        {
+          "source": "path",
+          "detail": "console script 'data-sentinel' resolved",
+          "path": "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel"
+        }
+      ],
+      "capabilities": [],
+      "declared_capabilities": [
+        "sentinel.log-analysis",
+        "sentinel.spark-explain",
+        "sentinel.sql-analyze",
+        "sentinel.lakehouse-metadata",
+        "sentinel.emr-analyze",
+        "sentinel.glue-inspect",
+        "sentinel.glue-runs",
+        "sentinel.glue-diagnose"
+      ],
+      "notes": [
+        "version probe ok: /home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel --version",
+        "descriptor probe ok: 15 descriptor(s)",
+        "descriptor manifest not adopted: descriptor[0] provider 'data-sentinel' != 'data-sentinel-forge'"
+      ],
+      "limitations": ["no capability/agentic manifest found to parse"]
+    },
+    {
+      "provider": "forge-doctor-data",
+      "state": "VERIFIED",
+      "version": "1.0.5",
+      "checks": {
+        "handshake": "PASS",
+        "manifest": "SKIP",
+        "health": "PASS"
+      },
+      "sources": [
+        {
+          "source": "path",
+          "detail": "console script 'forge-doctor-data' resolved",
+          "path": "/home/edgar/Documentos/projetos/forjas/forge-doctor-data/.venv/bin/forge-doctor-data"
+        }
+      ],
+      "capabilities": [],
+      "declared_capabilities": ["doctor.scan-project"],
+      "notes": [
+        "version probe ok: /home/edgar/Documentos/projetos/forjas/forge-doctor-data/.venv/bin/forge-doctor-data --version",
+        "health: liveness via the version probe"
+      ],
+      "limitations": ["no capability/agentic manifest found to parse"]
+    }
+  ],
+  "limitations": []
+}

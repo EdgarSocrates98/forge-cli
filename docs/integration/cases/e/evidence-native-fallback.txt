@@ -1,0 +1,325 @@
+{
+  "total_count": 11,
+  "returned_count": 11,
+  "next_cursor": null,
+  "filters_applied": {
+    "kind": null,
+    "limit": 50,
+    "cursor": null,
+    "upstream": null
+  },
+  "by_kind": {
+    "pyspark.action": 1,
+    "pyspark.chain": 4,
+    "pyspark.driver_collect": 1,
+    "pyspark.module_analyzed": 1,
+    "pyspark.partitioning": 1,
+    "pyspark.read": 2,
+    "pyspark.write": 1
+  },
+  "items": [
+    {
+      "id": "f_848d71",
+      "schema_version": 1,
+      "kind": "pyspark.action",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 11,
+        "col": 11,
+        "end_line": 11,
+        "symbol": "",
+        "snippet": "all_rows = orders.collect()"
+      },
+      "measures": {},
+      "attrs": {
+        "method": "collect"
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_300335",
+      "schema_version": 1,
+      "kind": "pyspark.chain",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 17,
+        "col": 0,
+        "end_line": 17,
+        "symbol": "",
+        "snippet": "inflated.repartition(1).write.parquet(\"s3://bucket/out\")"
+      },
+      "measures": {
+        "length": 3
+      },
+      "attrs": {
+        "methods": [
+          "repartition",
+          "write",
+          "parquet"
+        ]
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_48df08",
+      "schema_version": 1,
+      "kind": "pyspark.chain",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 8,
+        "col": 12,
+        "end_line": 8,
+        "symbol": "",
+        "snippet": "customers = spark.read.parquet(\"s3://bucket/customers\")"
+      },
+      "measures": {
+        "length": 2
+      },
+      "attrs": {
+        "methods": [
+          "read",
+          "parquet"
+        ]
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_8a370c",
+      "schema_version": 1,
+      "kind": "pyspark.chain",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 5,
+        "col": 8,
+        "end_line": 5,
+        "symbol": "",
+        "snippet": "spark = SparkSession.builder.appName(\"case-b\").getOrCreate()"
+      },
+      "measures": {
+        "length": 3
+      },
+      "attrs": {
+        "methods": [
+          "builder",
+          "appName",
+          "getOrCreate"
+        ]
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_ecae20",
+      "schema_version": 1,
+      "kind": "pyspark.chain",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 7,
+        "col": 9,
+        "end_line": 7,
+        "symbol": "",
+        "snippet": "orders = spark.read.parquet(\"s3://bucket/orders\")"
+      },
+      "measures": {
+        "length": 2
+      },
+      "attrs": {
+        "methods": [
+          "read",
+          "parquet"
+        ]
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_681b7d",
+      "schema_version": 1,
+      "kind": "pyspark.driver_collect",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 11,
+        "col": 11,
+        "end_line": 11,
+        "symbol": "",
+        "snippet": "all_rows = orders.collect()"
+      },
+      "measures": {},
+      "attrs": {
+        "method": "collect",
+        "bounded": false,
+        "inside_loop": false
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_f558a9",
+      "schema_version": 1,
+      "kind": "pyspark.module_analyzed",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 0,
+        "col": 0,
+        "symbol": "",
+        "snippet": ""
+      },
+      "measures": {
+        "resolved_calls": 8,
+        "unresolved_count": 0
+      },
+      "attrs": {
+        "parsed": true,
+        "referenced_names": [
+          "SparkSession",
+          "appName",
+          "builder",
+          "collect",
+          "crossJoin",
+          "customers",
+          "getOrCreate",
+          "inflated",
+          "orders",
+          "parquet",
+          "read",
+          "repartition",
+          "spark",
+          "write"
+        ]
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_49a0bc",
+      "schema_version": 1,
+      "kind": "pyspark.partitioning",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 17,
+        "col": 0,
+        "end_line": 17,
+        "symbol": "",
+        "snippet": "inflated.repartition(1).write.parquet(\"s3://bucket/out\")"
+      },
+      "measures": {
+        "target_count": 1
+      },
+      "attrs": {
+        "method": "repartition",
+        "literal_arg": true,
+        "has_partition_expr": false,
+        "inside_loop": false
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_79524e",
+      "schema_version": 1,
+      "kind": "pyspark.read",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 8,
+        "col": 12,
+        "end_line": 8,
+        "symbol": "",
+        "snippet": "customers = spark.read.parquet(\"s3://bucket/customers\")"
+      },
+      "measures": {},
+      "attrs": {
+        "format": "parquet",
+        "target": "s3://bucket/customers"
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_619940",
+      "schema_version": 1,
+      "kind": "pyspark.read",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 7,
+        "col": 9,
+        "end_line": 7,
+        "symbol": "",
+        "snippet": "orders = spark.read.parquet(\"s3://bucket/orders\")"
+      },
+      "measures": {},
+      "attrs": {
+        "format": "parquet",
+        "target": "s3://bucket/orders"
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    },
+    {
+      "id": "f_5841ea",
+      "schema_version": 1,
+      "kind": "pyspark.write",
+      "subject": {
+        "type": "source_location",
+        "file": "etl_job.py",
+        "line": 17,
+        "col": 0,
+        "end_line": 17,
+        "symbol": "",
+        "snippet": "inflated.repartition(1).write.parquet(\"s3://bucket/out\")"
+      },
+      "measures": {},
+      "attrs": {
+        "api": "dataframe_writer_v1",
+        "target": "s3://bucket/out"
+      },
+      "provenance": {
+        "artifact": "etl_job.py",
+        "artifact_sha256": "b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6",
+        "extractor": "pyspark_ast@0.1.0"
+      }
+    }
+  ]
+}

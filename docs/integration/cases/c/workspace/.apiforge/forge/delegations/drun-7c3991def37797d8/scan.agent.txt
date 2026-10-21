@@ -1,0 +1,9 @@
+# schema_version=1.0 tool_version=0.2.5
+# knowledge_versions=asyncapi-versions@2026.10,aws-api-gateway-capabilities@2026.10,envoy-capabilities@2026.10,express-capabilities@2026.10,fastapi-capabilities@2026.10,gateway-capability-map@2026.10,graphql-spec@2026.10,grpc-behaviors@2026.10,http-semantics@2026.10,jsonschema-dialects@2026.10,kong-capabilities@2026.10,nginx-capabilities@2026.10,openapi-versions@2026.10,owasp-api-security-top-10@2023,spring-capabilities@2026.10
+APISEC006|MEDIUM|LOW|openapi.yaml:7|[candidate] (API6) GET /orders: list-returning endpoint without a bounded pagination/limit parameter - unrestricted resource candidate
+APISEC011|MEDIUM|UNKNOWN|openapi.yaml:7|[unknown] (API2) GET /orders: no security evidence at any level - effective authentication is unknown (global_schemes=[] op_security=False op_reqs=0 scopes=[] unresolvable=[])
+APISEC011|MEDIUM|UNKNOWN|openapi.yaml:18|[unknown] (API2) POST /orders: no security evidence at any level - effective authentication is unknown (global_schemes=[] op_security=False op_reqs=0 scopes=[] unresolvable=[])
+OAS010|HIGH|LOW|api:openapi:openapi.yaml:1|openapi.yaml: no document-level security requirement protects 2 operations
+OAS020|INFO|LOW|operation:openapi:operation_id:createOrder:18|POST /orders has no tags or domain grouping
+OAS020|INFO|LOW|operation:openapi:operation_id:listOrders:7|GET /orders has no tags or domain grouping
+RELAPI008|LOW|LOW|openapi.yaml|POST /orders: mutating operation with no declared idempotency-key or contract metadata - safe replay cannot be evidenced

@@ -1,0 +1,7 @@
+# measured 2026-10-21T21:09:25Z
+sentinel_capabilities_descriptors_bytes=10008
+sentinel_agentic_manifest_bytes=1357
+sentinel_forge_json_bytes=397
+sentinel_docs_corpus_md_files=129
+sentinel_docs_corpus_bytes=323982
+sentinel_AGENTS_README_CLAUDE_bytes=7944

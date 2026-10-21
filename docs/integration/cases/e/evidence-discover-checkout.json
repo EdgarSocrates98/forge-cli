@@ -1,0 +1,44 @@
+{
+  "status": "ok",
+  "schema": "sparkforge_aws/PeerDiscoveryReport/v1",
+  "generated_at": "2026-10-21T21:02:36.315066Z",
+  "probed": true,
+  "entries": [
+    {
+      "provider": "data-sentinel-forge",
+      "state": "DISCOVERED",
+      "version": "0.1.0",
+      "checks": {
+        "handshake": "SKIP",
+        "manifest": "PASS",
+        "health": "SKIP"
+      },
+      "sources": [
+        {
+          "source": "checkout",
+          "detail": "forge.json at /home/edgar/Documentos/projetos/forjas/data-sentinel-forge",
+          "path": "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge"
+        },
+        {
+          "source": "bundled-manifest",
+          "detail": "forge.agentic.json at forge.agentic.json",
+          "path": "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/forge.agentic.json"
+        }
+      ],
+      "capabilities": [],
+      "declared_capabilities": [
+        "sentinel.log-analysis",
+        "sentinel.spark-explain",
+        "sentinel.sql-analyze",
+        "sentinel.lakehouse-metadata",
+        "sentinel.emr-analyze",
+        "sentinel.glue-inspect",
+        "sentinel.glue-runs",
+        "sentinel.glue-diagnose"
+      ],
+      "notes": ["cli 'data-sentinel' not resolvable for a version probe"],
+      "limitations": []
+    }
+  ],
+  "limitations": []
+}

@@ -1,0 +1,107 @@
+{
+  "changes": [
+    {
+      "after": null,
+      "before": null,
+      "classification": "BREAKING",
+      "detail": "method removed: GET /orders",
+      "kind": "method_removed",
+      "location": {
+        "column": 5,
+        "line": 7,
+        "path": "openapi-v1.yaml"
+      },
+      "path": "/orders",
+      "side": "meta",
+      "subject": "operation_id:listOrders"
+    },
+    {
+      "after": null,
+      "before": null,
+      "classification": "BREAKING",
+      "detail": "requestBody:OrderInput.customer_id: request field became required",
+      "kind": "request_field_required",
+      "location": {
+        "column": 5,
+        "line": 7,
+        "path": "openapi-v2-breaking.yaml"
+      },
+      "path": "requestBody:OrderInput.customer_id",
+      "side": "request",
+      "subject": "operation_id:createOrder"
+    }
+  ],
+  "findings": {
+    "findings": [
+      {
+        "confidence": "HIGH",
+        "description": "method removed: GET /orders",
+        "entity_ids": [],
+        "evidence": [
+          {
+            "kind": "STATIC",
+            "line": 7,
+            "offset": null,
+            "source": "openapi-v1.yaml",
+            "summary": "method removed: GET /orders"
+          }
+        ],
+        "evidence_kind": "STATIC",
+        "id": "COMPAT002",
+        "remediation": null,
+        "severity": "HIGH",
+        "source_location": {
+          "column": 5,
+          "line": 7,
+          "path": "openapi-v1.yaml"
+        },
+        "title": "Method removed",
+        "unknowns": []
+      },
+      {
+        "confidence": "HIGH",
+        "description": "requestBody:OrderInput.customer_id: request field became required",
+        "entity_ids": [],
+        "evidence": [
+          {
+            "kind": "STATIC",
+            "line": 7,
+            "offset": null,
+            "source": "openapi-v2-breaking.yaml",
+            "summary": "requestBody:OrderInput.customer_id: request field became required"
+          }
+        ],
+        "evidence_kind": "STATIC",
+        "id": "COMPAT006",
+        "remediation": null,
+        "severity": "HIGH",
+        "source_location": {
+          "column": 5,
+          "line": 7,
+          "path": "openapi-v2-breaking.yaml"
+        },
+        "title": "Request field became required",
+        "unknowns": []
+      }
+    ],
+    "knowledge_versions": {
+      "asyncapi-versions": "2026.10",
+      "aws-api-gateway-capabilities": "2026.10",
+      "envoy-capabilities": "2026.10",
+      "express-capabilities": "2026.10",
+      "fastapi-capabilities": "2026.10",
+      "gateway-capability-map": "2026.10",
+      "graphql-spec": "2026.10",
+      "grpc-behaviors": "2026.10",
+      "http-semantics": "2026.10",
+      "jsonschema-dialects": "2026.10",
+      "kong-capabilities": "2026.10",
+      "nginx-capabilities": "2026.10",
+      "openapi-versions": "2026.10",
+      "owasp-api-security-top-10": "2023",
+      "spring-capabilities": "2026.10"
+    },
+    "schema_version": "1.0",
+    "tool_version": "0.2.5"
+  }
+}

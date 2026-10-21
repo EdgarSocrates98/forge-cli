@@ -1,0 +1,21 @@
+{
+  "status": "unavailable",
+  "schema": "sparkforge_aws/DelegationPlan/v1",
+  "intent": "analyze the spark runtime log for oom",
+  "picks": [],
+  "refusals": [
+    {
+      "code": "provider-absent",
+      "detail": "data-sentinel-forge: discovery state NOT_INSTALLED is not VERIFIED",
+      "provider": "data-sentinel-forge"
+    },
+    {
+      "code": "provider-absent",
+      "detail": "forge-doctor-data: discovery state NOT_INSTALLED is not VERIFIED",
+      "provider": "forge-doctor-data"
+    }
+  ],
+  "limitations": [],
+  "unknowns": ["no declared intent matched the task intent"],
+  "fallback": "native-analysis"
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "forge/SpecialistDelegationResult/v1",
+  "task_id": "task-f14f8f425ce9",
+  "provider": "spark-forge-aws",
+  "stage": "COMPLETED",
+  "execution_mode": "DIRECT_CAPABILITY",
+  "executed_steps": [
+    "/home/edgar/Documentos/projetos/forjas/the-forge/.venv/bin/python3 -c import sys; sys.path.insert(0, '/home/edgar/Documentos/projetos/forjas/spark-forge-aws'); from sparkforge_aws.adapters.cli import main; main() analyze pyspark --path pyproj"
+  ],
+  "artifacts": [],
+  "evidence": ["exit_code=0", "elapsed_ms=5681"],
+  "limitations": [],
+  "stdout_tail": [
+    "        \"file\": \"etl_job.py\",",
+    "        \"line\": 17,",
+    "        \"col\": 0,",
+    "        \"end_line\": 17,",
+    "        \"symbol\": \"\",",
+    "        \"snippet\": \"inflated.repartition(1).write.parquet(\\\"s3://bucket/out\\\")\"",
+    "      },",
+    "      \"measures\": {},",
+    "      \"attrs\": {",
+    "        \"api\": \"dataframe_writer_v1\",",
+    "        \"target\": \"s3://bucket/out\"",
+    "      },",
+    "      \"provenance\": {",
+    "        \"artifact\": \"etl_job.py\",",
+    "        \"artifact_sha256\": \"b97f326216396c90a1b3c5fc1474afc8938e712aed434fbf7ba1879ac9b833a6\",",
+    "        \"extractor\": \"pyspark_ast@0.1.0\"",
+    "      }",
+    "    }",
+    "  ]",
+    "}"
+  ],
+  "stderr_tail": [],
+  "exit_code": 0,
+  "elapsed_ms": 5681
+}

@@ -1,0 +1,66 @@
+{
+  "status": "failed",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-f2e32e6021d573fb",
+  "consumer": "spark-forge-aws",
+  "provider": "data-sentinel-forge",
+  "provider_version": "0.1.0",
+  "capability": "sentinel.log-analysis",
+  "risks": ["LOCAL_READ"],
+  "argv": [
+    "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel",
+    "analyze",
+    "--file",
+    "glue_oom.log",
+    "--json",
+    "--no-persist"
+  ],
+  "findings": [],
+  "limitations": [],
+  "truncated": false,
+  "dropped": 0,
+  "handoff": {
+    "schema": "theforge/EvidenceHandoff/v1",
+    "run_id": "dl-f2e32e6021d573fb",
+    "correlation_id": "dl-f2e32e6021d573fb",
+    "idempotency_key": "idem-705df96d46f9f6cdad9daa20",
+    "source_provider": "data-sentinel-forge",
+    "source_version": "0.1.0",
+    "consumer_provider": "spark-forge-aws",
+    "capability": "sentinel.log-analysis",
+    "capability_version": "0.1.0",
+    "status": "failed",
+    "input_refs": [
+      {
+        "kind": "ref",
+        "value": "argv:target:b05a32b9d993214c3331bd8c",
+        "sha256": null,
+        "detail": "target argument fingerprint"
+      }
+    ],
+    "result_refs": [],
+    "findings": [],
+    "limitations": [],
+    "error": {
+      "code": "timeout",
+      "detail": "'/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel' exceeded timeout 1s",
+      "retryable": true
+    },
+    "created_at": "2026-10-21T21:08:00.612103Z",
+    "started_at": "",
+    "finished_at": "",
+    "resources": null,
+    "integrity": "ed17dadec6158c3ab049a7e7ef653178947488e8abce67dc51d67229ee301ba3",
+    "redacted": true,
+    "truncated": false,
+    "dropped": 0
+  },
+  "handoff_path": ".sparkforge_aws/delegation/handoffs/dl-f2e32e6021d573fb-sentinel.log-analysis-ed17dadec615.json",
+  "refusal": {
+    "code": "timeout",
+    "detail": "'/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel' exceeded timeout 1s"
+  },
+  "fallback": "native-analysis",
+  "elapsed_ms": null,
+  "returncode": null
+}

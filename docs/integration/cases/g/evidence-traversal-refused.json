@@ -1,0 +1,14 @@
+{
+  "status": "refused",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-b4aaa3ceaa48d897",
+  "consumer": "spark-forge-aws",
+  "refusal": {
+    "code": "invalid-input",
+    "detail": "{target} substitution '../../../../etc/passwd' must not contain '..' segments",
+    "provider": ""
+  },
+  "fallback": "native-analysis",
+  "findings": [],
+  "handoff": null
+}

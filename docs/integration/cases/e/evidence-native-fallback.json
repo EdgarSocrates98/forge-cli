@@ -1,0 +1,3 @@
+usage: sparkforge-aws [-h] [--version]
+                      {lab,analyze,architecture,migrate,glue,iceberg,release,controlm,benchmark,workload,capacity,finops,dq-ai,tune,economy,decision,delegate,context,distribution,workspace,agentops,agents,blackboard,decisions,budget,autonomy,funcval,sdd,fuse,judge,arbitrate,case,next-step,resume,handoff,journal,playbook,runtime,code,graph,pack,knowledge,debate,root-cause,lakeformation,rules,validate,report,telemetry,receipt,proof,simulate,gain,scan,doctor,integrate,detach,ai,install,status,repair,update,uninstall,mcp,portal,policy,change,collect} ...
+sparkforge-aws: error: unrecognized arguments: --json

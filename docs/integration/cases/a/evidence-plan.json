@@ -1,0 +1,18 @@
+{
+  "status": "refused",
+  "schema": "sparkforge_aws/DelegationPlan/v1",
+  "intent": "diagnose glue job failure from the spark runtime log: oom",
+  "picks": [],
+  "refusals": [
+    {
+      "code": "policy-refusal",
+      "detail": "data-sentinel-forge/sentinel.glue-diagnose: risk levels require explicit authorization: EXTERNAL_READ, COST_BEARING",
+      "provider": "data-sentinel-forge"
+    }
+  ],
+  "limitations": [
+    "forge-doctor-data: not delegated — no declared intent matched the task (router never fans out to all specialists)"
+  ],
+  "unknowns": [],
+  "fallback": "native-analysis"
+}

@@ -1,0 +1,14 @@
+{
+  "status": "refused",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-fabddc7344583b08",
+  "consumer": "spark-forge-aws",
+  "refusal": {
+    "code": "policy-refusal",
+    "detail": "data-sentinel-forge/sentinel.glue-diagnose: risk levels require explicit authorization: EXTERNAL_READ, COST_BEARING (grant with --authorize)",
+    "provider": "data-sentinel-forge"
+  },
+  "fallback": "native-analysis",
+  "findings": [],
+  "handoff": null
+}

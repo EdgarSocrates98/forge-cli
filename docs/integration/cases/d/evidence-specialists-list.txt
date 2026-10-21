@@ -1,0 +1,9 @@
+api-forge              CONFIGURED               vapiforge 0.1.0  cli:apiforge
+data-sentinel-forge    NOT_INSTALLED           
+  - no installation record and no local checkout
+forge-doctor-api       CONFIGURED               vforge-doctor-api 0.2.0  cli:forge-doctor-api
+forge-doctor-data      CONFIGURED               vforge-doctor-data 1.0.0  cli:forge-doctor-data
+platform-forge         CONFIGURED               vplatformforge 0.1.0  cli:platformforge
+spark-forge-aws        CONFIGURED               vsparkforge-aws 0.5.0  cli:sparkforge-aws
+spark-forge-azure      CONFIGURED               vsparkforge-azure 0.1.0  cli:sparkforge-azure
+the-forge              CONFIGURED               vtheforge 0.5.0  cli:theforge

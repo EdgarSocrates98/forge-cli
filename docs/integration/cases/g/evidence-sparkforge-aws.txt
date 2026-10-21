@@ -1,0 +1,34 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.15, pytest-9.1.1, pluggy-1.7.0 -- /home/edgar/Documentos/projetos/forjas/spark-forge-aws/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/edgar/Documentos/projetos/forjas/spark-forge-aws
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 45 items / 21 deselected / 24 selected
+
+tests/test_delegation.py::TestDiscoveryStates::test_untrusted_corrupt_manifest PASSED [  4%]
+tests/test_delegation.py::TestEnvScrubbing::test_credential_names PASSED [  8%]
+tests/test_delegation.py::TestEnvScrubbing::test_safe_env_strips_aws_credentials PASSED [ 12%]
+tests/test_delegation.py::TestEnvScrubbing::test_env_extra_cannot_smuggle_credentials PASSED [ 16%]
+tests/test_delegation.py::TestEnvScrubbing::test_subprocess_never_sees_credentials PASSED [ 20%]
+tests/test_delegation.py::TestRunGoverned::test_never_shell_argv_only PASSED [ 25%]
+tests/test_delegation.py::TestRunGoverned::test_timeout_is_named PASSED  [ 29%]
+tests/test_delegation.py::TestRunGoverned::test_spawn_failure_provider_absent PASSED [ 33%]
+tests/test_delegation.py::TestRunGoverned::test_output_caps PASSED       [ 37%]
+tests/test_delegation.py::TestHandoffParsers::test_sentinel_confidence_rename_no_promotion PASSED [ 41%]
+tests/test_delegation.py::TestHandoffParsers::test_possible_never_becomes_confirmed PASSED [ 45%]
+tests/test_delegation.py::TestHandoffParsers::test_sentinel_invalid_output PASSED [ 50%]
+tests/test_delegation.py::TestChainControl::test_revisit_refused PASSED  [ 54%]
+tests/test_delegation.py::TestChainControl::test_reentering_consumer_refused PASSED [ 58%]
+tests/test_delegation.py::TestChainControl::test_hop_budget PASSED       [ 62%]
+tests/test_delegation.py::TestArgvResolution::test_optional_placeholders_drop_flag PASSED [ 66%]
+tests/test_delegation.py::TestArgvResolution::test_traversal_in_target_refused PASSED [ 70%]
+tests/test_delegation.py::TestArgvResolution::test_unknown_placeholder_refused PASSED [ 75%]
+tests/test_delegation.py::TestPolicyGate::test_external_read_denied_without_authorize PASSED [ 79%]
+tests/test_delegation.py::TestPolicyGate::test_glue_diagnose_needs_read_and_cost_grants PASSED [ 83%]
+tests/test_delegation.py::TestPolicyGate::test_external_read_authorized_executes PASSED [ 87%]
+tests/test_delegation.py::TestDelegateEndToEnd::test_invalid_output_is_named_refusal PASSED [ 91%]
+tests/test_delegation.py::TestDelegateEndToEnd::test_timeout_is_named_failure PASSED [ 95%]
+tests/test_delegation.py::TestDelegateEndToEnd::test_cycle_via_chain_refused PASSED [100%]
+
+====================== 24 passed, 21 deselected in 3.63s =======================

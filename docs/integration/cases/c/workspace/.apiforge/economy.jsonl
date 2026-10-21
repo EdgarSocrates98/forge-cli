@@ -1,0 +1,6 @@
+{"detail_level": "normal", "payload_bytes": 399, "verb": "apiforge forge doctor discover"}
+{"detail_level": "normal", "payload_bytes": 3730, "verb": "apiforge forge doctor scan"}
+{"detail_level": "normal", "payload_bytes": 3047, "verb": "apiforge forge doctor scan"}
+{"detail_level": "normal", "payload_bytes": 625, "verb": "apiforge forge doctor compare"}
+{"detail_level": "normal", "payload_bytes": 574, "verb": "apiforge forge doctor list"}
+{"detail_level": "normal", "payload_bytes": 752, "verb": "apiforge economy stats"}

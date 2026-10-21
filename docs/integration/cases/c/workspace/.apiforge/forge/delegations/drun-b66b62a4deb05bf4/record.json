@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "schema": "apiforge/doctor-delegation/v1",
+  "run_id": "drun-b66b62a4deb05bf4",
+  "correlation_id": "corr-0be4289d972752c4",
+  "idempotency_key": "idem-b87a7437b378f1ef3d7ef294",
+  "source_provider": "forge-doctor-api",
+  "source_version": "0.2.5",
+  "consumer_provider": "api-forge",
+  "capability": "api.scan",
+  "status": "refused",
+  "discovery_state": "verified",
+  "input_refs": ["target:project"],
+  "result_refs": [],
+  "findings": [],
+  "unknowns": [],
+  "limitations": [],
+  "error": {
+    "version": 1,
+    "code": "invalid-input",
+    "detail": "doctor refused the invocation (exit 2): fail-on=breaking requires a --baseline contract context",
+    "retryable": false
+  },
+  "chain": {
+    "version": 1,
+    "correlation_id": "corr-206516c41d18ab18",
+    "delegation_depth": 0,
+    "visited_providers": ["api-forge"],
+    "max_hops": 4,
+    "timeout_budget_s": 301,
+    "cancelled": false
+  },
+  "delta": null,
+  "truncated": false,
+  "dropped": 0,
+  "elapsed_ms": 0,
+  "created_at": "2026-10-21T20:51:09.491612+00:00",
+  "integrity": "bd3b494d32281be1785f900fe5bcaa6c553ac49d749a63560a628c7802001248"
+}

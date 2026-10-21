@@ -1,0 +1,36 @@
+{
+  "capability": "sentinel.log-analysis",
+  "capability_version": "0.1.0",
+  "consumer_provider": "spark-forge-aws",
+  "correlation_id": "dl-2e0acaf23e75e2f2",
+  "created_at": "2026-10-21T21:07:42.598156Z",
+  "dropped": 0,
+  "error": {
+    "code": "invalid-output",
+    "detail": "sentinel output is not JSON: Expecting value: line 1 column 1 (char 0)",
+    "retryable": false
+  },
+  "findings": [],
+  "finished_at": "",
+  "idempotency_key": "idem-e91fe64e82af1dc3e26478b3",
+  "input_refs": [
+    {
+      "detail": "target argument fingerprint",
+      "kind": "ref",
+      "sha256": null,
+      "value": "argv:target:0d96a2b5512f4367364d0d06"
+    }
+  ],
+  "integrity": "158e9d1ec87f4361628fbe802270c9cf986fd3c17bdf9b3d1f25271fc16bec77",
+  "limitations": [],
+  "redacted": true,
+  "resources": null,
+  "result_refs": [],
+  "run_id": "dl-2e0acaf23e75e2f2",
+  "schema": "theforge/EvidenceHandoff/v1",
+  "source_provider": "data-sentinel-forge",
+  "source_version": "0.1.0",
+  "started_at": "",
+  "status": "refused",
+  "truncated": false
+}

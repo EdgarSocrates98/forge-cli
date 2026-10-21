@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0 -- /home/edgar/Documentos/projetos/forjas/api-forge/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/edgar/Documentos/projetos/forjas/api-forge
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 50 items / 35 deselected / 15 selected
+
+tests/forge/test_doctor_delegation.py::test_discover_untrusted_when_version_unproven PASSED [  6%]
+tests/forge/test_doctor_delegation.py::test_read_only_guard_refuses_mutation PASSED [ 13%]
+tests/forge/test_doctor_delegation.py::test_env_scrub_drops_credentials PASSED [ 20%]
+tests/forge/test_doctor_delegation.py::test_run_scan_exit2_usage_refused PASSED [ 26%]
+tests/forge/test_doctor_delegation.py::test_run_scan_other_exit_failed PASSED [ 33%]
+tests/forge/test_doctor_delegation.py::test_run_scan_timeout PASSED      [ 40%]
+tests/forge/test_doctor_delegation.py::test_run_scan_output_cap_refused PASSED [ 46%]
+tests/forge/test_doctor_delegation.py::test_run_scan_credentials_never_reach_doctor PASSED [ 53%]
+tests/forge/test_doctor_delegation.py::test_delegate_policy_deny_refused PASSED [ 60%]
+tests/forge/test_doctor_delegation.py::test_delegate_cycle_refused PASSED [ 66%]
+tests/forge/test_doctor_delegation.py::test_delegate_budget_exhausted_refused PASSED [ 73%]
+tests/forge/test_doctor_delegation.py::test_delegate_failed_run_persists_failed PASSED [ 80%]
+tests/forge/test_doctor_delegation.py::test_delegate_invalid_output_persists_failed PASSED [ 86%]
+tests/forge/test_doctor_delegation.py::test_delegate_timeout_persists_retryable_failure PASSED [ 93%]
+tests/forge/test_doctor_delegation.py::test_admit_hop_refuses_exhausted_budget PASSED [100%]
+
+====================== 15 passed, 35 deselected in 9.55s =======================

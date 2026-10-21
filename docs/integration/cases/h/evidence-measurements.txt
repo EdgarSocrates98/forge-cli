@@ -1,0 +1,35 @@
+# measured 2026-10-21, machine-local runs (REAL)
+
+## discovery / routing context surfaces (bytes)
+sentinel_capabilities_descriptors_bytes=10008
+sentinel_agentic_manifest_bytes=1357
+sentinel_forge_json_bytes=397
+sentinel_docs_corpus_md_files=129
+sentinel_docs_corpus_bytes=323982
+sentinel_AGENTS_README_CLAUDE_bytes=7944
+
+## delegated payload sizes (bytes)
+sentinel_raw_report_bytes=1779
+evidencehandoff_persisted_bytes=1701
+delegate_discover_output_bytes=2210
+delegate_plan_output_bytes=1064
+delegate_run_output_bytes=3272
+doctor_scan_agent_bytes_baseline=1556
+doctor_scan_agent_bytes_current=1185
+apiforge_delegation_payload_bytes_5calls=8375
+
+## subprocess calls (REAL, strace -f -e execve on 'delegate discover', 2 peers)
+governed_spawns=3 (data-sentinel --version; data-sentinel capabilities --descriptors; forge-doctor-data --version)
+child_env_vars=6 (scrubbed environment; only PATH/HOME-style vars pass)
+no_shell=true (execve argv directly on the peer executable)
+
+## wall latency (REAL, s)
+delegate_discover_2peers~=15 (includes two live probes with 5s probe timeout budget)
+delegate_run_sentinel_exec_ms=3686 (from run report elapsed_ms)
+delegate_run_doctor_exec_ms=4769
+data_sentinel_analyze_direct_s=3.7
+orchestrate_plan_narrowed_s~=7
+task_run_pyspark_exec_ms=5681
+
+## tokens
+observed_tokens=unresolved (no host/agent transcript token accounting available; bytes measured instead; apiforge economy reports observed_tokens=unresolved too)

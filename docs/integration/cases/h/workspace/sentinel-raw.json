@@ -1,0 +1,43 @@
+{
+  "report_id": "9685ea256af04b09926dcff44b48de71",
+  "schema_version": "1.0.0",
+  "request_id": "ca994235bc5e4f2a8026ca24a2227b8b",
+  "created_at": "2026-10-21T21:09:34.352953Z",
+  "environment": null,
+  "analyzer_versions": {
+    "spark-glue-log-analyzer": "0.1.0"
+  },
+  "findings": [
+    {
+      "finding_id": "230e54c162e04b8aab1043b348e3b0d8",
+      "category": "out_of_memory",
+      "severity": "HIGH",
+      "status": "CONFIRMED",
+      "explanation": "Assinatura inequívoca de java.lang.OutOfMemoryError indica que driver ou executor estourou o heap disponível. 2 ocorrência(s) no log analisado.",
+      "evidence_ids": ["b12e79eb43644cd78f9f8a59a93e131f", "0f96828b15384075996d888e98c9b574"],
+      "alternatives": [
+        "Aumentar spark.driver.memory ou spark.executor.memory",
+        "Reduzir partições muito grandes / coletas para o driver"
+      ],
+      "recommendations": [
+        "Aumentar spark.driver.memory ou spark.executor.memory",
+        "Reduzir partições muito grandes / coletas para o driver",
+        "Revisar skew de dados nas chaves de join/agregação"
+      ],
+      "validation_steps": [
+        "Reexecutar com mais memória e verificar se o OOM desaparece",
+        "Inspecionar Spark UI (abas Executors/Stages) para o maior consumer"
+      ]
+    }
+  ],
+  "limitations": [
+    "Baseado em padrões regex curados — não cobre erros fora da biblioteca",
+    "Sem métricas de executor (Spark UI/event log não analisados neste ciclo)",
+    "Sinal POSSIBLE/PROBABLE exige corroboração humana antes de agir"
+  ],
+  "summary": "1 achado(s): CONFIRMED=1",
+  "references": [
+    "/home/edgar/Documentos/projetos/forjas/forge-cli/docs/integration/cases/h/workspace/glue_oom.log"
+  ],
+  "recommendations": []
+}

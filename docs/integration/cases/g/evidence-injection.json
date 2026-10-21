@@ -1,0 +1,66 @@
+{
+  "status": "refused",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-2e0acaf23e75e2f2",
+  "consumer": "spark-forge-aws",
+  "provider": "data-sentinel-forge",
+  "provider_version": "0.1.0",
+  "capability": "sentinel.log-analysis",
+  "risks": ["LOCAL_READ"],
+  "argv": [
+    "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel",
+    "analyze",
+    "--file",
+    "x; touch /tmp/PWNED_DELEGATION",
+    "--json",
+    "--no-persist"
+  ],
+  "findings": [],
+  "limitations": [],
+  "truncated": false,
+  "dropped": 0,
+  "handoff": {
+    "schema": "theforge/EvidenceHandoff/v1",
+    "run_id": "dl-2e0acaf23e75e2f2",
+    "correlation_id": "dl-2e0acaf23e75e2f2",
+    "idempotency_key": "idem-e91fe64e82af1dc3e26478b3",
+    "source_provider": "data-sentinel-forge",
+    "source_version": "0.1.0",
+    "consumer_provider": "spark-forge-aws",
+    "capability": "sentinel.log-analysis",
+    "capability_version": "0.1.0",
+    "status": "refused",
+    "input_refs": [
+      {
+        "kind": "ref",
+        "value": "argv:target:0d96a2b5512f4367364d0d06",
+        "sha256": null,
+        "detail": "target argument fingerprint"
+      }
+    ],
+    "result_refs": [],
+    "findings": [],
+    "limitations": [],
+    "error": {
+      "code": "invalid-output",
+      "detail": "sentinel output is not JSON: Expecting value: line 1 column 1 (char 0)",
+      "retryable": false
+    },
+    "created_at": "2026-10-21T21:07:42.598156Z",
+    "started_at": "",
+    "finished_at": "",
+    "resources": null,
+    "integrity": "158e9d1ec87f4361628fbe802270c9cf986fd3c17bdf9b3d1f25271fc16bec77",
+    "redacted": true,
+    "truncated": false,
+    "dropped": 0
+  },
+  "handoff_path": ".sparkforge_aws/delegation/handoffs/dl-2e0acaf23e75e2f2-sentinel.log-analysis-158e9d1ec87f.json",
+  "refusal": {
+    "code": "invalid-output",
+    "detail": "sentinel output is not JSON: Expecting value: line 1 column 1 (char 0)"
+  },
+  "fallback": "native-analysis",
+  "elapsed_ms": 3554,
+  "returncode": 1
+}

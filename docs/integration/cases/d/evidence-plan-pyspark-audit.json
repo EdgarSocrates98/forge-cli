@@ -1,0 +1,96 @@
+{
+  "report": {
+    "correlation_id": "",
+    "entries": [],
+    "findings": [],
+    "generated_at": "2026-10-21T20:57:55.614198Z",
+    "intent": "audit a pyspark project",
+    "kind": "plan",
+    "limitations": [
+      "scan budget 5s exhausted: verification skipped",
+      "scan budget 5s exhausted: verification skipped",
+      "scan budget 5s exhausted: verification skipped",
+      "scan budget 5s exhausted: verification skipped",
+      "scan budget 5s exhausted: verification skipped",
+      "api-forge: not delegated — no declared intent matched the task (router never fans out to all specialists)"
+    ],
+    "plan_status": "unavailable",
+    "provenance": {
+      "delegation_tasks": [],
+      "discovery_digest": "39cca71cbc84f94b0bb40e88e8265a0f187d1703ec79411ad6dfd2e4f8ce3e79",
+      "plan_sha256": "be6ad3d5cf791ffc542a7f8e4780ee42d2793d131011ec1d4b6a08500f05c537",
+      "receipts": []
+    },
+    "recommended": [
+      {
+        "action": "install data-sentinel-forge or configure its path — optional, the plan does not block on it",
+        "provider": "data-sentinel-forge",
+        "why": "declared delegate absent: discovery state NOT_INSTALLED (data-sentinel-forge: discovery state NOT_INSTALLED is not VERIFIED)"
+      },
+      {
+        "action": "install forge-doctor-api or configure its path — optional, the plan does not block on it",
+        "provider": "forge-doctor-api",
+        "why": "declared delegate absent: discovery state DEGRADED (forge-doctor-api: discovery state DEGRADED is not VERIFIED (registry describe ok (protocol forge/v1); health probe error: health: no response within 1.95797s; capability manifest derived from the ForgeManifest (no capabilities op or bundled manifest)))"
+      },
+      {
+        "action": "install forge-doctor-data or configure its path — optional, the plan does not block on it",
+        "provider": "forge-doctor-data",
+        "why": "declared delegate absent: discovery state DISCOVERED (forge-doctor-data: discovery state DISCOVERED is not VERIFIED)"
+      },
+      {
+        "action": "install platform-forge or configure its path — optional, the plan does not block on it",
+        "provider": "platform-forge",
+        "why": "declared delegate absent: discovery state DISCOVERED (platform-forge: discovery state DISCOVERED is not VERIFIED)"
+      },
+      {
+        "action": "install spark-forge-aws or configure its path — optional, the plan does not block on it",
+        "provider": "spark-forge-aws",
+        "why": "declared delegate absent: discovery state DISCOVERED (spark-forge-aws: discovery state DISCOVERED is not VERIFIED)"
+      },
+      {
+        "action": "install spark-forge-azure or configure its path — optional, the plan does not block on it",
+        "provider": "spark-forge-azure",
+        "why": "declared delegate absent: discovery state DISCOVERED (spark-forge-azure: discovery state DISCOVERED is not VERIFIED)"
+      },
+      {
+        "action": "no verified specialist serves this intent — install one or broaden the delegation declaration",
+        "provider": "",
+        "why": "every declared specialist was absent, unverified or unmatched"
+      }
+    ],
+    "schema": "theforge/OrchestrationReport/v1",
+    "unknowns": ["no declared intent matched the task intent"],
+    "unresolved": [
+      {
+        "code": "provider-absent",
+        "detail": "data-sentinel-forge: discovery state NOT_INSTALLED is not VERIFIED",
+        "provider": "data-sentinel-forge"
+      },
+      {
+        "code": "provider-absent",
+        "detail": "forge-doctor-api: discovery state DEGRADED is not VERIFIED (registry describe ok (protocol forge/v1); health probe error: health: no response within 1.95797s; capability manifest derived from the ForgeManifest (no capabilities op or bundled manifest))",
+        "provider": "forge-doctor-api"
+      },
+      {
+        "code": "provider-absent",
+        "detail": "forge-doctor-data: discovery state DISCOVERED is not VERIFIED",
+        "provider": "forge-doctor-data"
+      },
+      {
+        "code": "provider-absent",
+        "detail": "platform-forge: discovery state DISCOVERED is not VERIFIED",
+        "provider": "platform-forge"
+      },
+      {
+        "code": "provider-absent",
+        "detail": "spark-forge-aws: discovery state DISCOVERED is not VERIFIED",
+        "provider": "spark-forge-aws"
+      },
+      {
+        "code": "provider-absent",
+        "detail": "spark-forge-azure: discovery state DISCOVERED is not VERIFIED",
+        "provider": "spark-forge-azure"
+      }
+    ]
+  }
+}

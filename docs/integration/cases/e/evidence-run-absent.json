@@ -1,0 +1,14 @@
+{
+  "status": "refused",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-6ff8680f9ad091aa",
+  "consumer": "spark-forge-aws",
+  "refusal": {
+    "code": "provider-absent",
+    "detail": "data-sentinel-forge: discovery state NOT_INSTALLED is not VERIFIED",
+    "provider": "data-sentinel-forge"
+  },
+  "fallback": "native-analysis",
+  "findings": [],
+  "handoff": null
+}

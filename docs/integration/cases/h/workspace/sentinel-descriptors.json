@@ -1,0 +1,203 @@
+[
+  {
+    "capability_id": "sentinel.cloudwatch-log-analyzer",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_log", "correlate_errors", "build_timeline"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Baseado em padrões regex curados — não cobre erros fora da biblioteca",
+      "Sem métricas de executor (Spark UI/event log não analisados neste ciclo)",
+      "Sinal POSSIBLE/PROBABLE exige corroboração humana antes de agir",
+      "correlação primário/cascata é heurística documentada — revise antes de agir",
+      "timestamps só entram na timeline quando observados no texto"
+    ]
+  },
+  {
+    "capability_id": "sentinel.emr.ec2",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_emr_ec2"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "DescribeCluster/ListSteps exportados — não é acesso direto às APIs (§3.4)",
+      "Métricas YARN/EC2 só quando fornecidas; sem elas, diagnósticos de utilização ficam UNKNOWN",
+      "Spot interruption inferida de InstanceGroups + falha, nunca afirmada sem CloudTrail/eventos",
+      "Sem métricas de disco: disk pressure só via texto de erro"
+    ]
+  },
+  {
+    "capability_id": "sentinel.emr.eks",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_emr_eks"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Manifests/eventos exportados (kubectl -o) — não há acesso direto ao cluster por padrão (§5.3)",
+      "emr-containers DescribeJobRun só quando exportado; sem ele a correlação vc↔pod fica limitada",
+      "Capacidade de nós só avaliada via eventos de scheduling exportados — sem Cluster Autoscaler real",
+      "IRSA/service-account revisado estaticamente — nunca sugerimos permissões administrativas"
+    ]
+  },
+  {
+    "capability_id": "sentinel.emr.serverless",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_emr_serverless"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "GetApplication/GetJobRun exportados — sem acesso à API emr-serverless",
+      "Utilização de recursos só quando totalResourceUtilization fornecido — advisor vira hipótese sem elas",
+      "Custos são ESTIMADOS a partir de uso declarado x tabela estática — nunca billing real (§4.5)",
+      "Logs ausentes viram limitação, não presunção de falha"
+    ]
+  },
+  {
+    "capability_id": "sentinel.iam.policy",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_iam_policy"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Análise offline de policies — SCPs, permission boundaries, resource policies e session policies só contam se fornecidos",
+      "IAM SimulatePrincipalPolicy é opcional e NÃO usada por padrão; suas limitações (resource policies, SCPs, contexto de sessão, Lake Formation) estão documentadas — simulação não é validação real",
+      "Conditions de policy não são avaliadas — Allow condicional permanece hipótese",
+      "Decrypt nunca é executado como teste"
+    ]
+  },
+  {
+    "capability_id": "sentinel.iceberg.metadata",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_iceberg_metadata"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Metadados declarados — snapshots/summaries descrevem o catálogo, não métricas de execução observadas",
+      "Manifests/data files analisados somente quando fornecidos como entrada; locations são referências, nunca URLs seguidas",
+      "Pruning e eficácia de partição são hipóteses sem plano/métricas",
+      "Campos desconhecidos de versões mais novas são preservados, não interpretados"
+    ]
+  },
+  {
+    "capability_id": "sentinel.import.doctor-bundle",
+    "provider": "data-sentinel",
+    "version": "1.0.0",
+    "input_types": ["handoff-bundle@1", "forge-contracts/1", "scan-json@3.0"],
+    "output_types": ["external-diagnostic-bundle", "findings"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "import-only: não exporta bundles",
+      "findings importados nunca são auto-CONFIRMED"
+    ]
+  },
+  {
+    "capability_id": "sentinel.incident.graph",
+    "provider": "data-sentinel",
+    "version": "1.0.0",
+    "input_types": ["unified-execution-context", "findings", "evidence"],
+    "output_types": ["evidence-graph", "incident-timeline"],
+    "permissions": [],
+    "limitations": [
+      "correlação exige vínculo justificável (ids/refs compartilhadas)",
+      "arestas causais são POTENTIALLY_CAUSED_BY, nunca comprovadas"
+    ]
+  },
+  {
+    "capability_id": "sentinel.join-intelligence-analyzer",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_joins"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Nunca deriva cardinalidade real a partir de contagens de linhas — estimativas exigem estatísticas de chave declaradas",
+      "Skew de stage não identifica a chave desbalanceada — apenas sinaliza o estágio afetado",
+      "Deduplicação nunca é sugerida automaticamente — altera semântica funcional e exige validação humana"
+    ]
+  },
+  {
+    "capability_id": "sentinel.lakehouse.cross_account",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_cross_account"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Contexto de acesso é declarado/fornecido — permissões não visíveis são UNKNOWN, nunca presumidas negadas",
+      "Grants Lake Formation analisados apenas quando fornecidos no contexto; sem chamada mutadora",
+      "Compatibilidade de cenário cross-account depende de regras de conhecimento — ausência de regra → UNKNOWN"
+    ]
+  },
+  {
+    "capability_id": "sentinel.lakehouse.operation",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_lakehouse_operation"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "SQL é parseado, nunca executado — sem efeitos em dados",
+      "Duplicação de chaves só é afirmada com estatística declarada ou unicidade observada; ausência de stats → risco, não fato",
+      "Idempotência é analisada estaticamente — reprocessamento real depende de checkpointing/orquestração externa",
+      "Nenhuma recomendação altera a semântica do MERGE declarado"
+    ]
+  },
+  {
+    "capability_id": "sentinel.spark-config-advisor",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["advise_config"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Recomendações são hipóteses rotuladas — benefício esperado não é medido",
+      "Sem métricas de workload, severidade de configs inadequadas permanece POSSIBLE",
+      "Aumentos de recurso sempre indicam implicação de custo/quota"
+    ]
+  },
+  {
+    "capability_id": "sentinel.spark-glue-log-analyzer",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_log"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Baseado em padrões regex curados — não cobre erros fora da biblioteca",
+      "Sem métricas de executor (Spark UI/event log não analisados neste ciclo)",
+      "Sinal POSSIBLE/PROBABLE exige corroboração humana antes de agir"
+    ]
+  },
+  {
+    "capability_id": "sentinel.spark-plan-analyzer",
+    "provider": "data-sentinel",
+    "version": "0.1.0",
+    "input_types": ["analyze_plan"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Plano estático — sem métricas de execução reais (bytes lidos, spill, skew) salvo quando o texto as declara",
+      "Presença de Exchange/SortMergeJoin é sinal de investigação, não problema por si só",
+      "Estatísticas exibidas são estimativas do otimizador salvo indicação explícita contrária"
+    ]
+  },
+  {
+    "capability_id": "sentinel.sql-static-analyzer",
+    "provider": "data-sentinel",
+    "version": "0.2.0",
+    "input_types": ["sql_query"],
+    "output_types": ["findings", "evidence", "recommendations"],
+    "permissions": ["filesystem:read"],
+    "limitations": [
+      "Análise estática: não observa execução física nem custos reais",
+      "Sem acesso a catálogo: não valida existência de tabelas/colunas",
+      "Cobertura limitada à lista de antipadrões documentada"
+    ]
+  }
+]

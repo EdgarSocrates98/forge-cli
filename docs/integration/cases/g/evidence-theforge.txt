@@ -1,0 +1,34 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.7.0 -- /home/edgar/Documentos/projetos/forjas/the-forge/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /home/edgar/Documentos/projetos/forjas/the-forge
+configfile: pyproject.toml
+plugins: hypothesis-6.169.4
+collecting ... collected 45 items / 22 deselected / 23 selected
+
+tests/test_delegation_governance.py::test_capability_risks_maps_operation_class_positionally PASSED [  4%]
+tests/test_delegation_governance.py::test_sentinel_spark_sentinel_cycle_is_refused PASSED [  8%]
+tests/test_delegation_governance.py::test_reentering_the_consumer_is_refused PASSED [ 13%]
+tests/test_delegation_governance.py::test_undeclared_provider_refused_before_chain_grows PASSED [ 17%]
+tests/test_delegation_governance.py::test_hop_budget_exhaustion_is_a_named_refusal PASSED [ 21%]
+tests/test_delegation_governance.py::test_timeout_budget_counts_elapsed_seconds PASSED [ 26%]
+tests/test_delegation_governance.py::test_resolve_capability_argv_replaces_known_placeholders PASSED [ 30%]
+tests/test_delegation_governance.py::test_injection_attempt_stays_a_single_inert_argument PASSED [ 34%]
+tests/test_delegation_governance.py::test_injection_via_control_characters_is_refused PASSED [ 39%]
+tests/test_delegation_governance.py::test_traversal_in_substitutions_is_refused PASSED [ 43%]
+tests/test_delegation_governance.py::test_seal_and_verify_integrity PASSED [ 47%]
+tests/test_delegation_governance.py::test_bound_handoff_truncates_oversized_findings_with_flag PASSED [ 52%]
+tests/test_delegation_governance.py::test_bound_handoff_preserves_refusal_state PASSED [ 56%]
+tests/test_delegation_governance.py::test_bound_handoff_never_repairs_invalid_data PASSED [ 60%]
+tests/test_delegation_governance.py::test_redact_handoff_scrubs_free_text_and_marks_itself PASSED [ 65%]
+tests/test_delegation_governance.py::test_refusal_preservation_through_serialize_redact_and_bound PASSED [ 69%]
+tests/test_evidence_handoff.py::test_correlation_fields_are_required_and_bounded PASSED [ 73%]
+tests/test_evidence_handoff.py::test_error_state_required_iff_failed_or_refused_or_cancelled PASSED [ 78%]
+tests/test_evidence_handoff.py::test_path_refs_refuse_traversal_and_absolute PASSED [ 82%]
+tests/test_evidence_handoff.py::test_refs_refuse_dereferenceable_and_instruction_schemes PASSED [ 86%]
+tests/test_evidence_handoff.py::test_confidence_normalization_never_promotes PASSED [ 91%]
+tests/test_evidence_handoff.py::test_summary_and_collection_caps_enforced PASSED [ 95%]
+tests/test_evidence_handoff.py::test_integrity_field_must_be_sha256 PASSED [100%]
+
+====================== 23 passed, 22 deselected in 4.68s =======================

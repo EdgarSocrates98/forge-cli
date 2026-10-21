@@ -1,0 +1,36 @@
+{
+  "capability": "sentinel.log-analysis",
+  "capability_version": "0.1.0",
+  "consumer_provider": "spark-forge-aws",
+  "correlation_id": "dl-f2e32e6021d573fb",
+  "created_at": "2026-10-21T21:08:00.612103Z",
+  "dropped": 0,
+  "error": {
+    "code": "timeout",
+    "detail": "'/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel' exceeded timeout 1s",
+    "retryable": true
+  },
+  "findings": [],
+  "finished_at": "",
+  "idempotency_key": "idem-705df96d46f9f6cdad9daa20",
+  "input_refs": [
+    {
+      "detail": "target argument fingerprint",
+      "kind": "ref",
+      "sha256": null,
+      "value": "argv:target:b05a32b9d993214c3331bd8c"
+    }
+  ],
+  "integrity": "ed17dadec6158c3ab049a7e7ef653178947488e8abce67dc51d67229ee301ba3",
+  "limitations": [],
+  "redacted": true,
+  "resources": null,
+  "result_refs": [],
+  "run_id": "dl-f2e32e6021d573fb",
+  "schema": "theforge/EvidenceHandoff/v1",
+  "source_provider": "data-sentinel-forge",
+  "source_version": "0.1.0",
+  "started_at": "",
+  "status": "failed",
+  "truncated": false
+}

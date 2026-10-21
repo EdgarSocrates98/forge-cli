@@ -1,0 +1,26 @@
+{
+  "status": "planned",
+  "schema": "sparkforge_aws/DelegationPlan/v1",
+  "intent": "static analysis and pyspark review for antipatterns",
+  "picks": [
+    {
+      "provider": "forge-doctor-data",
+      "capability": "doctor.scan-project",
+      "capability_version": "1.0.5",
+      "risks": ["LOCAL_READ"],
+      "entrypoint": ["{cli}", "scan", "{target}", "--format", "agent", "--check", "{check}"],
+      "justification": [
+        "declared intent(s) matched the task: antipatterns, pyspark-review, static-analysis",
+        "capability 'doctor.scan-project': 6 intent token(s) matched id/description/intents",
+        "risk gate: all declared risk levels allowed by policy or authorization (risks: LOCAL_READ)",
+        "provider version 1.0.5, state VERIFIED"
+      ]
+    }
+  ],
+  "refusals": [],
+  "limitations": [
+    "data-sentinel-forge: not delegated — no declared intent matched the task (router never fans out to all specialists)"
+  ],
+  "unknowns": [],
+  "fallback": "native-analysis"
+}

@@ -1,0 +1,49 @@
+{
+  "capability": "sentinel.log-analysis",
+  "capability_version": "0.1.0",
+  "consumer_provider": "spark-forge-aws",
+  "correlation_id": "dl-7460c06c386ac128",
+  "created_at": "2026-10-21T20:47:57.545190Z",
+  "dropped": 0,
+  "error": null,
+  "findings": [
+    {
+      "confidence": "CONFIRMED",
+      "evidence_refs": ["1d273a0fdd424298bec93667994bb5a5", "d9a2a67585d94458af7577daef92aa27"],
+      "id": "82f4da9f8c6d47feaa102754ff31f085",
+      "severity": "high",
+      "summary": "Assinatura inequívoca de java.lang.OutOfMemoryError indica que driver ou executor estourou o heap disponível. 2 ocorrência(s) no log analisado."
+    }
+  ],
+  "finished_at": "2026-10-21T20:47:57.545620Z",
+  "idempotency_key": "idem-1c39106f9b6eb400a7c44750",
+  "input_refs": [
+    {
+      "detail": "target argument fingerprint",
+      "kind": "ref",
+      "sha256": null,
+      "value": "argv:target:b05a32b9d993214c3331bd8c"
+    }
+  ],
+  "integrity": "993992756d5edbfe856e0160f0254c3d93163cf5024f89d7f4f89bbadce430f3",
+  "limitations": [
+    "Baseado em padrões regex curados — não cobre erros fora da biblioteca",
+    "Sem métricas de executor (Spark UI/event log não analisados neste ciclo)",
+    "Sinal POSSIBLE/PROBABLE exige corroboração humana antes de agir"
+  ],
+  "redacted": true,
+  "resources": {
+    "elapsed_ms": 3686,
+    "provider_tokens": null,
+    "stderr_bytes": 0,
+    "stdout_bytes": 1779
+  },
+  "result_refs": [],
+  "run_id": "dl-7460c06c386ac128",
+  "schema": "theforge/EvidenceHandoff/v1",
+  "source_provider": "data-sentinel-forge",
+  "source_version": "0.1.0",
+  "started_at": "2026-10-21T20:47:57.545190Z",
+  "status": "completed",
+  "truncated": false
+}

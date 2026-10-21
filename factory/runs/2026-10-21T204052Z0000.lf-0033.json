@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0033.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T20:40:52+00:00",
+  "id": "lf-0033",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0033.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0033.md",
+  "spec_sha256": "18cb3b1b4965c4225cbb7d78525889f9fe1934e589bb371ed81bb0fbd1277120",
+  "status": "planned",
+  "title": "Integrations: E2E tests A-H, CI gates, docs, consolidated final report"
+}

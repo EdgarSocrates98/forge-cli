@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "schema": "apiforge/doctor-scan/v1",
+  "run_id": "drun-f90eaac628215654",
+  "target": "project",
+  "argv": [
+    "/home/edgar/Documentos/projetos/forjas/forge-doctor-api/.venv/bin/forge-doctor-api",
+    "scan",
+    "project",
+    "--format",
+    "agent"
+  ],
+  "exit_code": 0,
+  "gate_failed": false,
+  "tool_version": "0.2.5",
+  "scan_schema_version": "1.0",
+  "knowledge_versions": {
+    "asyncapi-versions": "2026.10",
+    "aws-api-gateway-capabilities": "2026.10",
+    "envoy-capabilities": "2026.10",
+    "express-capabilities": "2026.10",
+    "fastapi-capabilities": "2026.10",
+    "gateway-capability-map": "2026.10",
+    "graphql-spec": "2026.10",
+    "grpc-behaviors": "2026.10",
+    "http-semantics": "2026.10",
+    "jsonschema-dialects": "2026.10",
+    "kong-capabilities": "2026.10",
+    "nginx-capabilities": "2026.10",
+    "openapi-versions": "2026.10",
+    "owasp-api-security-top-10": "2023",
+    "spring-capabilities": "2026.10"
+  },
+  "findings": [
+    {
+      "version": 1,
+      "check_id": "APISEC011",
+      "severity": "MEDIUM",
+      "confidence": "UNKNOWN",
+      "subject": "openapi.yaml",
+      "line": 7,
+      "description": "[unknown] (API2) POST /orders: no security evidence at any level - effective authentication is unknown (global_schemes=[] op_security=False op_reqs=0 scopes=[] unresolvable=[])"
+    },
+    {
+      "version": 1,
+      "check_id": "OAS010",
+      "severity": "HIGH",
+      "confidence": "LOW",
+      "subject": "api:openapi:openapi.yaml",
+      "line": 1,
+      "description": "openapi.yaml: no document-level security requirement protects 1 operations"
+    },
+    {
+      "version": 1,
+      "check_id": "OAS018",
+      "severity": "INFO",
+      "confidence": "MEDIUM",
+      "subject": "schema:openapi:openapi.yaml#/components/schemas/Order",
+      "line": 20,
+      "description": "component schema 'Order' is never referenced"
+    },
+    {
+      "version": 1,
+      "check_id": "OAS020",
+      "severity": "INFO",
+      "confidence": "LOW",
+      "subject": "operation:openapi:operation_id:createOrder",
+      "line": 7,
+      "description": "POST /orders has no tags or domain grouping"
+    },
+    {
+      "version": 1,
+      "check_id": "RELAPI008",
+      "severity": "LOW",
+      "confidence": "LOW",
+      "subject": "openapi.yaml",
+      "line": null,
+      "description": "POST /orders: mutating operation with no declared idempotency-key or contract metadata - safe replay cannot be evidenced"
+    }
+  ],
+  "unknowns": [],
+  "stdout_sha256": "0c8fc6a3f5aa60e03306890b54db6a1f7ea5dca5ac5e04ca1e5079ee8b78f34c",
+  "stderr_tail": "",
+  "elapsed_ms": 4421
+}

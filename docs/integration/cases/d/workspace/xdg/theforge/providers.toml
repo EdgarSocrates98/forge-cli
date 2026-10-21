@@ -1,0 +1,7 @@
+# lf-0033 case D — minimal registry: only the provider this plan needs is
+# registered (the discovery scan budget is 5s fixed; each adapter probe is a
+# real subprocess). Remaining specialists resolve as NOT_INSTALLED quickly.
+[[providers]]
+id = "spark-forge-aws"
+argv = ["/home/edgar/Documentos/projetos/forjas/spark-forge-aws/.venv/bin/python", "-m", "theforge_sparkforge_aws"]
+trust = "local"

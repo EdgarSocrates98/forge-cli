@@ -1,0 +1,6 @@
+{
+  "forge_id": "data-sentinel-forge",
+  "package": "data_sentinel",
+  "cli": "data-sentinel",
+  "version": "99.0.0"
+}

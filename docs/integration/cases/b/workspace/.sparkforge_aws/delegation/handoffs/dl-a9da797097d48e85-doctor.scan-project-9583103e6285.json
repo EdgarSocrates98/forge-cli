@@ -1,0 +1,59 @@
+{
+  "capability": "doctor.scan-project",
+  "capability_version": "1.0.5",
+  "consumer_provider": "spark-forge-aws",
+  "correlation_id": "dl-a9da797097d48e85",
+  "created_at": "2026-10-21T20:49:26.437336Z",
+  "dropped": 0,
+  "error": null,
+  "findings": [
+    {
+      "confidence": "UNKNOWN",
+      "evidence_refs": ["etl_job.py:11", "fp:365ae243247fae4e"],
+      "id": "SPARK001",
+      "severity": "medium",
+      "summary": ""
+    },
+    {
+      "confidence": "UNKNOWN",
+      "evidence_refs": ["etl_job.py:17", "fp:4f671d7809b25ed3"],
+      "id": "SPARK003",
+      "severity": "medium",
+      "summary": ""
+    },
+    {
+      "confidence": "UNKNOWN",
+      "evidence_refs": ["etl_job.py:14", "fp:6ccfef22989da6fa"],
+      "id": "SPARK009",
+      "severity": "medium",
+      "summary": ""
+    }
+  ],
+  "finished_at": "2026-10-21T20:49:26.437787Z",
+  "idempotency_key": "idem-6b8ce2ada890addc0e35f9b9",
+  "input_refs": [
+    {
+      "detail": "target argument fingerprint",
+      "kind": "ref",
+      "sha256": null,
+      "value": "argv:target:244210e48437b6556980a702"
+    }
+  ],
+  "integrity": "9583103e62855c7a47a3d620b5cdf9c2a26db72fa4c9af55adbb684c84e7da2e",
+  "limitations": ["summary: errors=0, info=0, passed=1, warnings=3"],
+  "redacted": true,
+  "resources": {
+    "elapsed_ms": 4769,
+    "provider_tokens": null,
+    "stderr_bytes": 0,
+    "stdout_bytes": 408
+  },
+  "result_refs": [],
+  "run_id": "dl-a9da797097d48e85",
+  "schema": "theforge/EvidenceHandoff/v1",
+  "source_provider": "forge-doctor-data",
+  "source_version": "1.0.5",
+  "started_at": "2026-10-21T20:49:26.437336Z",
+  "status": "completed",
+  "truncated": false
+}

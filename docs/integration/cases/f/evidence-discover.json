@@ -1,0 +1,53 @@
+{
+  "status": "ok",
+  "schema": "sparkforge_aws/PeerDiscoveryReport/v1",
+  "generated_at": "2026-10-21T21:03:26.455616Z",
+  "probed": true,
+  "entries": [
+    {
+      "provider": "data-sentinel-forge",
+      "state": "VERIFIED",
+      "version": "99.0.0",
+      "checks": {
+        "handshake": "PASS",
+        "manifest": "PASS",
+        "health": "PASS"
+      },
+      "sources": [
+        {
+          "source": "path",
+          "detail": "console script 'data-sentinel' resolved",
+          "path": "/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel"
+        },
+        {
+          "source": "checkout",
+          "detail": "forge.json at /home/edgar/Documentos/projetos/forjas/forge-cli/docs/integration/cases/f/data-sentinel-forge",
+          "path": "/home/edgar/Documentos/projetos/forjas/forge-cli/docs/integration/cases/f/data-sentinel-forge"
+        },
+        {
+          "source": "bundled-manifest",
+          "detail": "capability manifest at forge.capabilities.json",
+          "path": "/home/edgar/Documentos/projetos/forjas/forge-cli/docs/integration/cases/f/data-sentinel-forge/forge.capabilities.json"
+        }
+      ],
+      "capabilities": ["sentinel.log-analysis"],
+      "declared_capabilities": [
+        "sentinel.log-analysis",
+        "sentinel.spark-explain",
+        "sentinel.sql-analyze",
+        "sentinel.lakehouse-metadata",
+        "sentinel.emr-analyze",
+        "sentinel.glue-inspect",
+        "sentinel.glue-runs",
+        "sentinel.glue-diagnose"
+      ],
+      "notes": [
+        "version probe ok: /home/edgar/Documentos/projetos/forjas/data-sentinel-forge/.venv/bin/data-sentinel --version",
+        "descriptor probe ok: 15 descriptor(s)",
+        "descriptor manifest not adopted: descriptor[0] provider 'data-sentinel' != 'data-sentinel-forge'"
+      ],
+      "limitations": []
+    }
+  ],
+  "limitations": []
+}

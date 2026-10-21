@@ -1,0 +1,18 @@
+{
+  "candidates": [
+    {
+      "command": [
+        "/home/edgar/Documentos/projetos/forjas/the-forge/.venv/bin/python3",
+        "-c",
+        "import sys; sys.path.insert(0, '/home/edgar/Documentos/projetos/forjas/data-sentinel-forge/src'); from data_sentinel.cli import app; app()",
+        "analyze",
+        "--file",
+        "{artifact}"
+      ],
+      "mode": "DIAGNOSTIC_ONLY",
+      "provider": "data-sentinel-forge"
+    }
+  ],
+  "intent": "diagnose spark job failure",
+  "note": "plan only — run `task run` to execute"
+}

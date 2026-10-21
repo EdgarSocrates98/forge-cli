@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.15, pytest-9.1.1, pluggy-1.7.0 -- /home/edgar/Documentos/projetos/forjas/spark-forge-aws/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/edgar/Documentos/projetos/forjas/spark-forge-aws
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 45 items / 42 deselected / 3 selected
+
+tests/test_delegation.py::TestDiscoveryStates::test_incompatible_requires_python PASSED [ 33%]
+tests/test_delegation.py::TestDiscoveryStates::test_incompatible_manifest_major_drift PASSED [ 66%]
+tests/test_delegation.py::TestIncompatibleSpecialist::test_delegate_incompatible_blocked PASSED [100%]
+
+======================= 3 passed, 42 deselected in 2.37s =======================

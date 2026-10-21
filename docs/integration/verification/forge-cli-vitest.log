@@ -1,0 +1,157 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/home/edgar/Documentos/projetos/forjas/forge-cli[39m
+
+ [2m[90m↓[39m[22m tests/compat.test.ts [2m([22m[2m16 tests[22m[2m | [22m[33m16 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/configs.test.ts [2m([22m[2m5 tests[22m[2m | [22m[33m5 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/ai-sanitize.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m15 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/artifacts.test.ts [2m([22m[2m12 tests[22m[2m | [22m[33m12 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/ai-proposal.test.ts [2m([22m[2m12 tests[22m[2m | [22m[33m12 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/ai-cache.test.ts [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/e2e-cli.test.ts [2m([22m[2m41 tests[22m[2m | [22m[33m41 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/config.test.ts [2m([22m[2m11 tests[22m[2m | [22m[33m11 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/contracts.test.ts [2m([22m[2m33 tests[22m[2m | [22m[33m33 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/commands.test.ts [2m([22m[2m11 tests[22m[2m | [22m[33m11 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/ai-bridge.test.ts [2m([22m[2m18 tests[22m[2m | [22m[33m18 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/cli-args.test.ts [2m([22m[2m16 tests[22m[2m | [22m[33m16 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/e2e-gitless.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/env.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/doctor.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/hosts-mapping.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/discovery.test.ts [2m([22m[2m17 tests[22m[2m | [22m[33m17 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/git-revs.test.ts [2m([22m[2m14 tests[22m[2m | [22m[33m14 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/env-python.test.ts [2m([22m[2m23 tests[22m[2m | [22m[33m23 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/fault-injection.test.ts [2m([22m[2m30 tests[22m[2m | [22m[33m30 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/install-windows-sh.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/install.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m15 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/heal.test.ts [2m([22m[2m22 tests[22m[2m | [22m[33m22 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/envintel.test.ts [2m([22m[2m32 tests[22m[2m | [22m[33m32 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/env-discover.test.ts [2m([22m[2m42 tests[22m[2m | [22m[33m42 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/cli-polish.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m15 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/independence.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/keyless-gate.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/hosts.test.ts [2m([22m[2m51 tests[22m[2m | [22m[33m51 skipped[39m[2m)[22m
+ [32m✓[39m tests/wizard.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m13 skipped[39m[2m)[22m[32m 119[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/learning.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/lifecycle-matrix.test.ts [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/intel-predict.test.ts [2m([22m[2m17 tests[22m[2m | [22m[33m17 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/lifecycle.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/maintenance.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/doctor2.test.ts [2m([22m[2m27 tests[22m[2m | [22m[33m27 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/intel-engine.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m10 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/intel-context.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/manifest.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/local-source.test.ts [2m([22m[2m12 tests[22m[2m | [22m[33m12 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/local-source-negative.test.ts [2m([22m[2m21 tests[22m[2m | [22m[33m21 skipped[39m[2m)[22m
+│
+▲  flags ignoradas no método registry: --dir
+│
+●  Python detectado: 3.12.4
+[?25l│
+◇  the-forge: instalado theforge-core==0.1.0
+[?25h│
+●  Relatório JSON salvo em: /tmp/forge-cli-int-fLlJEs/install-report.json
+ [2m[90m↓[39m[22m tests/mcp-verify.test.ts [2m([22m[2m21 tests[22m[2m | [22m[33m21 skipped[39m[2m)[22m
+│
+◇  Launchers em ~/.forge-cli/bin (no PATH do forge-cli); sem shim, invoque o caminho da venv ─╮
+│                                                                                             │
+│  the-forge → theforge (em /tmp/forge-cli-int-nA5IhE/.forge-cli/bin)                         │
+│                                                                                             │
+├─────────────────────────────────────────────────────────────────────────────────────────────╯
+│
+└  ✅ instalação registry-first concluída
+
+│
+◇  Integrações opcionais ─────────────────────────────────────────────────────╮
+│                                                                             │
+│  spark-forge-aws — análise estática/runtime PySpark — delegate do           │
+│  orquestrador                                                               │
+│  spark-forge-azure — análise PySpark em Azure — delegate do orquestrador    │
+│  api-forge — construção/contratos de API — delegate do orquestrador         │
+│  platform-forge — postura de plataforma — delegate do orquestrador          │
+│  forge-doctor-data — verificação independente de dados — delegate do        │
+│  orquestrador                                                               │
+│  forge-doctor-api — verificação independente de API — delegate do           │
+│  orquestrador                                                               │
+│  data-sentinel-forge — diagnóstico de runtime (logs/plans) — sem adapter    │
+│  the-forge e sem rota de install: gap documentado, nunca obrigatório (sem   │
+│  dist no catálogo registry — instale via git (`--method git`) ou pelo       │
+│  método do repositório)                                                     │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────╯
+│
+▲  flags ignoradas no método registry: --dir
+│
+●  Python detectado: 3.12.4
+[?25l│
+◇  the-forge: instalado theforge-core==0.1.0
+[?25h│
+●  Relatório JSON salvo em: /tmp/forge-cli-int-5Mijho/install-report.json
+│
+◇  Launchers em ~/.forge-cli/bin (no PATH do forge-cli); sem shim, invoque o caminho da venv ─╮
+│                                                                                             │
+│  the-forge → theforge (em /tmp/forge-cli-int-JaErXw/.forge-cli/bin)                         │
+│                                                                                             │
+├─────────────────────────────────────────────────────────────────────────────────────────────╯
+│
+└  ✅ instalação registry-first concluída
+
+│
+◇  Integrações opcionais ─────────────────────────────────────────────────────╮
+│                                                                             │
+│  spark-forge-aws — análise estática/runtime PySpark — delegate do           │
+│  orquestrador                                                               │
+│  spark-forge-azure — análise PySpark em Azure — delegate do orquestrador    │
+│  api-forge — construção/contratos de API — delegate do orquestrador         │
+│  platform-forge — postura de plataforma — delegate do orquestrador          │
+│  forge-doctor-data — verificação independente de dados — delegate do        │
+│  orquestrador                                                               │
+│  forge-doctor-api — verificação independente de API — delegate do           │
+│  orquestrador                                                               │
+│  data-sentinel-forge — diagnóstico de runtime (logs/plans) — sem adapter    │
+│  the-forge e sem rota de install: gap documentado, nunca obrigatório (sem   │
+│  dist no catálogo registry — instale via git (`--method git`) ou pelo       │
+│  método do repositório)                                                     │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────╯
+ [32m✓[39m tests/integrations.test.ts [2m([22m[2m23 tests[22m[2m | [22m[33m15 skipped[39m[2m)[22m[33m 1862[2mms[22m[39m
+   [32m✓[39m doctor2 — installation.integrations.* [2m(4)[22m
+     [33m[2m✓[22m[39m absent integrations classify as optional — skip, never fail[33m 378[2mms[22m[39m
+   [32m✓[39m runRegistryInstall — optional integrations surface [2m(2)[22m
+     [33m[2m✓[22m[39m install report lists pending integrations; nothing installs without consent[33m 519[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/intel-contracts.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/menu.test.ts [2m([22m[2m19 tests[22m[2m | [22m[33m19 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/planner.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m10 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/native-install.test.ts [2m([22m[2m11 tests[22m[2m | [22m[33m11 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/recommend.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m10 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/prereqs.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m15 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/plan.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/preflight-fail.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/preflight.test.ts [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-pypi.test.ts [2m([22m[2m27 tests[22m[2m | [22m[33m27 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-install.test.ts [2m([22m[2m47 tests[22m[2m | [22m[33m47 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-versions.test.ts [2m([22m[2m29 tests[22m[2m | [22m[33m29 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/portability.test.ts [2m([22m[2m16 tests[22m[2m | [22m[33m16 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/report.test.ts [2m([22m[2m13 tests[22m[2m | [22m[33m13 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-lock.test.ts [2m([22m[2m21 tests[22m[2m | [22m[33m21 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/repos.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m9 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-cmd.test.ts [2m([22m[2m25 tests[22m[2m | [22m[33m25 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/source-detect.test.ts [2m([22m[2m18 tests[22m[2m | [22m[33m18 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/runner.test.ts [2m([22m[2m39 tests[22m[2m | [22m[33m39 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/theme.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/registry-lifecycle.test.ts [2m([22m[2m35 tests[22m[2m | [22m[33m35 skipped[39m[2m)[22m
+[graphify hook] launching background rebuild (log: /home/edgar/.cache/graphify-rebuild.log)
+ [2m[90m↓[39m[22m tests/release-workflow.test.ts [2m([22m[2m24 tests[22m[2m | [22m[33m24 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/system.test.ts [2m([22m[2m21 tests[22m[2m | [22m[33m21 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/plan-purity.test.ts [2m([22m[2m44 tests[22m[2m | [22m[33m44 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/safety.test.ts [2m([22m[2m35 tests[22m[2m | [22m[33m35 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/tui-repos.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[2m | [22m[33m67 skipped[39m[90m (69)[39m
+[2m      Tests [22m [1m[32m10 passed[39m[22m[2m | [22m[33m1184 skipped[39m[90m (1194)[39m
+[2m   Start at [22m 18:23:40
+[2m   Duration [22m 27.27s[2m (transform 66%, import 31%, worker 2%, tests 1%)[22m
+
+[2m  Transform [22m [33mtransforming modules took 167.59s[39m[2m · 66% of tracked time, re-done on every run[22m
+[2m            [22m [2mpersist transforms across runs with [22m[33mfsModuleCache: true[39m
+[2m            [22m [2mlearn more: https://vitest.dev/guide/improving-performance#caching-between-reruns[22m
+

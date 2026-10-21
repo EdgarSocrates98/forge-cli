@@ -1,0 +1,90 @@
+{
+  "changed": true,
+  "entries": [
+    {
+      "argv": ["/usr/bin/python3.12", "-m", "theforge_apiforge"],
+      "forge_id": "api-forge",
+      "status": "unavailable"
+    },
+    {
+      "argv": ["/usr/bin/python3.12", "-m", "theforge_doctorapi"],
+      "forge_id": "forge-doctor-api",
+      "status": "unavailable"
+    },
+    {
+      "argv": ["/usr/bin/python3.12", "-m", "theforge_doctordata"],
+      "forge_id": "forge-doctor-data",
+      "status": "unavailable"
+    },
+    {
+      "argv": [
+        "/home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10",
+        "-m",
+        "theforge_platformforge"
+      ],
+      "forge_id": "platform-forge",
+      "status": "unavailable"
+    },
+    {
+      "argv": [
+        "/home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10",
+        "-m",
+        "theforge_sparkforge_aws"
+      ],
+      "forge_id": "spark-forge-aws",
+      "status": "unavailable"
+    },
+    {
+      "argv": [
+        "/home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10",
+        "-m",
+        "theforge_sparkforge_azure"
+      ],
+      "forge_id": "spark-forge-azure",
+      "status": "unavailable"
+    }
+  ],
+  "path": "/home/edgar/Documentos/projetos/forjas/forge-cli/docs/integration/cases/d/workspace/xdg/theforge/providers.toml",
+  "records": [
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /usr/bin/python3.12: No module named theforge_apiforge",
+      "forge_id": "api-forge",
+      "routable": false,
+      "state": "unreachable"
+    },
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /usr/bin/python3.12: No module named theforge_doctorapi",
+      "forge_id": "forge-doctor-api",
+      "routable": false,
+      "state": "unreachable"
+    },
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /usr/bin/python3.12: No module named theforge_doctordata",
+      "forge_id": "forge-doctor-data",
+      "routable": false,
+      "state": "unreachable"
+    },
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10: No module named theforge_platformforge",
+      "forge_id": "platform-forge",
+      "routable": false,
+      "state": "unreachable"
+    },
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10: No module named theforge_sparkforge_aws",
+      "forge_id": "spark-forge-aws",
+      "routable": false,
+      "state": "unreachable"
+    },
+    {
+      "error": "FORGE-PROTO-EXIT: describe: exit code 1; stderr: /home/edgar/.local/share/uv/python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10: No module named theforge_sparkforge_azure",
+      "forge_id": "spark-forge-azure",
+      "routable": false,
+      "state": "unreachable"
+    }
+  ],
+  "status": "completed",
+  "verification": {
+    "status": "UNVERIFIED"
+  }
+}

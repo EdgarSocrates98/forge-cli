@@ -1,0 +1,110 @@
+{
+  "capability": "api.scan",
+  "chain": {
+    "cancelled": false,
+    "correlation_id": "corr-f0c153fc627a6e07",
+    "delegation_depth": 1,
+    "max_hops": 4,
+    "timeout_budget_s": 1,
+    "version": 1,
+    "visited_providers": [
+      "api-forge",
+      "forge-doctor-api"
+    ]
+  },
+  "consumer_provider": "api-forge",
+  "correlation_id": "corr-f0c153fc627a6e07",
+  "created_at": "2026-10-21T20:50:48.515140+00:00",
+  "delta": null,
+  "discovery_state": "verified",
+  "dropped": 0,
+  "elapsed_ms": 4279,
+  "error": null,
+  "findings": [
+    {
+      "check_id": "APISEC006",
+      "confidence": "LOW",
+      "description": "[candidate] (API6) GET /orders: list-returning endpoint without a bounded pagination/limit parameter - unrestricted resource candidate",
+      "line": 7,
+      "severity": "MEDIUM",
+      "subject": "openapi.yaml",
+      "version": 1
+    },
+    {
+      "check_id": "APISEC011",
+      "confidence": "UNKNOWN",
+      "description": "[unknown] (API2) GET /orders: no security evidence at any level - effective authentication is unknown (global_schemes=[] op_security=False op_reqs=0 scopes=[] unresolvable=[])",
+      "line": 7,
+      "severity": "MEDIUM",
+      "subject": "openapi.yaml",
+      "version": 1
+    },
+    {
+      "check_id": "APISEC011",
+      "confidence": "UNKNOWN",
+      "description": "[unknown] (API2) POST /orders: no security evidence at any level - effective authentication is unknown (global_schemes=[] op_security=False op_reqs=0 scopes=[] unresolvable=[])",
+      "line": 18,
+      "severity": "MEDIUM",
+      "subject": "openapi.yaml",
+      "version": 1
+    },
+    {
+      "check_id": "OAS010",
+      "confidence": "LOW",
+      "description": "openapi.yaml: no document-level security requirement protects 2 operations",
+      "line": 1,
+      "severity": "HIGH",
+      "subject": "api:openapi:openapi.yaml",
+      "version": 1
+    },
+    {
+      "check_id": "OAS020",
+      "confidence": "LOW",
+      "description": "POST /orders has no tags or domain grouping",
+      "line": 18,
+      "severity": "INFO",
+      "subject": "operation:openapi:operation_id:createOrder",
+      "version": 1
+    },
+    {
+      "check_id": "OAS020",
+      "confidence": "LOW",
+      "description": "GET /orders has no tags or domain grouping",
+      "line": 7,
+      "severity": "INFO",
+      "subject": "operation:openapi:operation_id:listOrders",
+      "version": 1
+    },
+    {
+      "check_id": "RELAPI008",
+      "confidence": "LOW",
+      "description": "POST /orders: mutating operation with no declared idempotency-key or contract metadata - safe replay cannot be evidenced",
+      "line": null,
+      "severity": "LOW",
+      "subject": "openapi.yaml",
+      "version": 1
+    }
+  ],
+  "idempotency_key": "idem-0c5ebfb5f7f241196ebdada1",
+  "input_refs": [
+    "target:project",
+    "argv:/home/edgar/Documentos/projetos/forjas/forge-doctor-api/.venv/bin/forge-doctor-api scan project --format agent"
+  ],
+  "integrity": "82ce186d51b2ac94373ee51dd0b4a1c5effca46aba371caab168ab4d8862a107",
+  "limitations": [
+    "evidence collection only \u2014 plan/implement stay with the host; the doctor is deterministic diagnostics, api-forge owns the changes",
+    "severity/confidence are the doctor's declared tokens, verbatim \u2014 not apiforge Severity/FindingStatus values"
+  ],
+  "result_refs": [
+    ".apiforge/forge/delegations/drun-7c3991def37797d8/scan.agent.txt#sha256:061225e9aab4",
+    ".apiforge/forge/delegations/drun-7c3991def37797d8/scan.json"
+  ],
+  "run_id": "drun-7c3991def37797d8",
+  "schema": "apiforge/doctor-delegation/v1",
+  "source_provider": "forge-doctor-api",
+  "source_version": "0.2.5",
+  "status": "completed",
+  "truncated": false,
+  "unknowns": [],
+  "version": 1
+}

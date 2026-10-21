@@ -1,0 +1,109 @@
+{
+  "status": "completed",
+  "schema": "sparkforge_aws/DelegationResult/v1",
+  "correlation_id": "dl-a9da797097d48e85",
+  "consumer": "spark-forge-aws",
+  "provider": "forge-doctor-data",
+  "provider_version": "1.0.5",
+  "capability": "doctor.scan-project",
+  "risks": ["LOCAL_READ"],
+  "argv": [
+    "/home/edgar/Documentos/projetos/forjas/forge-doctor-data/.venv/bin/forge-doctor-data",
+    "scan",
+    "project",
+    "--format",
+    "agent",
+    "--check",
+    "spark"
+  ],
+  "findings": [
+    {
+      "id": "SPARK001",
+      "severity": "medium",
+      "confidence": "UNKNOWN",
+      "summary": "",
+      "evidence_refs": ["etl_job.py:11", "fp:365ae243247fae4e"]
+    },
+    {
+      "id": "SPARK003",
+      "severity": "medium",
+      "confidence": "UNKNOWN",
+      "summary": "",
+      "evidence_refs": ["etl_job.py:17", "fp:4f671d7809b25ed3"]
+    },
+    {
+      "id": "SPARK009",
+      "severity": "medium",
+      "confidence": "UNKNOWN",
+      "summary": "",
+      "evidence_refs": ["etl_job.py:14", "fp:6ccfef22989da6fa"]
+    }
+  ],
+  "limitations": ["summary: errors=0, info=0, passed=1, warnings=3"],
+  "truncated": false,
+  "dropped": 0,
+  "handoff": {
+    "schema": "theforge/EvidenceHandoff/v1",
+    "run_id": "dl-a9da797097d48e85",
+    "correlation_id": "dl-a9da797097d48e85",
+    "idempotency_key": "idem-6b8ce2ada890addc0e35f9b9",
+    "source_provider": "forge-doctor-data",
+    "source_version": "1.0.5",
+    "consumer_provider": "spark-forge-aws",
+    "capability": "doctor.scan-project",
+    "capability_version": "1.0.5",
+    "status": "completed",
+    "input_refs": [
+      {
+        "kind": "ref",
+        "value": "argv:target:244210e48437b6556980a702",
+        "sha256": null,
+        "detail": "target argument fingerprint"
+      }
+    ],
+    "result_refs": [],
+    "findings": [
+      {
+        "id": "SPARK001",
+        "severity": "medium",
+        "confidence": "UNKNOWN",
+        "summary": "",
+        "evidence_refs": ["etl_job.py:11", "fp:365ae243247fae4e"]
+      },
+      {
+        "id": "SPARK003",
+        "severity": "medium",
+        "confidence": "UNKNOWN",
+        "summary": "",
+        "evidence_refs": ["etl_job.py:17", "fp:4f671d7809b25ed3"]
+      },
+      {
+        "id": "SPARK009",
+        "severity": "medium",
+        "confidence": "UNKNOWN",
+        "summary": "",
+        "evidence_refs": ["etl_job.py:14", "fp:6ccfef22989da6fa"]
+      }
+    ],
+    "limitations": ["summary: errors=0, info=0, passed=1, warnings=3"],
+    "error": null,
+    "created_at": "2026-10-21T20:49:26.437336Z",
+    "started_at": "2026-10-21T20:49:26.437336Z",
+    "finished_at": "2026-10-21T20:49:26.437787Z",
+    "resources": {
+      "elapsed_ms": 4769,
+      "stdout_bytes": 408,
+      "stderr_bytes": 0,
+      "provider_tokens": null
+    },
+    "integrity": "9583103e62855c7a47a3d620b5cdf9c2a26db72fa4c9af55adbb684c84e7da2e",
+    "redacted": true,
+    "truncated": false,
+    "dropped": 0
+  },
+  "handoff_path": ".sparkforge_aws/delegation/handoffs/dl-a9da797097d48e85-doctor.scan-project-9583103e6285.json",
+  "refusal": null,
+  "fallback": "native-analysis",
+  "elapsed_ms": 4769,
+  "returncode": 0
+}

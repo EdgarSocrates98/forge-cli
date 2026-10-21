@@ -1,0 +1,23 @@
+{
+  "baseline_ref": "drun-7c3991def37797d8",
+  "confidence_changes": [],
+  "current_ref": "drun-f90eaac628215654",
+  "delta_source": "apiforge-derived",
+  "empty": false,
+  "findings_added": [
+    "OAS018|schema:openapi:openapi.yaml#/components/schemas/Order"
+  ],
+  "findings_changed": [
+    "APISEC011|openapi.yaml",
+    "OAS010|api:openapi:openapi.yaml",
+    "OAS020|operation:openapi:operation_id:createOrder"
+  ],
+  "findings_removed": [
+    "APISEC006|openapi.yaml",
+    "OAS020|operation:openapi:operation_id:listOrders"
+  ],
+  "severity_changes": [],
+  "unknowns_added": [],
+  "unknowns_removed": [],
+  "version": 1
+}
