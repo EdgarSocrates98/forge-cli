@@ -1,0 +1,15 @@
+{
+  "agent": "claude",
+  "command": [
+    "claude",
+    "-p",
+    "$(cat /home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0022.implement.claude.md)"
+  ],
+  "created_at": "2026-10-21T01:44:32+00:00",
+  "id": "lf-0022",
+  "prompt_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/prompts/lf-0022.implement.claude.md",
+  "spec_path": "/home/edgar/Documentos/projetos/forjas/forge-cli/factory/specs/active/lf-0022.md",
+  "spec_sha256": "ebe7d72bcd04bc9ad0f5b2a915306bfbf07a27a6782f72fbe34307358bb4e395",
+  "status": "planned",
+  "title": "Cycle 13 scalable viz \u2014 overview/explore/full modes + navigation + rendering core"
+}
