@@ -47,7 +47,7 @@ Source root `src/apiforge/` (CLI `apiforge`, MCP `apiforge-mcp`,
 
 ### 1.2 How it discovers installed tools
 
-- `run list` reports each registry row with *measured* install status —
+- `run list` reports each registry row with _measured_ install status —
   `shutil.which(binary)` at query time, never declared
   (`src/apiforge/run_tools.py:396-408`, comment at `88-98`).
 - `apiforge doctor` probes `git` and `apiforge-mcp` on PATH plus state-dir
@@ -74,7 +74,7 @@ Source root `src/apiforge/` (CLI `apiforge`, MCP `apiforge-mcp`,
 
 ### 1.4 How it executes external commands
 
-- `apiforge run tool` is the *only* verb family executing external
+- `apiforge run tool` is the _only_ verb family executing external
   binaries: closed argv-template table, `shutil.which` resolution,
   `subprocess.run(argv, capture_output=True, text=True, timeout=…)` —
   **no shell** (`src/apiforge/run_tools.py:1-8,411-467`; CLI wiring
@@ -115,7 +115,7 @@ Source root `src/apiforge/` (CLI `apiforge`, MCP `apiforge-mcp`,
   returning `exit_code`, `stderr_tail` (300 chars), argv and parsed
   facts/diagnostics.
 - Cross-engine results enter as **files**: `--upstream
-  upstream-facts.json` on `analyze` (`cli.py:898-901`) carrying
+upstream-facts.json` on `analyze` (`cli.py:898-901`) carrying
   `apiforge/upstream-facts/v1` bounded foreign facts.
 - Forge Protocol `retrieve_result` maps the governed `OutcomeBrief` onto
   `ForgeTaskResult` (`ok|review|blocked|failed|unresolved`) with gaps and
@@ -170,7 +170,7 @@ Source root `src/apiforge/` (CLI `apiforge`, MCP `apiforge-mcp`,
   the delegated subset (`src/apiforge/trust/tools.py:54-231`;
   `delegates_to` at `tool_risk.yaml:698`).
 - Forge submit gates declared risk classes — `risk_gate: [sensitive,
-  external_mutation, destructive, irreversible]` requires
+external_mutation, destructive, irreversible]` requires
   `--acknowledge-risk` (`rules/forge_protocol.yaml:6`;
   `forge/protocol.py:122-127`, `AF-FORGE-RISK-GATE`).
 - Evidence transport can never carry instructions: closed
@@ -226,7 +226,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
 ### 2.1 What it already knows about other specialists
 
 - Routing contract knows its consumers: `_DOMAIN_HANDLERS = {"api":
-  "api-forge", "data": "data-doctor"}` and chains
+"api-forge", "data": "data-doctor"}` and chains
   `("doctor-api","api-forge")`, `("doctor-api","data-doctor"[, "spark-forge"])`
   for implementation-grade data work
   (`src/forge_doctor_api/handoff/routing.py:19-27,30-84`). Docstring is
@@ -261,7 +261,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
 - `scan` runs the full deterministic pipeline — every analyzer; there is
   no per-request capability selection
   (`cli/__init__.py:129-235`, `scan_project` at `scan.py`).
-- Detected capabilities are *observed output*, not negotiated input:
+- Detected capabilities are _observed output_, not negotiated input:
   `report.capabilities: [DetectedCapability]`
   (`docs/output-contract.md` report table; `handoff/model.py:131-136` maps
   them to `ForgeCapability` = name + status + unknowns).
@@ -277,7 +277,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
   `:196` (`test_boundary_ast_purity`), `:220` (no dynamic imports).
 - Residual subprocess use is install/TUI lifecycle only:
   `install/service.py:22,240` (venv pip, `spawn_ok` gate),
-  `ui/home.py:77,140` (runs its *own* CLI argv, `timeout=120`),
+  `ui/home.py:77,140` (runs its _own_ CLI argv, `timeout=120`),
   `ui/tui.py:65-68` (TimeoutExpired handled). None touches analysis.
 - `forge-doctor-api mcp` serves over stdio and requires the `mcp` extra
   (`cli/__init__.py:1364-1387`; `pyproject.toml:33` `mcp = ["mcp>=2.0,<3"]`).
@@ -302,7 +302,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
 - Only operational timeouts exist: `factory/self_scan.py:39`
   (`timeout=1800` on its own dogfood scan), `ui/home.py:140`
   (`timeout=120`).
-- For consumers, the MCP surface bounds *response size*, not time:
+- For consumers, the MCP surface bounds _response size_, not time:
   `MCP_RESPONSE_BUDGET` with deterministic truncation recorded as
   `UnknownFact`s (`handoff/mcp_server.py:43,77-87`).
 
@@ -314,7 +314,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
 - For the delegation surface, `DoctorBoundary` exposes four shapes over
   one scan: `handle()` → bounded `ApiHandoffBundle`; `envelope()` →
   `ForgeHandoff`; `endpoint_dict()` → `{request, handoff, capabilities,
-  manifest}` (`handoff/boundary.py:45-141`).
+manifest}` (`handoff/boundary.py:45-141`).
 - Incoming side: `ForgeRequest.parse` — strict, unknown fields rejected
   unless `x-*`, `ProtocolError` never silent coercion
   (`handoff/protocol.py:29-51`).
@@ -344,7 +344,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
   `domain_sha256`, `doctor://` context refs (`handoff/model.py:107-150`;
   `body_sha256` V1-body-only so identity survives projections).
 - Incremental revalidation is native: `RequestDelta{baseline_ref,
-  changed_files}` → `compute_delta(baseline, report)`; unresolvable
+changed_files}` → `compute_delta(baseline, report)`; unresolvable
   baseline degrades to an explicit unknown, "never a fabricated delta"
   (`handoff/boundary.py:57-88`; `handoff/delta.py`).
 - `factory/runs/` records dogfood runs; `factory/self_scan.py` is the
@@ -367,7 +367,7 @@ intelligence" (`src/forge_doctor_api/cli/__init__.py:64`).
 
 ### 2.11 How it prevents delegation cycles
 
-- Trivially: it emits route *declarations* (`ForgerRoute.chain`) but
+- Trivially: it emits route _declarations_ (`ForgerRoute.chain`) but
   executes none of them — cycles cannot form inside the Doctor
   (`handoff/routing.py:1-7`).
 - `doctor://` context refs are bounded depth-1 graph slices
@@ -566,31 +566,31 @@ the spec, no specialist fit forced.
 
 ## 4. Contract & verb inventory (paths)
 
-| Artifact | Where |
-|---|---|
-| `forge/SpecialistAgenticManifest/v1` | `api-forge/forge.agentic.json`, `forge-doctor-api/forge.agentic.json`, `platform-forge/forge.agentic.json` (all: empty `skills`/`agents`/`coordinators`) |
-| Forge Protocol façade (7 ops + health) | `api-forge/src/apiforge/forge/protocol.py`; CLI `apiforge forge capabilities|submit|attach|inspect|result|evidence|handoff|health` (`cli_forge.py:19-170`); MCP tools `forge_capabilities|forge_inspect|forge_result|forge_evidence|forge_health` (`mcp/tools.py:~3268`) |
-| `apiforge/forge-capability-descriptor/v1` … `ForgeHandoff` | `api-forge/src/apiforge/contracts/forge_protocol.py` (+`docs/contracts/ForgeHandoff-v1.md`) |
-| `apiforge/upstream-facts/v1` intake | `api-forge/src/apiforge/cli.py:468-505` + `application/analyze.py:69-169` (`analyze --upstream`) |
-| `apiforge/forge-capability-descriptor` peers policy | `api-forge/src/apiforge/rules/forge_protocol.yaml` (engine, `forge-protocol/v1`, risk_gate, engines) |
-| `apiforge/tool-risk/v1` authz | `api-forge/src/apiforge/rules/tool_risk.yaml` + `trust/tools.py` |
-| Policy allow/gate/deny | `api-forge/src/apiforge/policy/decide.py` |
-| Tool runner allowlist | `api-forge/src/apiforge/run_tools.py` (`TOOLS`, `TOOL_REGISTRY`) |
-| `forge-doctor-api scan` verbs | `forge-doctor-api/src/forge_doctor_api/cli/__init__.py:129-235` (`--format`, `--fail-on`, `--baseline`, `--incremental`); `diagnose` :1235; `diff` :740; `fingerprint` :789; `blast-radius` :905; `mcp` :1364; `inventory` :266; `lab` :334 |
-| Exit codes (doctor) | `0` pass · `1` gate failure · `2` usage (`docs/cli.md:5`; code `cli/__init__.py:196,210,232-235`) |
-| `--format agent` line schema | `output/writers.py:109-132` — `id|sev|conf|subject[:line]|desc`, `UNKNOWN|subject|missing`; frozen in `docs/output-contract.md` §agent |
-| Forge Protocol v2 (doctor) | `forge-doctor-api/src/forge_doctor_api/handoff/protocol.py` (`PROTOCOL_VERSION=2`, parses v1+v2); `handoff/model.py` `ApiHandoffBundle` v2 content-addressed |
-| `DoctorBoundary` delegation seam | `forge-doctor-api/src/forge_doctor_api/handoff/boundary.py` (handle/envelope/endpoint_dict) |
-| Forger routing contract | `forge-doctor-api/src/forge_doctor_api/handoff/routing.py` |
-| `forge-contracts/1` shared vocabulary | `forge-doctor-api/src/forge_doctor_api/contracts/{models,adapters,schemas,validate}.py` |
-| Doctor MCP surface | `forge-doctor-api/src/forge_doctor_api/handoff/mcp_server.py` (`doctor.scan`, `get_*`, `doctor://` resources, `MCP_RESPONSE_BUDGET`) |
-| PF capability registry v2 | `platform-forge/platformforge/mcp/registry.py` (38 tools) |
-| `platformforge/capability-manifest/v4` | `platform-forge/platformforge/forge/manifest.py` |
-| `platformforge/a2a-envelope/v1` + `result-receipt/v1` | `platform-forge/platformforge/forge/delegate.py` |
-| Sibling collect/discover | `platform-forge/platformforge/forge/collect.py` (`KNOWN_FORGES`) |
-| Cross-forge delegation contract | `platform-forge/platformforge/ops/registry.py` `delegation_contract()`/`validate_delegate_request()` |
-| Host execution boundary | `platform-forge/platformforge/ops/executors/base.py` `host_transport()` |
-| **Consumers (the-forge)** | `the-forge/adapters/apiforge/` (api.analyze `--upstream` intake via `handoff.py`, `catalog.py:102`); `the-forge/adapters/doctorapi/` (`api.diagnose`, `api.verify`; `VERIFIES` → `api-forge/api.analyze`,`api-forge/api.change-control`, `catalog.py:90-92,130`); shared `_shell.py` Forge Protocol v1 runner (no shell, env-scrubbed, tree-kill, `ADAPTER-NATIVE-TIMEOUT`, 85% budget share, spill >4 MiB) |
+| Artifact                                                   | Where                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge/SpecialistAgenticManifest/v1`                       | `api-forge/forge.agentic.json`, `forge-doctor-api/forge.agentic.json`, `platform-forge/forge.agentic.json` (all: empty `skills`/`agents`/`coordinators`)                                                                                                                                                                                                                                                    |
+| Forge Protocol façade (7 ops + health)                     | `api-forge/src/apiforge/forge/protocol.py`; CLI `apiforge forge capabilities                                                                                                                                                                                                                                                                                                                                | submit | attach | inspect        | result          | evidence | handoff                                              | health` (`cli_forge.py:19-170`); MCP tools `forge_capabilities | forge_inspect | forge_result | forge_evidence | forge_health` (`mcp/tools.py:~3268`) |
+| `apiforge/forge-capability-descriptor/v1` … `ForgeHandoff` | `api-forge/src/apiforge/contracts/forge_protocol.py` (+`docs/contracts/ForgeHandoff-v1.md`)                                                                                                                                                                                                                                                                                                                 |
+| `apiforge/upstream-facts/v1` intake                        | `api-forge/src/apiforge/cli.py:468-505` + `application/analyze.py:69-169` (`analyze --upstream`)                                                                                                                                                                                                                                                                                                            |
+| `apiforge/forge-capability-descriptor` peers policy        | `api-forge/src/apiforge/rules/forge_protocol.yaml` (engine, `forge-protocol/v1`, risk_gate, engines)                                                                                                                                                                                                                                                                                                        |
+| `apiforge/tool-risk/v1` authz                              | `api-forge/src/apiforge/rules/tool_risk.yaml` + `trust/tools.py`                                                                                                                                                                                                                                                                                                                                            |
+| Policy allow/gate/deny                                     | `api-forge/src/apiforge/policy/decide.py`                                                                                                                                                                                                                                                                                                                                                                   |
+| Tool runner allowlist                                      | `api-forge/src/apiforge/run_tools.py` (`TOOLS`, `TOOL_REGISTRY`)                                                                                                                                                                                                                                                                                                                                            |
+| `forge-doctor-api scan` verbs                              | `forge-doctor-api/src/forge_doctor_api/cli/__init__.py:129-235` (`--format`, `--fail-on`, `--baseline`, `--incremental`); `diagnose` :1235; `diff` :740; `fingerprint` :789; `blast-radius` :905; `mcp` :1364; `inventory` :266; `lab` :334                                                                                                                                                                 |
+| Exit codes (doctor)                                        | `0` pass · `1` gate failure · `2` usage (`docs/cli.md:5`; code `cli/__init__.py:196,210,232-235`)                                                                                                                                                                                                                                                                                                           |
+| `--format agent` line schema                               | `output/writers.py:109-132` — `id                                                                                                                                                                                                                                                                                                                                                                           | sev    | conf   | subject[:line] | desc`, `UNKNOWN | subject  | missing`; frozen in `docs/output-contract.md` §agent |
+| Forge Protocol v2 (doctor)                                 | `forge-doctor-api/src/forge_doctor_api/handoff/protocol.py` (`PROTOCOL_VERSION=2`, parses v1+v2); `handoff/model.py` `ApiHandoffBundle` v2 content-addressed                                                                                                                                                                                                                                                |
+| `DoctorBoundary` delegation seam                           | `forge-doctor-api/src/forge_doctor_api/handoff/boundary.py` (handle/envelope/endpoint_dict)                                                                                                                                                                                                                                                                                                                 |
+| Forger routing contract                                    | `forge-doctor-api/src/forge_doctor_api/handoff/routing.py`                                                                                                                                                                                                                                                                                                                                                  |
+| `forge-contracts/1` shared vocabulary                      | `forge-doctor-api/src/forge_doctor_api/contracts/{models,adapters,schemas,validate}.py`                                                                                                                                                                                                                                                                                                                     |
+| Doctor MCP surface                                         | `forge-doctor-api/src/forge_doctor_api/handoff/mcp_server.py` (`doctor.scan`, `get_*`, `doctor://` resources, `MCP_RESPONSE_BUDGET`)                                                                                                                                                                                                                                                                        |
+| PF capability registry v2                                  | `platform-forge/platformforge/mcp/registry.py` (38 tools)                                                                                                                                                                                                                                                                                                                                                   |
+| `platformforge/capability-manifest/v4`                     | `platform-forge/platformforge/forge/manifest.py`                                                                                                                                                                                                                                                                                                                                                            |
+| `platformforge/a2a-envelope/v1` + `result-receipt/v1`      | `platform-forge/platformforge/forge/delegate.py`                                                                                                                                                                                                                                                                                                                                                            |
+| Sibling collect/discover                                   | `platform-forge/platformforge/forge/collect.py` (`KNOWN_FORGES`)                                                                                                                                                                                                                                                                                                                                            |
+| Cross-forge delegation contract                            | `platform-forge/platformforge/ops/registry.py` `delegation_contract()`/`validate_delegate_request()`                                                                                                                                                                                                                                                                                                        |
+| Host execution boundary                                    | `platform-forge/platformforge/ops/executors/base.py` `host_transport()`                                                                                                                                                                                                                                                                                                                                     |
+| **Consumers (the-forge)**                                  | `the-forge/adapters/apiforge/` (api.analyze `--upstream` intake via `handoff.py`, `catalog.py:102`); `the-forge/adapters/doctorapi/` (`api.diagnose`, `api.verify`; `VERIFIES` → `api-forge/api.analyze`,`api-forge/api.change-control`, `catalog.py:90-92,130`); shared `_shell.py` Forge Protocol v1 runner (no shell, env-scrubbed, tree-kill, `ADAPTER-NATIVE-TIMEOUT`, 85% budget share, spill >4 MiB) |
 
 ---
 
@@ -601,32 +601,32 @@ discover Doctor API → verify capability → execute read-only analysis →
 collect evidence → plan/implement → run Doctor again → compare → publish
 handoff` (`prompt_evo_integrations.md:483-533`).
 
-| # | Gap | Evidence |
-|---|---|---|
-| G1 | **No direct api-forge → doctor delegation exists.** The only live path is *through the-forge*: `adapters/doctorapi` runs `DoctorBoundary` in the doctor's interpreter (`theforge/adapters/doctorapi/src/theforge_doctorapi/catalog.py:1-24`), and `adapters/apiforge` injects handoff items into `analyze --upstream` (`theforge/adapters/apiforge/src/theforge_apiforge/handoff.py:1-30`, `catalog.py:102`). In api-forge itself nothing can invoke `forge-doctor-api scan`. | api-forge `run_tools.py:56-85` (no doctor entry), `rules/forge_protocol.yaml:8` (no doctor engine) |
-| G2 | **api-forge cannot discover the doctor.** `apiforge doctor` probes git + `apiforge-mcp` only (`distribution/doctor.py:54-65`); no `forge-doctor-api` PATH probe, no `forge.agentic.json` reader, no sibling registry. Discovery today is exclusively the-forge's job (`the-forge/src/theforge/specialists.py:151-268`, `_VERSION_TIMEOUT=15` at :99). | §1.2 |
-| G3 | **No `forge-doctor-api` runner in the `run tool` allowlist.** Adding it is mechanical (a `_argv` template + reader), but today `apiforge run tool forge-doctor-api` → `AF-RUN-TOOL-UNKNOWN` (`run_tools.py:445-448`). The doctor's `--format agent` line schema (`id|sev|conf|subject|desc` + `UNKNOWN|…`) has **no parser in api-forge** — readers exist only for semgrep/trivy/gitleaks/k6 (`run_tools.py:60-83`). | §1.4, §2.7 |
-| G4 | **Peer declaration mismatch.** `rules/forge_protocol.yaml:8` declares `engines: [spark-forge, the-forger]`; PHASE 7 needs `forge-doctor-api` (and the name `the-forger` vs actual `the-forge` is worth rechecking). Until declared, `apiforge forge handoff --to forge-doctor-api` → `AF-FORGE-ENGINE-UNKNOWN` (`forge/protocol.py:305-309`). | §1.1 |
-| G5 | **Agent awareness absent.** No `agents/*.md` teaches when Doctor API adds value, when *not* to delegate, or how to consume `UNKNOWN|` rows — PHASE 11's explicit requirement (`prompt_evo_integrations.md:696-748`). The 5 `af-*` executors have no doctor boundary prose. | §1.1 |
-| G6 | **Before/after revalidation exists on the doctor side but has no driver.** `RequestDelta{baseline_ref,changed_files}` + `compute_delta` + `scan --baseline` (`handoff/boundary.py:57-88`; `cli/__init__.py:139-142`) support the "run Doctor again, compare" step; nothing in api-forge sequences it. | §2.7-2.9 |
-| G7 | **Protocol family split.** api-forge speaks `forge-protocol/v1` (`ForgeHandoff`, `forge/protocol.py`); the doctor speaks its own v2 protocol (`handoff/protocol.py:23`) and `forge-contracts/1` bundles (`contracts/adapters.py`). The-forge adapters already translate (handoff→`upstream-facts/v1`); a direct api↔doctor path needs either the same translation or a declared `forge/EvidenceHandoff/v1`. | §1.7, §2.7 |
-| G8 | **No delegation-cycle contract.** Neither `ForgeHandoff` (api-forge) nor `ForgeRequest` (doctor) nor `a2a-envelope/v1` (platform-forge) carries visited-providers / hop budget / correlation id — PHASE 3's explicit list (`prompt_evo_integrations.md:321-333`). Existing guards are internal-only (api-forge `delegates_to` + recovery-depth-1; doctor never executes routes; PF envelopes are inert). | §1.11, §2.11, §3.11 |
-| G9 | **platform-forge `KNOWN_FORGES` is stale vs the ecosystem** — knows api-forge, spark-forge-aws, itself only; missing `forge-doctor-api`, `forge-doctor-data`, `data-sentinel`, `spark-forge-azure` (`forge/collect.py:15-21`). Its `forge discover` marker scan would find checkouts, but `collect_manifest` refuses unknown forges (`collect.py:74-76`). Natural complementary fit: `platformforge forge collect --path <doctor repo>` would work once `forge-doctor-api` gains a `capability manifest`-style verb or KNOWN_FORGES is extended — doctor has no `capability manifest` verb today (closest: `forge.agentic.json` + `contracts` exports). | §3.1-3.2 |
-| G10 | **Doctor lacks a machine-readable capability-manifest verb** for PF-style collection: it publishes `forge.agentic.json` + `mcp` tools + `contracts`, but no `<cli> capability manifest` matching the PF `KNOWN_FORGES` convention (`manifest_cmd: ["capability","manifest"]`). | §2.2, §3.2 |
-| G11 | **Confidence semantics differ** — spec warns "Não transformar um finding POSSIBLE em CONFIRMED" (`prompt_evo_integrations.md:417`). Doctor `Confidence` = HIGH/MEDIUM/LOW/UNKNOWN (`docs/output-contract.md` shared types); api-forge `Severity`/`Finding` model differs (`core/models.py`). The `upstream:` namespace prevents laundering into local findings (`analyze.py:143-149`), but severity/confidence mapping needs an explicit adapter rule. | §1.8, §2.8 |
-| G12 | **Eval coverage for PHASE 7 absent.** api-forge evals cover forge-protocol refusals (`evals/corpus/forge-protocol/`) but no doctor-delegation case; doctor `test_handoff.py` proves route *declaration*, not end-to-end api↔doctor flow; the only true E2E today is `the-forge/tests/test_adapter_doctorapi.py` + `test_delta_handoff.py`. Spec Caso C (`prompt_evo_integrations.md:973-983`) has no test anywhere. | §1.12, §2.12 |
+| #   | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Evidence                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | **No direct api-forge → doctor delegation exists.** The only live path is _through the-forge_: `adapters/doctorapi` runs `DoctorBoundary` in the doctor's interpreter (`theforge/adapters/doctorapi/src/theforge_doctorapi/catalog.py:1-24`), and `adapters/apiforge` injects handoff items into `analyze --upstream` (`theforge/adapters/apiforge/src/theforge_apiforge/handoff.py:1-30`, `catalog.py:102`). In api-forge itself nothing can invoke `forge-doctor-api scan`.                                                                                                                                                                           | api-forge `run_tools.py:56-85` (no doctor entry), `rules/forge_protocol.yaml:8` (no doctor engine)                                     |
+| G2  | **api-forge cannot discover the doctor.** `apiforge doctor` probes git + `apiforge-mcp` only (`distribution/doctor.py:54-65`); no `forge-doctor-api` PATH probe, no `forge.agentic.json` reader, no sibling registry. Discovery today is exclusively the-forge's job (`the-forge/src/theforge/specialists.py:151-268`, `_VERSION_TIMEOUT=15` at :99).                                                                                                                                                                                                                                                                                                   | §1.2                                                                                                                                   |
+| G3  | **No `forge-doctor-api` runner in the `run tool` allowlist.** Adding it is mechanical (a `_argv` template + reader), but today `apiforge run tool forge-doctor-api` → `AF-RUN-TOOL-UNKNOWN` (`run_tools.py:445-448`). The doctor's `--format agent` line schema (`id                                                                                                                                                                                                                                                                                                                                                                                    | sev                                                                                                                                    | conf | subject | desc`+`UNKNOWN | …`) has **no parser in api-forge** — readers exist only for semgrep/trivy/gitleaks/k6 (`run_tools.py:60-83`). | §1.4, §2.7 |
+| G4  | **Peer declaration mismatch.** `rules/forge_protocol.yaml:8` declares `engines: [spark-forge, the-forger]`; PHASE 7 needs `forge-doctor-api` (and the name `the-forger` vs actual `the-forge` is worth rechecking). Until declared, `apiforge forge handoff --to forge-doctor-api` → `AF-FORGE-ENGINE-UNKNOWN` (`forge/protocol.py:305-309`).                                                                                                                                                                                                                                                                                                           | §1.1                                                                                                                                   |
+| G5  | **Agent awareness absent.** No `agents/*.md` teaches when Doctor API adds value, when _not_ to delegate, or how to consume `UNKNOWN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ` rows — PHASE 11's explicit requirement (`prompt_evo_integrations.md:696-748`). The 5 `af-*` executors have no doctor boundary prose. | §1.1 |
+| G6  | **Before/after revalidation exists on the doctor side but has no driver.** `RequestDelta{baseline_ref,changed_files}` + `compute_delta` + `scan --baseline` (`handoff/boundary.py:57-88`; `cli/__init__.py:139-142`) support the "run Doctor again, compare" step; nothing in api-forge sequences it.                                                                                                                                                                                                                                                                                                                                                   | §2.7-2.9                                                                                                                               |
+| G7  | **Protocol family split.** api-forge speaks `forge-protocol/v1` (`ForgeHandoff`, `forge/protocol.py`); the doctor speaks its own v2 protocol (`handoff/protocol.py:23`) and `forge-contracts/1` bundles (`contracts/adapters.py`). The-forge adapters already translate (handoff→`upstream-facts/v1`); a direct api↔doctor path needs either the same translation or a declared `forge/EvidenceHandoff/v1`.                                                                                                                                                                                                                                             | §1.7, §2.7                                                                                                                             |
+| G8  | **No delegation-cycle contract.** Neither `ForgeHandoff` (api-forge) nor `ForgeRequest` (doctor) nor `a2a-envelope/v1` (platform-forge) carries visited-providers / hop budget / correlation id — PHASE 3's explicit list (`prompt_evo_integrations.md:321-333`). Existing guards are internal-only (api-forge `delegates_to` + recovery-depth-1; doctor never executes routes; PF envelopes are inert).                                                                                                                                                                                                                                                | §1.11, §2.11, §3.11                                                                                                                    |
+| G9  | **platform-forge `KNOWN_FORGES` is stale vs the ecosystem** — knows api-forge, spark-forge-aws, itself only; missing `forge-doctor-api`, `forge-doctor-data`, `data-sentinel`, `spark-forge-azure` (`forge/collect.py:15-21`). Its `forge discover` marker scan would find checkouts, but `collect_manifest` refuses unknown forges (`collect.py:74-76`). Natural complementary fit: `platformforge forge collect --path <doctor repo>` would work once `forge-doctor-api` gains a `capability manifest`-style verb or KNOWN_FORGES is extended — doctor has no `capability manifest` verb today (closest: `forge.agentic.json` + `contracts` exports). | §3.1-3.2                                                                                                                               |
+| G10 | **Doctor lacks a machine-readable capability-manifest verb** for PF-style collection: it publishes `forge.agentic.json` + `mcp` tools + `contracts`, but no `<cli> capability manifest` matching the PF `KNOWN_FORGES` convention (`manifest_cmd: ["capability","manifest"]`).                                                                                                                                                                                                                                                                                                                                                                          | §2.2, §3.2                                                                                                                             |
+| G11 | **Confidence semantics differ** — spec warns "Não transformar um finding POSSIBLE em CONFIRMED" (`prompt_evo_integrations.md:417`). Doctor `Confidence` = HIGH/MEDIUM/LOW/UNKNOWN (`docs/output-contract.md` shared types); api-forge `Severity`/`Finding` model differs (`core/models.py`). The `upstream:` namespace prevents laundering into local findings (`analyze.py:143-149`), but severity/confidence mapping needs an explicit adapter rule.                                                                                                                                                                                                  | §1.8, §2.8                                                                                                                             |
+| G12 | **Eval coverage for PHASE 7 absent.** api-forge evals cover forge-protocol refusals (`evals/corpus/forge-protocol/`) but no doctor-delegation case; doctor `test_handoff.py` proves route _declaration_, not end-to-end api↔doctor flow; the only true E2E today is `the-forge/tests/test_adapter_doctorapi.py` + `test_delta_handoff.py`. Spec Caso C (`prompt_evo_integrations.md:973-983`) has no test anywhere.                                                                                                                                                                                                                                     | §1.12, §2.12                                                                                                                           |
 
 ### What already works (reuse, don't rebuild)
 
 - **Doctor delegation surface is production-shaped**: `scan <target>
-  --format agent`, documented exit codes, bounded outputs, AST-enforced
+--format agent`, documented exit codes, bounded outputs, AST-enforced
   determinism, content-addressed v2 handoff bundles with delta support —
   exactly what PHASE 7's "execute read-only analysis / collect evidence /
   run again / compare" needs (`forge-doctor-api` §2.4-2.9).
 - **api-forge upstream intake is the handoff target**: bounded,
   provenance-marked, instruction-smuggling-proof
   (`application/analyze.py:69-169`) — the `apiforge/upstream-facts/v1`
-  doc is *the* EvidenceHandoff consumer shape already in production via
+  doc is _the_ EvidenceHandoff consumer shape already in production via
   the-forge's `api.analyze` capability (`accepts_handoff`,
   `the-forge/adapters/apiforge/.../catalog.py:240`).
 - **the-forge adapters prove the end-to-end loop exists**: doctorapi
@@ -639,4 +639,4 @@ handoff` (`prompt_evo_integrations.md:483-533`).
   accepts/refuses contract (`ops/registry.py:63-77`), a2a
   envelope+receipt, and PREPARE-only ops surface are orthogonal to the
   api↔doctor lane; extending `KNOWN_FORGES` is the only change its side
-  needs to *observe* doctor manifests.
+  needs to _observe_ doctor manifests.

@@ -6,18 +6,18 @@ exists at the cited lines; it does **not** mean the path was run during this aud
 
 **Audited commits** (`git rev-parse HEAD`, branch `main` in all cases):
 
-| Repo | SHA |
-|---|---|
-| `data-sentinel-forge` | `97d770969d03` |
-| `forge-doctor-data` | `784dfe8979c2` |
-| `spark-forge-aws` | `6b065fa65ae0` |
-| `spark-forge-azure` | `d50fcc481327` |
+| Repo                    | SHA            |
+| ----------------------- | -------------- |
+| `data-sentinel-forge`   | `97d770969d03` |
+| `forge-doctor-data`     | `784dfe8979c2` |
+| `spark-forge-aws`       | `6b065fa65ae0` |
+| `spark-forge-azure`     | `d50fcc481327` |
 | `the-forge` (reference) | `679fc4f37e94` |
 
 **Spec:** `prompt_evo_integrations.md` — Cycle 13: intelligent specialist
 discovery, optional cross-forge delegation, evidence handoff, governed execution.
-End state: *"uma Forge pode conhecer, descobrir e utilizar outra sem depender
-obrigatoriamente dela."*
+End state: _"uma Forge pode conhecer, descobrir e utilizar outra sem depender
+obrigatoriamente dela."_
 
 **Status legend:** ✅ implemented · 🟡 partial · ❌ absent · ❓ unresolved (cannot
 be determined from static reading).
@@ -27,11 +27,11 @@ be determined from static reading).
 ## 0. Executive summary
 
 The ecosystem already has **two working cross-forge channels**, both
-*evidence-in, never instruction-in*:
+_evidence-in, never instruction-in_:
 
 1. **The Forge → specialists via Forge Protocol v1.** `the-forge` is a real
    control plane: adapters in `the-forge/adapters/{sparkforge_aws,sparkforge_azure,
-   apiforge,platformforge,doctordata,doctorapi}` spawn the specialist as a
+apiforge,platformforge,doctordata,doctorapi}` spawn the specialist as a
    **subprocess without a shell**, enforce per-profile timeouts with process-tree
    kill (Job Object on Windows / process group on POSIX), cap stdout/stderr, drop
    credential-shaped env vars, and answer with structured `refused`/`error`
@@ -53,10 +53,10 @@ A third emerging channel is **Doctor Data ↔ Data Sentinel**: Doctor exports
 `forge-contracts/1`, `scan-json@3.0` and exports `forge-contracts/1`
 (`data-sentinel-forge/src/data_sentinel/adapters/doctor/adapter.py`).
 
-**The main gap:** none of the four audited specialists *discovers peers at
-runtime*. All four declare `forge.agentic.json` manifests
+**The main gap:** none of the four audited specialists _discovers peers at
+runtime_. All four declare `forge.agentic.json` manifests
 (`forge/SpecialistAgenticManifest/v1`) and capability surfaces, but discovery of
-*other* forges, capability negotiation between them, cycle detection for
+_other_ forges, capability negotiation between them, cycle detection for
 delegation, and refusal codes for absent/incompatible peers exist **only inside
 The Forge's adapter shell** — not inside the specialists themselves. Cross-forge
 delegation today is orchestrated **from above** (The Forge), not **peer-to-peer**.
@@ -65,19 +65,19 @@ delegation today is orchestrated **from above** (The Forge), not **peer-to-peer*
 
 ## 1. Contract inventory
 
-| Contract | Where defined | Producer | Consumer |
-|---|---|---|---|
-| `forge/SpecialistAgenticManifest/v1` | each repo's `forge.agentic.json` | all 4 specialists | The Forge (install/discovery), humans |
-| `forge/v1` (Forge Protocol envelope) | `the-forge/adapters/sparkforge_aws/src/theforge_sparkforge_aws/_shell.py` (`PROTOCOL = "forge/v1"`) | adapters | The Forge core |
-| `theforge/Handoff/v1` | `the-forge` core + `adapters/sparkforge_aws/src/theforge_sparkforge_aws/handoff.py` | The Forge core | adapter → `translate_handoff` |
-| `sparkforge_aws/upstream-facts/v1` | `spark-forge-aws/sparkforge_aws/adapters/upstream.py` (`UPSTREAM_SCHEMA`) | theforge adapter | `analyze_pyspark(upstream=…)`, case intake |
-| `sparkforge_azure/upstream-facts/v1` | `spark-forge-azure/sparkforge_azure/adapters/upstream.py:44` | theforge adapter | case bundle `upstream.json` → `run_case` |
-| `handoff-bundle@1` | `forge-doctor-data/src/forge_doctor_data/core/handoff.py` | Doctor Data | Sentinel doctor importer |
-| `forge-contracts/1` | `data-sentinel-forge/src/data_sentinel/core/contracts/interop.py` (`FORGE_CONTRACTS_1`) | Sentinel exporter, Doctor | Sentinel doctor importer |
-| `scan-json@3.0` | `forge-doctor-data/src/forge_doctor_data/output/agent_renderer.py` | Doctor `scan -f agent` | Sentinel doctor importer |
-| `DiagnosticReport` | `data-sentinel-forge/src/data_sentinel/core/contracts/` | Sentinel | exporter, `report show` |
-| `CapabilityDescriptor` | `data-sentinel-forge/src/data_sentinel/core/contracts/interop.py` | `data-sentinel capabilities --descriptors` | orchestrators (declared, no in-repo consumer) |
-| Install receipts | `data-sentinel-forge/src/data_sentinel/installation/contracts.py`; `spark-forge-aws/sparkforge_aws/install/lifecycle.py:25–48` (`STATE_DIR`, `RECEIPTS_DIR`) | each forge | `doctor`/`status` verbs |
+| Contract                             | Where defined                                                                                                                                                | Producer                                   | Consumer                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------- |
+| `forge/SpecialistAgenticManifest/v1` | each repo's `forge.agentic.json`                                                                                                                             | all 4 specialists                          | The Forge (install/discovery), humans         |
+| `forge/v1` (Forge Protocol envelope) | `the-forge/adapters/sparkforge_aws/src/theforge_sparkforge_aws/_shell.py` (`PROTOCOL = "forge/v1"`)                                                          | adapters                                   | The Forge core                                |
+| `theforge/Handoff/v1`                | `the-forge` core + `adapters/sparkforge_aws/src/theforge_sparkforge_aws/handoff.py`                                                                          | The Forge core                             | adapter → `translate_handoff`                 |
+| `sparkforge_aws/upstream-facts/v1`   | `spark-forge-aws/sparkforge_aws/adapters/upstream.py` (`UPSTREAM_SCHEMA`)                                                                                    | theforge adapter                           | `analyze_pyspark(upstream=…)`, case intake    |
+| `sparkforge_azure/upstream-facts/v1` | `spark-forge-azure/sparkforge_azure/adapters/upstream.py:44`                                                                                                 | theforge adapter                           | case bundle `upstream.json` → `run_case`      |
+| `handoff-bundle@1`                   | `forge-doctor-data/src/forge_doctor_data/core/handoff.py`                                                                                                    | Doctor Data                                | Sentinel doctor importer                      |
+| `forge-contracts/1`                  | `data-sentinel-forge/src/data_sentinel/core/contracts/interop.py` (`FORGE_CONTRACTS_1`)                                                                      | Sentinel exporter, Doctor                  | Sentinel doctor importer                      |
+| `scan-json@3.0`                      | `forge-doctor-data/src/forge_doctor_data/output/agent_renderer.py`                                                                                           | Doctor `scan -f agent`                     | Sentinel doctor importer                      |
+| `DiagnosticReport`                   | `data-sentinel-forge/src/data_sentinel/core/contracts/`                                                                                                      | Sentinel                                   | exporter, `report show`                       |
+| `CapabilityDescriptor`               | `data-sentinel-forge/src/data_sentinel/core/contracts/interop.py`                                                                                            | `data-sentinel capabilities --descriptors` | orchestrators (declared, no in-repo consumer) |
+| Install receipts                     | `data-sentinel-forge/src/data_sentinel/installation/contracts.py`; `spark-forge-aws/sparkforge_aws/install/lifecycle.py:25–48` (`STATE_DIR`, `RECEIPTS_DIR`) | each forge                                 | `doctor`/`status` verbs                       |
 
 **Refusal codes observed (adapter shell):** `ADAPTER-OP-UNSUPPORTED`,
 `ADAPTER-PROTOCOL-UNSUPPORTED`, `ADAPTER-REQUEST-INVALID`,
@@ -98,17 +98,17 @@ delegation today is orchestrated **from above** (The Forge), not **peer-to-peer*
 data-sentinel mcp serve`). All CLI verbs live in
 `src/data_sentinel/cli/__init__.py` (Typer `app` at line 48).
 
-1. **Knows about other specialists?** 🟡 Knows *Doctor Data's formats*, not the
+1. **Knows about other specialists?** 🟡 Knows _Doctor Data's formats_, not the
    tool. The importer accepts `handoff-bundle@1`, `forge-contracts/1`,
    `scan-json@3.0` (`adapters/doctor/adapter.py`) and the tool registry ships
    `sentinel.doctor.import_bundle` (`tools/registry.py`). No manifest scanning
    of peer forges.
 2. **Discovers installed tools?** ❌ No peer-forge discovery. Internal
-   *analyzer* discovery is a static registry (`diagnostics/orchestrator.py`,
+   _analyzer_ discovery is a static registry (`diagnostics/orchestrator.py`,
    `registry.all()`).
 3. **Selects a capability?** Registry lookup by `capability_id`; agent routing
    is deterministic keyword-matching (`agents/specialists.py`).
-4. **Executes external commands?** Guardrails *forbid* process execution for
+4. **Executes external commands?** Guardrails _forbid_ process execution for
    agent flows (`agents/guardrails.py` — remote writes, destructive actions,
    process execution denied). CLI AWS access goes through boto3 connectors
    inside the process (`cli/__init__.py:508–527`, `glue_diagnose`).
@@ -139,28 +139,28 @@ data-sentinel mcp serve`). All CLI verbs live in
 
 ### 2.1 Sentinel CLI verb inventory (real, from `cli/__init__.py`)
 
-| Verb | Lines | Signature (key options) |
-|---|---|---|
-| `version` | 102–103 | — |
-| `analyze` | 215–264 | `--file/-f` XOR `--sql`, `--platform/-p`, `--profile`, `--dialect`, `--json`, `--no-persist`, `--output/-o` |
-| `config show` | 267–289 | `--json` (redacted) |
-| `capabilities` | 292–315 | `--json`, `--descriptors` → `CapabilityDescriptor` JSON (interop §5) |
-| `doctor` | 326–381 | environment checks |
-| `glue inspect` | 420–456 | `--job` (required), `--profile`, `--region`, `--json`, `--quiet` — read-only AWS |
-| `glue runs` | 457–487 | `--job`, `--limit 10`, `--profile`, `--region`, `--json` |
-| `glue diagnose` | 488–575 | `--job`, `--run-id`, `--log-group`, `--profile`, `--region`, `--dry-run`, `--no-persist`, `--json`, `--output` |
-| `spark explain` / `spark optimize` | 576–634 | plan analysis/optimization |
-| `sql analyze` | 635–663 | static SQL |
-| `report show` / `report export` | 723–747 / 1060–1084 | persisted `DiagnosticReport` |
-| `lakehouse metadata|access|policy|operation|compat` | 775–886 | Iceberg/access/policy/ops |
-| `import doctor-bundle` | 887–929 | path → interop findings (formats above) |
-| `quality validate` / `quality import` | 937–999 | data-quality contracts |
-| `lineage ingest` / `lineage impact` | 1000–1059 | OpenLineage |
-| `mcp serve` | 1088–1089 | stdio |
-| `investigate run` | ~1144 | `{tool_id: path}` explicit inputs |
-| `agents` / `tools` | ~1176 / ~1184 | roster listings |
-| `emr analyze|compare|cost` | ~1191+ | EMR surfaces |
-| `serve` | ~1255 | HTTP API extra |
+| Verb                                  | Lines               | Signature (key options)                                                                                        |
+| ------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `version`                             | 102–103             | —                                                                                                              |
+| `analyze`                             | 215–264             | `--file/-f` XOR `--sql`, `--platform/-p`, `--profile`, `--dialect`, `--json`, `--no-persist`, `--output/-o`    |
+| `config show`                         | 267–289             | `--json` (redacted)                                                                                            |
+| `capabilities`                        | 292–315             | `--json`, `--descriptors` → `CapabilityDescriptor` JSON (interop §5)                                           |
+| `doctor`                              | 326–381             | environment checks                                                                                             |
+| `glue inspect`                        | 420–456             | `--job` (required), `--profile`, `--region`, `--json`, `--quiet` — read-only AWS                               |
+| `glue runs`                           | 457–487             | `--job`, `--limit 10`, `--profile`, `--region`, `--json`                                                       |
+| `glue diagnose`                       | 488–575             | `--job`, `--run-id`, `--log-group`, `--profile`, `--region`, `--dry-run`, `--no-persist`, `--json`, `--output` |
+| `spark explain` / `spark optimize`    | 576–634             | plan analysis/optimization                                                                                     |
+| `sql analyze`                         | 635–663             | static SQL                                                                                                     |
+| `report show` / `report export`       | 723–747 / 1060–1084 | persisted `DiagnosticReport`                                                                                   |
+| `lakehouse metadata                   | access              | policy                                                                                                         | operation | compat`      | 775–886 | Iceberg/access/policy/ops |
+| `import doctor-bundle`                | 887–929             | path → interop findings (formats above)                                                                        |
+| `quality validate` / `quality import` | 937–999             | data-quality contracts                                                                                         |
+| `lineage ingest` / `lineage impact`   | 1000–1059           | OpenLineage                                                                                                    |
+| `mcp serve`                           | 1088–1089           | stdio                                                                                                          |
+| `investigate run`                     | ~1144               | `{tool_id: path}` explicit inputs                                                                              |
+| `agents` / `tools`                    | ~1176 / ~1184       | roster listings                                                                                                |
+| `emr analyze                          | compare             | cost`                                                                                                          | ~1191+    | EMR surfaces |
+| `serve`                               | ~1255               | HTTP API extra                                                                                                 |
 
 ---
 
@@ -225,9 +225,9 @@ SPECIALIST_WORKFLOW; coordinator `spark-performance-architect`; MCP
 `{cli} mcp serve`).
 
 1. **Knows about other specialists?** 🟡 Defines the intake contract
-   (`upstream-facts/v1`) and Forge Protocol envelopes; accepts evidence *from*
+   (`upstream-facts/v1`) and Forge Protocol envelopes; accepts evidence _from_
    an orchestrator but has no peer list.
-2. **Discovers installed tools?** 🟡 `install/lifecycle.py` manages *its own*
+2. **Discovers installed tools?** 🟡 `install/lifecycle.py` manages _its own_
    install (`install|status|doctor|repair|uninstall`), receipts under
    `.sparkforge_aws/receipts` (`install/lifecycle.py:25–48`); verifies itself
    via `mcp_verify_tool = sparkforge_aws_runtime_detect`
@@ -238,7 +238,7 @@ SPECIALIST_WORKFLOW; coordinator `spark-performance-architect`; MCP
    `NON_DISPATCHABLE_SKILLS` whitelists with per-skill rationale
    (`integrate/render.py:189–270`) — e.g. `diagnose-lakeformation-access` is
    non-dispatchable because it hits live AWS and recommends permission changes.
-4. **Executes external commands?** It *is* executed (as MCP server or CLI);
+4. **Executes external commands?** It _is_ executed (as MCP server or CLI);
    internally, guarded `subprocess` in `_installkit.py` and a CLI executor
    callback (`adapters/cli.py`). 14 coordinators in `agents/*.md` dispatch 5
    executors (`sf-inventory`, `sf-extractor`, `sf-judge`, `sf-verifier`,
@@ -249,7 +249,7 @@ SPECIALIST_WORKFLOW; coordinator `spark-performance-architect`; MCP
    step 3).
 6. **Timeouts?** `agentic/budget.py` enforces token/tool-call/time/retry/cost
    budgets; registry models carry `workflow timeout defaults`
-   (`registry/models.py`). Process-level kill of a *callee* exists only in The
+   (`registry/models.py`). Process-level kill of a _callee_ exists only in The
    Forge adapter (`_shell.py`).
 7. **Receives results?** `ForgeResult`/`ForgeEvidenceBundle`/`ForgeTaskStatus`
    (`accepted/running/succeeded/failed/blocked/unresolved`)
@@ -258,7 +258,7 @@ SPECIALIST_WORKFLOW; coordinator `spark-performance-architect`; MCP
    policy/version/scope; 50 KB output cap; secret-leakage scan. Upstream
    intake: schema check, `upstream:`/`upstream.` namespaces, forbidden
    imperative keys (`action|command|execute|instruction|plan|prompt|route|task|
-   workflow`), 256 KiB / 128 facts (`adapters/upstream.py`).
+workflow`), 256 KiB / 128 facts (`adapters/upstream.py`).
 9. **Preserves evidence?** `Finding` requires non-empty `evidence[]` +
    `rule_id` (invalid by construction otherwise); facts keep foreign provenance
    (`provenance.extractor = "theforge/handoff"` + `artifact_sha256` stamped at
@@ -272,7 +272,7 @@ SPECIALIST_WORKFLOW; coordinator `spark-performance-architect`; MCP
     destructive/production ops can require human approval.
 11. **Delegation cycles?** 🟡 Subagent→subagent dispatch is structurally
     impossible on host platforms (`AGENTS.md`: "subagents cannot spawn
-    subagents"); no *forge-to-forge* cycle detection (that's The Forge's plan
+    subagents"); no _forge-to-forge_ cycle detection (that's The Forge's plan
     graph).
 12. **Tests?** `tests/test_upstream_intake.py`, `tests/test_forge_cli_doctor.py`,
     `tests/test_adapters_mcp.py`, `tests/test_fixtures_golden_mcp_parity.py`,
@@ -339,7 +339,7 @@ enforced by a test):
 
 - Ops: `describe`, `health`, `execute` over `forge/v1`; unknown op / unsupported
   protocol / undeclared capability or action → `refused`; invalid request or
-  unexpected exception → structured `error` (exception *type* only — never
+  unexpected exception → structured `error` (exception _type_ only — never
   traceback or message).
 - `stage_context` copies only ContextPack files inside the workspace root that
   match sha256 → else `limitation`.
@@ -369,24 +369,24 @@ flat structures only (imperative keys can never be emitted); bounds mirrored
 
 ## 7. Gap list vs `prompt_evo_integrations.md`
 
-| Requirement | Status | Evidence / gap |
-|---|---|---|
-| Independent optional integrations | ✅ | Each forge installs/runs standalone; manifests are declarative; no forge imports another |
-| Discovery before execution | 🟡 | The Forge `describe`/`health` probes exist; specialists don't discover peers |
-| Real capability verification | 🟡 | `capabilities --descriptors`, `capabilities explain`, adapter `describe`; but no cross-forge negotiation inside specialists |
-| Version compatibility | 🟡 | Adapter `health` enforces `SUPPORTED_SPECIALIST` window; Sentinel/Doctor version their bundle formats; specialists don't check *peer* versions |
-| Typed args + safe process boundary | ✅ (adapter) / ❌ (peer) | `_shell.py run_native` is exactly this; nothing comparable inside the four repos for calling each other |
-| Timeout/cancellation | 🟡 | Adapter: process-tree kill + `ADAPTER-NATIVE-TIMEOUT`; Sentinel: `AnalysisLimits.timeout_ms` cooperative only; Doctor: `timeout_s` declared, enforcement unverified; Spark: budgets, no callee kill |
-| Output size/schema validation | ✅ | Adapter caps; Sentinel registry caps + path security; upstream intake bounds; agent renderer schema 3.0 |
-| Evidence/provenance handoff | ✅ | upstream-facts pipeline (theforge→both Sparks); doctor-bundle→Sentinel; sha256 stamping; `upstream:`/`upstream.` namespacing |
-| Permission/risk gating | ✅ | Sentinel tool permissions + guardrails; Spark role-plan admission DATA_ONLY + risk levels; Azure default-deny |
-| Graceful degradation (absent specialist) | 🟡 | Adapter `health` → `unavailable`; `no_input` answers; but "specialist absent → fallback workflow" inside a specialist is absent |
-| Incompatible-provider refusal | ✅ (adapter) | `ADAPTER-*` refusal codes; version window → `degraded` |
-| Cycle prevention | 🟡 | Host subagent rule + orchestrated plan graph; no token/chain-id cycle detection across forges |
-| Controlled retries / budgets | 🟡 | Spark `budget.py` (token/tool/time/retry); adapter has no retry of native calls (fail-fast → structured error) |
-| Cross-forge E2E fixtures | 🟡 | the-forge `--replay` scenario machinery + `record_execute.py`; Sentinel `test_e2e_interop.py`; no 4-repo fixture |
-| Windows/Linux, wheel-only | 🟡 | `_shell.py` handles both process-kill modes; adapters stdlib-only py≥3.10; specialists py≥3.11 (Sentinel) |
-| No new mandatory inter-forge deps | ✅ | Confirmed: all channels are file/stdio contracts |
+| Requirement                              | Status                   | Evidence / gap                                                                                                                                                                                      |
+| ---------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Independent optional integrations        | ✅                       | Each forge installs/runs standalone; manifests are declarative; no forge imports another                                                                                                            |
+| Discovery before execution               | 🟡                       | The Forge `describe`/`health` probes exist; specialists don't discover peers                                                                                                                        |
+| Real capability verification             | 🟡                       | `capabilities --descriptors`, `capabilities explain`, adapter `describe`; but no cross-forge negotiation inside specialists                                                                         |
+| Version compatibility                    | 🟡                       | Adapter `health` enforces `SUPPORTED_SPECIALIST` window; Sentinel/Doctor version their bundle formats; specialists don't check _peer_ versions                                                      |
+| Typed args + safe process boundary       | ✅ (adapter) / ❌ (peer) | `_shell.py run_native` is exactly this; nothing comparable inside the four repos for calling each other                                                                                             |
+| Timeout/cancellation                     | 🟡                       | Adapter: process-tree kill + `ADAPTER-NATIVE-TIMEOUT`; Sentinel: `AnalysisLimits.timeout_ms` cooperative only; Doctor: `timeout_s` declared, enforcement unverified; Spark: budgets, no callee kill |
+| Output size/schema validation            | ✅                       | Adapter caps; Sentinel registry caps + path security; upstream intake bounds; agent renderer schema 3.0                                                                                             |
+| Evidence/provenance handoff              | ✅                       | upstream-facts pipeline (theforge→both Sparks); doctor-bundle→Sentinel; sha256 stamping; `upstream:`/`upstream.` namespacing                                                                        |
+| Permission/risk gating                   | ✅                       | Sentinel tool permissions + guardrails; Spark role-plan admission DATA_ONLY + risk levels; Azure default-deny                                                                                       |
+| Graceful degradation (absent specialist) | 🟡                       | Adapter `health` → `unavailable`; `no_input` answers; but "specialist absent → fallback workflow" inside a specialist is absent                                                                     |
+| Incompatible-provider refusal            | ✅ (adapter)             | `ADAPTER-*` refusal codes; version window → `degraded`                                                                                                                                              |
+| Cycle prevention                         | 🟡                       | Host subagent rule + orchestrated plan graph; no token/chain-id cycle detection across forges                                                                                                       |
+| Controlled retries / budgets             | 🟡                       | Spark `budget.py` (token/tool/time/retry); adapter has no retry of native calls (fail-fast → structured error)                                                                                      |
+| Cross-forge E2E fixtures                 | 🟡                       | the-forge `--replay` scenario machinery + `record_execute.py`; Sentinel `test_e2e_interop.py`; no 4-repo fixture                                                                                    |
+| Windows/Linux, wheel-only                | 🟡                       | `_shell.py` handles both process-kill modes; adapters stdlib-only py≥3.10; specialists py≥3.11 (Sentinel)                                                                                           |
+| No new mandatory inter-forge deps        | ✅                       | Confirmed: all channels are file/stdio contracts                                                                                                                                                    |
 
 **Biggest missing pieces (architectural):**
 

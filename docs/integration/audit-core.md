@@ -204,7 +204,7 @@ about that do not exist are marked **ABSENT**.
   (`src/registry/catalog.ts:7-117`).
 - **Gap:** `data-sentinel-forge` is in **neither** catalog — it cannot be
   installed, verified, or MCP-probed via forge-cli today.
-- No knowledge of *capabilities* a specialist offers beyond install/MCP
+- No knowledge of _capabilities_ a specialist offers beyond install/MCP
   metadata; no `forge.agentic.json` consumer (only `forge.json` —
   `src/manifest.ts`).
 
@@ -225,10 +225,10 @@ about that do not exist are marked **ABSENT**.
 
 - `negotiateCapabilities(requested, offered)` over
   `forge/ForgeCapability/v1` → `granted|granted_unverified|refused|
-  unknown` per request, `ok`/`complete` flags
+unknown` per request, `ok`/`complete` flags
   (`src/contracts/negotiate.ts:20-60`).
 - `resolveDiscovery`: precedence `manifest > forja-discovery > catalog >
-  remote-registry > fallback`; 7 `DiscoveryState` values never flattened
+remote-registry > fallback`; 7 `DiscoveryState` values never flattened
   (`src/contracts/negotiate.ts:67-114`; doctrine in
   `contracts/CONTRACTS.md`).
 
@@ -236,7 +236,7 @@ about that do not exist are marked **ABSENT**.
 
 - `execa` argv arrays, `reject:false`, never shell (`src/registry/install.ts:588-606`;
   `src/utils/system.ts` commandOutput/commandProbe).
-- `delegateNative`: runs the forge's *verified venv bin* with documented
+- `delegateNative`: runs the forge's _verified venv bin_ with documented
   flags; `{python} scripts/...` argv honestly skipped under registry
   method (`src/cmd/registry.ts:237-294`).
 - Git/setup execution via `runner.ts`/`processPool` (`src/cmd/run.ts`,
@@ -262,9 +262,9 @@ about that do not exist are marked **ABSENT**.
 - Probe timeout `FORGE_CLI_PROBE_TIMEOUT_MS` default 15s
   (`src/utils/system.ts:110-127`).
 - MCP per-step 8s + guaranteed SIGTERM→SIGKILL (`src/mcp/handshake.ts:44,
-  213-229`).
+213-229`).
 - Discovery global budget 2000ms via `raced()` (`src/discovery.ts:38,
-  344-349`).
+344-349`).
 - Lifecycle lock: 5min acquire deadline, 10min stale break, pid-liveness
   check (`src/registry/install.ts:341-466`).
 
@@ -347,7 +347,7 @@ about that do not exist are marked **ABSENT**.
   `FederationSnapshot {specialists[], installed_forges[]}`
   (`src/app/core/api/api.models.ts:360-384`); the the-forge adapter fills
   it from `specialists.collect()` (`the-forge/src/theforge/
-  portal_adapter.py:458-493`).
+portal_adapter.py:458-493`).
 - Explorer renders serving forge + specialists + registry-only rows —
   never invents entries (`src/app/pages/explorer/forges.data.ts:97-158`).
 - Federation Graph Studio overlay: `forge→capability`, `agent→skill`,
@@ -380,7 +380,7 @@ about that do not exist are marked **ABSENT**.
   `tests/test_security_c5.py`).
 - The single exec boundary: `forge-cli` argv arrays for the 9-action
   `_REGISTRY_ACTIONS` allowlist (`install|update|reinstall|uninstall|
-  rollback|pin|unpin|repair|verify`), `subprocess.run` never shell
+rollback|pin|unpin|repair|verify`), `subprocess.run` never shell
   (`portal_core/registry_ops.py:19-77`).
 - Execution is plan → confirm → execute with one-time HMAC plan tokens
   (`registry_ops.py:104-158`; `forge_portal.py:433-453,1034-1052`).
@@ -397,7 +397,7 @@ about that do not exist are marked **ABSENT**.
 - Per-op `Operation.timeout` (default 30s; registry plan 90s, execute
   320s) enforced by `run_with_timeout` — timed-out handler keeps running
   on its thread, documented honestly (`portal_core/forge_portal.py:176,
-  769-773,784-799,1006`; `registry_ops.py:164-178`).
+769-773,784-799,1006`; `registry_ops.py:164-178`).
 - forge-cli subprocess timeouts: 60s plan, 180s/300s execute
   (`registry_ops.py:129,150-153`); `CLI-TIMEOUT` named error
   (`registry_ops.py:61-62`).
@@ -437,7 +437,7 @@ about that do not exist are marked **ABSENT**.
   SameSite=Strict cookie), DNS-rebinding guard (`forge_portal.py:587-622`).
 - POST: `Content-Type: application/json`, mutation rate limit 10/min,
   `confirm` + `plan_token` for mutating ops (`forge_portal.py:48-50,
-  689-758`; `registry_ops.py:170-178`).
+689-758`; `registry_ops.py:170-178`).
 - CSP/XFO/Permissions-Policy/nosniff/no-store on all responses incl.
   error paths (`forge_portal.py:500-544`).
 - The CLI argv allowlist is closed — unknown actions refused
@@ -464,51 +464,51 @@ about that do not exist are marked **ABSENT**.
 
 ## 4. Inventory — existing contracts & mechanisms
 
-| Mechanism | Contract / implementation | Where |
-|---|---|---|
-| Agentic manifest | `forge/SpecialistAgenticManifest/v1` (`forge.agentic.json`) | `the-forge/src/theforge/contracts/specialist.py:13,139-165`; shipped by spark-forge-aws/azure, api-forge, platform-forge, forge-doctor-api/data, **data-sentinel-forge** |
-| Specialist lifecycle | `forge/SpecialistLifecycleState/v1` + transitions | `the-forge/src/theforge/contracts/specialist.py:12,19-57`; collector `specialists.py:151-268` |
-| Delegation req/result | `forge/SpecialistDelegationRequest|Result/v1` | `contracts/specialist.py:14-15,168-213`; exec `delegation.py` |
-| Host activation | `forge/HostActivationPlan|Receipt/v1` | `contracts/specialist.py:16-17,216-246`; `cli/commands.py:1724-1793` |
-| Forge Protocol | subprocess `<argv> <op>`, JSON stdio, `theforge/ForgeManifest/v1` | `protocol/transport.py`, `protocol/proctree.py`, `contracts/manifest.py:16,155-209` |
-| Provider registry | `providers.toml` entries + trust + sha256-bound cache `theforge/RegistryCache/v2` | `registry/config.py`, `registry/registry.py` |
-| Remote discovery | `theforge/RegistryDocument/v1`, `ForgeRegistryEntry/v1`, `RemoteProviderCandidate/v1` | `contracts/registry.py`; `registry/discovery.py`, `registry/sources.py` |
-| Capability routing | `RoutingDecision`, `CapabilityNegotiationResult`, signals/negotiation | `routing/router.py`, `negotiation.py`, `contracts/routing.py` |
-| Handoff | `theforge/Handoff/v1` (plan-node evidence bus) | `contracts/handoff.py`; `planning/handoff.py` |
-| Agent orchestration | `AgentSpec` registry + authority gate | `agents.py`; `agentic/agents/*.toml` |
-| MCP | `theforge/McpServerEntry|RegistryDocument/v1`; `mcp_requires`; stdio probe | `contracts/mcp.py`, `registry/mcp.py`, `interop/mcp.py`; `forge-cli/src/mcp/handshake.ts` |
-| Install receipts | `install.json` + `state.json` (`forge-cli`), `~/.forge/installations/*.json` (bootstrap) | `forge-cli/src/registry/install.ts:80-198`; `the-forge/src/theforge/_installkit.py:1352-1408` |
-| Install plans | `theforge/InstallationPlan/v1` + `/v2` (approval-gated, plan-only) | `contracts/installation.py`; `registry/install_plan.py` |
-| Skills/agents | `agents.py` AgentSpec + host adapters list in manifests | `the-forge/src/theforge/agents.py`; `specialists.py:152-158` |
-| Result formats | `theforge/ExecutionResult/v1` (findings/evidence/artifacts) | `contracts/result.py` |
-| Governed execution | trust gates, `safe_env`, approval plans, remote policy, receipts | `registry/registry.py:206-215`, `security/env.py`, `remote.py` |
-| Evidence contracts | `ExecutionReceipt/v1`, `Handoff/v1`, `ProviderReceipt`, run artifacts | `contracts/receipt.py`, `runs/store.py` |
-| Token economy | `RunBudget/v1`, profiles economy/balanced/max, context broker, `ProviderEconomyReceipt`, `EconomyRollup` | `contracts/budget.py`, `economy.py`, `profiles.py`, `context/broker.py`, `contracts/economy.py` |
-| forge-cli contracts | `forge/ForgeDescriptor|ForgeCapability|ForgeInstallContract|ForgeEnvironmentSchema|ForgeHostDescriptor|ForgeOperationPlan|ForgeOperationReceipt|ForgeHealthReport/v1` | `forge-cli/contracts/schemas/*.json`, `contracts/CONTRACTS.md` |
-| Portal API | `forge/PortalApi/1`, `forge/PortalEvent/1`, `forge-cli/RegistryState/v1`, `forge/FederatedGraph/v1` | `portal_core/forge_portal.py:38-47`, `telemetry.py`, `forge-portal/src/app/core/graph/federated.ts` |
-| Remote/A2A | `RemoteExecutionRequest|Receipt`, A2A AgentCard bridge | `the-forge/src/theforge/remote.py`, `interop/a2a.py` |
+| Mechanism             | Contract / implementation                                                                                | Where                                                                                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Agentic manifest      | `forge/SpecialistAgenticManifest/v1` (`forge.agentic.json`)                                              | `the-forge/src/theforge/contracts/specialist.py:13,139-165`; shipped by spark-forge-aws/azure, api-forge, platform-forge, forge-doctor-api/data, **data-sentinel-forge** |
+| Specialist lifecycle  | `forge/SpecialistLifecycleState/v1` + transitions                                                        | `the-forge/src/theforge/contracts/specialist.py:12,19-57`; collector `specialists.py:151-268`                                                                            |
+| Delegation req/result | `forge/SpecialistDelegationRequest                                                                       | Result/v1`                                                                                                                                                               | `contracts/specialist.py:14-15,168-213`; exec `delegation.py`                             |
+| Host activation       | `forge/HostActivationPlan                                                                                | Receipt/v1`                                                                                                                                                              | `contracts/specialist.py:16-17,216-246`; `cli/commands.py:1724-1793`                      |
+| Forge Protocol        | subprocess `<argv> <op>`, JSON stdio, `theforge/ForgeManifest/v1`                                        | `protocol/transport.py`, `protocol/proctree.py`, `contracts/manifest.py:16,155-209`                                                                                      |
+| Provider registry     | `providers.toml` entries + trust + sha256-bound cache `theforge/RegistryCache/v2`                        | `registry/config.py`, `registry/registry.py`                                                                                                                             |
+| Remote discovery      | `theforge/RegistryDocument/v1`, `ForgeRegistryEntry/v1`, `RemoteProviderCandidate/v1`                    | `contracts/registry.py`; `registry/discovery.py`, `registry/sources.py`                                                                                                  |
+| Capability routing    | `RoutingDecision`, `CapabilityNegotiationResult`, signals/negotiation                                    | `routing/router.py`, `negotiation.py`, `contracts/routing.py`                                                                                                            |
+| Handoff               | `theforge/Handoff/v1` (plan-node evidence bus)                                                           | `contracts/handoff.py`; `planning/handoff.py`                                                                                                                            |
+| Agent orchestration   | `AgentSpec` registry + authority gate                                                                    | `agents.py`; `agentic/agents/*.toml`                                                                                                                                     |
+| MCP                   | `theforge/McpServerEntry                                                                                 | RegistryDocument/v1`; `mcp_requires`; stdio probe                                                                                                                        | `contracts/mcp.py`, `registry/mcp.py`, `interop/mcp.py`; `forge-cli/src/mcp/handshake.ts` |
+| Install receipts      | `install.json` + `state.json` (`forge-cli`), `~/.forge/installations/*.json` (bootstrap)                 | `forge-cli/src/registry/install.ts:80-198`; `the-forge/src/theforge/_installkit.py:1352-1408`                                                                            |
+| Install plans         | `theforge/InstallationPlan/v1` + `/v2` (approval-gated, plan-only)                                       | `contracts/installation.py`; `registry/install_plan.py`                                                                                                                  |
+| Skills/agents         | `agents.py` AgentSpec + host adapters list in manifests                                                  | `the-forge/src/theforge/agents.py`; `specialists.py:152-158`                                                                                                             |
+| Result formats        | `theforge/ExecutionResult/v1` (findings/evidence/artifacts)                                              | `contracts/result.py`                                                                                                                                                    |
+| Governed execution    | trust gates, `safe_env`, approval plans, remote policy, receipts                                         | `registry/registry.py:206-215`, `security/env.py`, `remote.py`                                                                                                           |
+| Evidence contracts    | `ExecutionReceipt/v1`, `Handoff/v1`, `ProviderReceipt`, run artifacts                                    | `contracts/receipt.py`, `runs/store.py`                                                                                                                                  |
+| Token economy         | `RunBudget/v1`, profiles economy/balanced/max, context broker, `ProviderEconomyReceipt`, `EconomyRollup` | `contracts/budget.py`, `economy.py`, `profiles.py`, `context/broker.py`, `contracts/economy.py`                                                                          |
+| forge-cli contracts   | `forge/ForgeDescriptor                                                                                   | ForgeCapability                                                                                                                                                          | ForgeInstallContract                                                                      | ForgeEnvironmentSchema | ForgeHostDescriptor | ForgeOperationPlan | ForgeOperationReceipt | ForgeHealthReport/v1` | `forge-cli/contracts/schemas/*.json`, `contracts/CONTRACTS.md` |
+| Portal API            | `forge/PortalApi/1`, `forge/PortalEvent/1`, `forge-cli/RegistryState/v1`, `forge/FederatedGraph/v1`      | `portal_core/forge_portal.py:38-47`, `telemetry.py`, `forge-portal/src/app/core/graph/federated.ts`                                                                      |
+| Remote/A2A            | `RemoteExecutionRequest                                                                                  | Receipt`, A2A AgentCard bridge                                                                                                                                           | `the-forge/src/theforge/remote.py`, `interop/a2a.py`                                      |
 
 ---
 
 ## 5. Exists vs. `prompt_evo_integrations.md` — gap list
 
-| Spec asks for | Status today |
-|---|---|
-| `forge/SpecialistCapability/v1` (id, description, in/out schemas, entrypoint, permissions, network, cost, timeout, discovery+verify modes) | **ABSENT** — nearest is `Capability` inside `theforge/ForgeManifest/v1` (`contracts/manifest.py:96-144`: actions, state, operation_class, signals, relations) plus `forge/ForgeCapability/v1` (forge-cli `contracts/schemas/ForgeCapability.v1.json`: id/state/requires only). No per-capability input/output schema, entrypoint argv, cost or timeout fields. |
-| `forge/SpecialistDelegation/v1` (consumer→provider optional intents + policy) | **ABSENT** — only the imperative pair `SpecialistDelegationRequest|Result/v1` exists; no declarative consumer-side intent/policy contract. |
-| `forge/EvidenceHandoff/v1` (correlation id, idempotency, provider versions, confidence, limitations, redaction) | **PARTIAL** — `theforge/Handoff/v1` is a plan-node evidence bus with provenance/epistemic/dedup (`contracts/handoff.py`), not a specialist↔specialist envelope; no correlation_id/idempotency key on `DelegationRequest` (`contracts/specialist.py:168-187`). |
-| Universal discovery w/ states NOT_INSTALLED…UNTRUSTED | **PARTIAL** — the-forge lifecycle covers UNKNOWN/DISCOVERED/NOT_INSTALLED/INSTALLABLE/INSTALLED/CONFIGURED/REGISTERED/HEALTHY/DEGRADED/FAILED (`contracts/specialist.py:19-37`); forge-cli has 7 DiscoveryStates incl. `integrated` (`forge-cli/src/contracts/negotiate.ts:77-85`). **Missing:** `VERIFIED` as a distinct state and `UNTRUSTED` as a *discovered* state (unverified entries exist but are never executed — `registry/registry.py:208-215`); no PyPI/pipx/entry-point probing beyond the two registries. |
-| Specialist→specialist runtime delegation (Data Sentinel ↔ Spark Forge) | **ABSENT** — only control-plane→specialist exists (`task run` fan-out, `install auto`). Specialists cannot call each other; no consumer-side delegation adapter exists in any specialist codebase (out of scope here but confirmed absent in core). |
-| Cycle prevention (depth, correlation, visited providers, max hops, cancellation) | **ABSENT for delegation** — plan DAG cycle check exists (`planning/order.py:34-38`), correlation_id exists only in telemetry (`contracts/telemetry.py:182`). No `visited_providers`/`delegation_depth`/`max_hops`/`timeout budget` fields on DelegationRequest. |
-| Risk classes LOCAL_READ/LOCAL_WRITE/EXTERNAL_READ/EXTERNAL_WRITE/DESTRUCTIVE/COST_BEARING | **ABSENT as closed vocabulary** — `Capability.operation_class` exists (`contracts/types.py` OperationClass; `_MUTATING` at `negotiation.py:46`) and `DelegationEntry.read_only` (`contracts/specialist.py:136`); no six-level risk enum, no per-op authorization policy wired to it. |
-| Timeout/cancellation/output limits on delegated CLI calls | **PARTIAL** — fixed 600s timeout + 20-line stdout/stderr tail (`delegation.py:26-27,83-118`); no per-request timeout, cancellation, or output byte caps. Transport has 8 MiB stdout cap + tree kill (`protocol/transport.py:26-31,163-192`). |
-| Provider health | **EXISTS** — `health` op + `HealthReport` (`registry/health.py`); MCP level chain in forge-cli (`mcp/handshake.ts:13-19`). |
-| `data-sentinel` in ecosystem | **ABSENT from catalogs** — has `forge.json` + `forge.agentic.json` (checkout) but no the-forge adapter, no `forge-knowledge` package, no forge-cli `FORGE_REPOS`/`REGISTRY_PACKAGES` entry, no `ecosystem-compatibility.json` row. |
-| Evidence preservation | **EXISTS and strong** — RunStore artifacts, ExecutionReceipt hash-binding, delegation records; forge-cli receipts w/ atomic writes + quarantine. |
-| Token economy | **EXISTS** — RunBudget + profiles + context broker + ProviderEconomyReceipt. |
-| MCP tools discovery | **EXISTS** — contract (`contracts/mcp.py`), source reads (`registry/mcp.py`), allowlisted probe (`forge-cli/src/mcp/handshake.ts`), `mcp_safe_tools` catalog field. |
-| Install receipts | **EXISTS** — two formats: bootstrap `~/.forge/installations/<id>.json` and forge-cli `~/.forge-cli/forges/{install.json,state.json}`; the-forge already bridges both (`specialists.py:37-56`). |
-| Agents/skills awareness | **PARTIAL** — AgentSpec registry + authority gate (`agents.py`); manifest declares skills/agents/coordinators + host_adapters; no per-specialist delegation guidance ("when to call X") in any coordinator doc — spec Phase 11 work. |
-| Governed execution | **EXISTS** for protocol providers (trust, safe_env, approval, remote policy); **PARTIAL** for argv delegation (trust/approval only — no risk classes, no capability allowlist, no input-size caps). |
+| Spec asks for                                                                                                                              | Status today                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge/SpecialistCapability/v1` (id, description, in/out schemas, entrypoint, permissions, network, cost, timeout, discovery+verify modes) | **ABSENT** — nearest is `Capability` inside `theforge/ForgeManifest/v1` (`contracts/manifest.py:96-144`: actions, state, operation_class, signals, relations) plus `forge/ForgeCapability/v1` (forge-cli `contracts/schemas/ForgeCapability.v1.json`: id/state/requires only). No per-capability input/output schema, entrypoint argv, cost or timeout fields.                                                                                                                                                          |
+| `forge/SpecialistDelegation/v1` (consumer→provider optional intents + policy)                                                              | **ABSENT** — only the imperative pair `SpecialistDelegationRequest                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Result/v1` exists; no declarative consumer-side intent/policy contract. |
+| `forge/EvidenceHandoff/v1` (correlation id, idempotency, provider versions, confidence, limitations, redaction)                            | **PARTIAL** — `theforge/Handoff/v1` is a plan-node evidence bus with provenance/epistemic/dedup (`contracts/handoff.py`), not a specialist↔specialist envelope; no correlation_id/idempotency key on `DelegationRequest` (`contracts/specialist.py:168-187`).                                                                                                                                                                                                                                                           |
+| Universal discovery w/ states NOT_INSTALLED…UNTRUSTED                                                                                      | **PARTIAL** — the-forge lifecycle covers UNKNOWN/DISCOVERED/NOT_INSTALLED/INSTALLABLE/INSTALLED/CONFIGURED/REGISTERED/HEALTHY/DEGRADED/FAILED (`contracts/specialist.py:19-37`); forge-cli has 7 DiscoveryStates incl. `integrated` (`forge-cli/src/contracts/negotiate.ts:77-85`). **Missing:** `VERIFIED` as a distinct state and `UNTRUSTED` as a _discovered_ state (unverified entries exist but are never executed — `registry/registry.py:208-215`); no PyPI/pipx/entry-point probing beyond the two registries. |
+| Specialist→specialist runtime delegation (Data Sentinel ↔ Spark Forge)                                                                     | **ABSENT** — only control-plane→specialist exists (`task run` fan-out, `install auto`). Specialists cannot call each other; no consumer-side delegation adapter exists in any specialist codebase (out of scope here but confirmed absent in core).                                                                                                                                                                                                                                                                     |
+| Cycle prevention (depth, correlation, visited providers, max hops, cancellation)                                                           | **ABSENT for delegation** — plan DAG cycle check exists (`planning/order.py:34-38`), correlation_id exists only in telemetry (`contracts/telemetry.py:182`). No `visited_providers`/`delegation_depth`/`max_hops`/`timeout budget` fields on DelegationRequest.                                                                                                                                                                                                                                                         |
+| Risk classes LOCAL_READ/LOCAL_WRITE/EXTERNAL_READ/EXTERNAL_WRITE/DESTRUCTIVE/COST_BEARING                                                  | **ABSENT as closed vocabulary** — `Capability.operation_class` exists (`contracts/types.py` OperationClass; `_MUTATING` at `negotiation.py:46`) and `DelegationEntry.read_only` (`contracts/specialist.py:136`); no six-level risk enum, no per-op authorization policy wired to it.                                                                                                                                                                                                                                    |
+| Timeout/cancellation/output limits on delegated CLI calls                                                                                  | **PARTIAL** — fixed 600s timeout + 20-line stdout/stderr tail (`delegation.py:26-27,83-118`); no per-request timeout, cancellation, or output byte caps. Transport has 8 MiB stdout cap + tree kill (`protocol/transport.py:26-31,163-192`).                                                                                                                                                                                                                                                                            |
+| Provider health                                                                                                                            | **EXISTS** — `health` op + `HealthReport` (`registry/health.py`); MCP level chain in forge-cli (`mcp/handshake.ts:13-19`).                                                                                                                                                                                                                                                                                                                                                                                              |
+| `data-sentinel` in ecosystem                                                                                                               | **ABSENT from catalogs** — has `forge.json` + `forge.agentic.json` (checkout) but no the-forge adapter, no `forge-knowledge` package, no forge-cli `FORGE_REPOS`/`REGISTRY_PACKAGES` entry, no `ecosystem-compatibility.json` row.                                                                                                                                                                                                                                                                                      |
+| Evidence preservation                                                                                                                      | **EXISTS and strong** — RunStore artifacts, ExecutionReceipt hash-binding, delegation records; forge-cli receipts w/ atomic writes + quarantine.                                                                                                                                                                                                                                                                                                                                                                        |
+| Token economy                                                                                                                              | **EXISTS** — RunBudget + profiles + context broker + ProviderEconomyReceipt.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| MCP tools discovery                                                                                                                        | **EXISTS** — contract (`contracts/mcp.py`), source reads (`registry/mcp.py`), allowlisted probe (`forge-cli/src/mcp/handshake.ts`), `mcp_safe_tools` catalog field.                                                                                                                                                                                                                                                                                                                                                     |
+| Install receipts                                                                                                                           | **EXISTS** — two formats: bootstrap `~/.forge/installations/<id>.json` and forge-cli `~/.forge-cli/forges/{install.json,state.json}`; the-forge already bridges both (`specialists.py:37-56`).                                                                                                                                                                                                                                                                                                                          |
+| Agents/skills awareness                                                                                                                    | **PARTIAL** — AgentSpec registry + authority gate (`agents.py`); manifest declares skills/agents/coordinators + host_adapters; no per-specialist delegation guidance ("when to call X") in any coordinator doc — spec Phase 11 work.                                                                                                                                                                                                                                                                                    |
+| Governed execution                                                                                                                         | **EXISTS** for protocol providers (trust, safe_env, approval, remote policy); **PARTIAL** for argv delegation (trust/approval only — no risk classes, no capability allowlist, no input-size caps).                                                                                                                                                                                                                                                                                                                     |
 
-*Audit produced for lf-0026 Phase 0; read-only — no source files were modified.*
+_Audit produced for lf-0026 Phase 0; read-only — no source files were modified._

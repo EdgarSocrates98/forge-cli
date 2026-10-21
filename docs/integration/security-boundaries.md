@@ -30,15 +30,15 @@ below. Refusal codes are named, never silent.
 
 ## 3. Process boundary — argv, never shell
 
-| Repo | Mechanism | Cite |
-|---|---|---|
-| the-forge | Forge Protocol spawn `shell=False`, process-tree managed | `protocol/transport.py:70-113`; `protocol/proctree.py:186-263` |
-| the-forge adapters | `run_native`: no shell, cwd-scoped, timeout=85% of profile budget | `adapters/*/src/…/_shell.py` (byte-identical, test-enforced; audit-data §6) |
-| forge-cli | execa argv arrays, `reject:false`, never shell; MCP `spawn(argv[0], args, {shell:false})` | `src/registry/install.ts:588-606`; `src/mcp/handshake.ts:170-194` |
-| forge-portal | single exec boundary = closed 9-action forge-cli argv allowlist, `subprocess.run` never shell; `_SAFE_FORGE` regex | `portal_core/registry_ops.py:19-77,108-116` |
-| api-forge | `run tool` closed argv-template table, `shutil.which` + `subprocess.run(argv, …)` no shell | `src/apiforge/run_tools.py:411-467` |
-| platform-forge | `host_transport()` argv-only `subprocess.run`, never `shell=True`, rc124 timeout / rc127 missing | `platformforge/ops/executors/base.py:188-209` |
-| api-forge (install) | vendored `_installkit.py` under spawn gate `FORGE-INSTALL-SPAWN-DISABLED` | `src/apiforge/_installkit.py:1471-1532` |
+| Repo                | Mechanism                                                                                                          | Cite                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| the-forge           | Forge Protocol spawn `shell=False`, process-tree managed                                                           | `protocol/transport.py:70-113`; `protocol/proctree.py:186-263`              |
+| the-forge adapters  | `run_native`: no shell, cwd-scoped, timeout=85% of profile budget                                                  | `adapters/*/src/…/_shell.py` (byte-identical, test-enforced; audit-data §6) |
+| forge-cli           | execa argv arrays, `reject:false`, never shell; MCP `spawn(argv[0], args, {shell:false})`                          | `src/registry/install.ts:588-606`; `src/mcp/handshake.ts:170-194`           |
+| forge-portal        | single exec boundary = closed 9-action forge-cli argv allowlist, `subprocess.run` never shell; `_SAFE_FORGE` regex | `portal_core/registry_ops.py:19-77,108-116`                                 |
+| api-forge           | `run tool` closed argv-template table, `shutil.which` + `subprocess.run(argv, …)` no shell                         | `src/apiforge/run_tools.py:411-467`                                         |
+| platform-forge      | `host_transport()` argv-only `subprocess.run`, never `shell=True`, rc124 timeout / rc127 missing                   | `platformforge/ops/executors/base.py:188-209`                               |
+| api-forge (install) | vendored `_installkit.py` under spawn gate `FORGE-INSTALL-SPAWN-DISABLED`                                          | `src/apiforge/_installkit.py:1471-1532`                                     |
 
 ## 4. Environment scrubbing
 
@@ -51,7 +51,7 @@ below. Refusal codes are named, never silent.
 ## 5. Anti-instruction-smuggling on evidence intake (upstream-facts family)
 
 - Closed `_FORBIDDEN_KEYS` vocabulary (`action|command|execute|instruction|
-  plan|prompt|route|task|workflow`, apiforge adds `routing|tool_call`)
+plan|prompt|route|task|workflow`, apiforge adds `routing|tool_call`)
   scanned **recursively/iteratively** — "payload depth is
   adversary-controlled" (`spark-forge-aws/adapters/upstream.py`;
   `spark-forge-azure/adapters/upstream.py:1-36`;
@@ -69,13 +69,13 @@ below. Refusal codes are named, never silent.
 
 ## 6. Named refusal vocabularies (no silent failure)
 
-| Family | Codes | Where |
-|---|---|---|
-| `ADAPTER-*` | `OP-UNSUPPORTED`, `PROTOCOL-UNSUPPORTED`, `REQUEST-INVALID`, `CAPABILITY-UNSUPPORTED`, `ACTION-UNSUPPORTED`, `INTERNAL`, `OUTPUT-TOO-LARGE`, `NATIVE-TIMEOUT` | `_shell.py` constants (audit-data §1) |
+| Family                | Codes                                                                                                                                                                                                                                                                                                              | Where                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADAPTER-*`           | `OP-UNSUPPORTED`, `PROTOCOL-UNSUPPORTED`, `REQUEST-INVALID`, `CAPABILITY-UNSUPPORTED`, `ACTION-UNSUPPORTED`, `INTERNAL`, `OUTPUT-TOO-LARGE`, `NATIVE-TIMEOUT`                                                                                                                                                      | `_shell.py` constants (audit-data §1)                                                                                                              |
 | `AF-*` (~40 families) | `AF-RUN-TOOL-UNKNOWN`, `AF-RUN-IMPORT-ONLY`, `AF-RUN-TIMEOUT`, `AF-RUN-NO-REPORT`, `AF-UPSTREAM-LIMIT/INVALID/UNMARKED/FORBIDDEN`, `AF-EVIDENCE-MISSING/MISMATCH`, `AF-POLICY-*`, `AF-TOOL-*`, `AF-FORGE-ENGINE-UNKNOWN`, `AF-FORGE-RISK-GATE`, `AF-ROUTING-NO-ROUTE`, `AF-GOV-RECOVERY-DEPTH`, `AF-RUN-PROD-GATE` | `api-forge/docs/catalog-contract.md`; `run_tools.py`; `application/analyze.py`; `forge/protocol.py`; `trust/tools.py`; `runtime/supervisor.py:866` |
-| `PF-OPS-*` | `PF-OPS-CROSSFORGE-REFUSED`, `PF-OPS-ENVELOPE-UNGOVERNED`, `PF-OPS-POLICY-BLOCK`, `PF-OPS-ENVELOPE-INVALID`, `PF-OPS-NO-DELTA`, `PF-OPS-UNKNOWN-ACTION`, `PF-OPS-OFFLINE` | `platformforge/ops/registry.py:63-110`; `ops/engine.py:132-191,354` |
-| Portal | `CLI-TIMEOUT`, `PORTAL-NOT-FOUND`→UNVERIFIED (never crash) | `registry_ops.py:61-62`; `forges.data.ts:17-56` |
-| platformforge collect | `platform.forge.cli_missing` (unlock `pip install -e`), `platform.forge.unknown` (unlock "extend KNOWN_FORGES"), `platform.capability.unresolved`, `platform.envelope.invalid` | `forge/collect.py:44-76`; `forge/delegate.py:54-60` |
+| `PF-OPS-*`            | `PF-OPS-CROSSFORGE-REFUSED`, `PF-OPS-ENVELOPE-UNGOVERNED`, `PF-OPS-POLICY-BLOCK`, `PF-OPS-ENVELOPE-INVALID`, `PF-OPS-NO-DELTA`, `PF-OPS-UNKNOWN-ACTION`, `PF-OPS-OFFLINE`                                                                                                                                          | `platformforge/ops/registry.py:63-110`; `ops/engine.py:132-191,354`                                                                                |
+| Portal                | `CLI-TIMEOUT`, `PORTAL-NOT-FOUND`→UNVERIFIED (never crash)                                                                                                                                                                                                                                                         | `registry_ops.py:61-62`; `forges.data.ts:17-56`                                                                                                    |
+| platformforge collect | `platform.forge.cli_missing` (unlock `pip install -e`), `platform.forge.unknown` (unlock "extend KNOWN_FORGES"), `platform.capability.unresolved`, `platform.envelope.invalid`                                                                                                                                     | `forge/collect.py:44-76`; `forge/delegate.py:54-60`                                                                                                |
 
 ## 7. Data-only authority
 
@@ -107,7 +107,7 @@ below. Refusal codes are named, never silent.
 - Transport poll deadline → `PROTO_TIMEOUT` + guaranteed **tree kill**
   (`protocol/transport.py:163-192`).
 - Adapter `_shell.py`: `EXECUTE_TIMEOUTS {economy:60s, balanced:180s,
-  max:600s}`; native timeout = 85% of profile; whole process tree killed
+max:600s}`; native timeout = 85% of profile; whole process tree killed
   (Job Object on Windows / process group on POSIX); overrun →
   `ADAPTER-NATIVE-TIMEOUT`.
 - `DESCRIBE_TIMEOUT=10.0` (`registry/registry.py:46`);

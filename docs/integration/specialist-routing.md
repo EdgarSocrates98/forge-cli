@@ -48,21 +48,21 @@ all three audit appendices.
   `{python} scripts/…` argv is honestly skipped under the registry method
   (`src/cmd/registry.ts:237-294`).
 - `resolveDiscovery` precedence: `manifest > forja-discovery > catalog >
-  remote-registry > fallback` (`src/contracts/negotiate.ts:67-114`).
+remote-registry > fallback` (`src/contracts/negotiate.ts:67-114`).
 - **data-sentinel-forge is in neither catalog** — it cannot be installed,
   verified, or MCP-probed via forge-cli (audit-core §2.1).
 
 ## 4. Routing inside specialists (all internal, none peer-aware)
 
 - **api-forge**: `rules/catalog/routing.yaml` `(phase, dominant_area) →
-  recommended_agent`; no route → `AF-ROUTING-NO-ROUTE`
+recommended_agent`; no route → `AF-ROUTING-NO-ROUTE`
   (`application/next_step.py:58-134`). `run tool` is a closed argv-template
   allowlist — no forge CLI registered (`run_tools.py:56-85,433-448`).
   `prepare_handoff` targets only declared engines `[spark-forge,
-  the-forger]` → `AF-FORGE-ENGINE-UNKNOWN` otherwise
+the-forger]` → `AF-FORGE-ENGINE-UNKNOWN` otherwise
   (`rules/forge_protocol.yaml:8`; `forge/protocol.py:305-309`).
 - **forge-doctor-api**: declares consumer routes — `_DOMAIN_HANDLERS =
-  {"api": "api-forge", "data": "data-doctor"}` and chains
+{"api": "api-forge", "data": "data-doctor"}` and chains
   `("doctor-api","api-forge")`, `("doctor-api","data-doctor"[,"spark-forge"])`
   — but executes none: "The Doctor declares routes — The Forger executes
   them" (`handoff/routing.py:6-7,19-84`).
