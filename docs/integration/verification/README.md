@@ -22,14 +22,33 @@ npx vitest run -t integration
 | forge-doctor-data   | 84 passed, 2616 deselected                            | 186 s    | `forge-doctor-data-pytest.log`   |
 | forge-doctor-api    | 18 passed, 1962 deselected                            | 21 s     | `forge-doctor-api-pytest.log`    |
 | forge-cli           | vitest: 10 passed (2 files), 1184 skipped             | 27 s     | `forge-cli-vitest.log`           |
-| the-forge           | see `the-forge-pytest.log` (long run — captured live) | —        | `the-forge-pytest.log`           |
+| the-forge           | **4 failed**, 2809 passed, 54 skipped (2867/5425 selected) | 8,718 s  | `the-forge-pytest.log`           |
 
-### Additional honest result
+### the-forge failures (reported, not hidden)
 
-A broader ad-hoc probe in the-forge
-(`-k "delegation or orchestrat or handoff or discovery or specialist"`,
-498 passed) surfaced **one failure**:
-`tests/test_browser_real_adapter.py::test_specialists_federation_real`
-→ `HTTPError 504` on the `/federation` endpoint of a _real_ browser
-adapter — an environmental/live-adapter timeout, not a contract
-regression. Reported, not hidden. It sits outside the required subset.
+All four are in `tests/test_browser_real_adapter.py` — the real
+portal/browser adapter suite, where serving-adapter operations exceed
+`run_with_timeout` and return HTTP 504 to the test client:
+
+- `test_specialists_federation_real`
+- `test_capabilities_real`
+- `test_install_plan_preview_only`
+- `test_no_console_errors_on_routes`
+
+Reproduced in isolation on this machine (same 4 of 9 fail with
+`TimeoutError` inside `_forge_portal.py:run_with_timeout`), so they are
+a repeatable environment/dependency issue in the portal real-adapter
+path — **not** a delegation/orchestration regression: the cycle-relevant
+files were run separately and are fully green:
+
+```bash
+python -m pytest tests/test_delegation_governance.py \
+  tests/test_specialist_delegation.py tests/test_delegation_router.py \
+  tests/test_orchestrate.py -q
+# → 80 passed in 6.91s
+```
+
+A standalone probe of `tests/test_reality_collect.py` (outside this
+subset) also showed `test_snapshot_info_counts_lists_and_dicts` failing
+on a pytest `tmp_path`-outside-repo assumption — environmental harness
+issue, recorded for the parent.

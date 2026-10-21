@@ -167,12 +167,16 @@ All commands + logs in `verification/README.md` (subset:
 | forge-doctor-data   | 84 passed                                          |
 | forge-doctor-api    | 18 passed                                          |
 | forge-cli           | 10 passed (2 files)                                |
-| the-forge           | §pending — see `verification/the-forge-pytest.log` |
+| the-forge           | **4 failed**, 2809 passed, 54 skipped (2867/5425 selected) |
 
-Additional honest failure (outside the required subset):
-`tests/test_browser_real_adapter.py::test_specialists_federation_real`
-→ HTTP 504 on a real `/federation` adapter endpoint — environmental
-timeout, reported not hidden.
+The four the-forge failures are all in
+`tests/test_browser_real_adapter.py` (portal real-adapter ops exceed
+`run_with_timeout` → HTTP 504; reproduced in isolation — a repeatable
+environment/dependency issue, **not** a delegation/orchestration
+regression: `test_delegation_governance.py`,
+`test_specialist_delegation.py`, `test_delegation_router.py`,
+`test_orchestrate.py` run separately = 80/80 green). Details:
+`verification/README.md`.
 
 ## 10. Evals
 
@@ -239,7 +243,10 @@ unresolved** (no host transcript; Bytes ≠ Tokens, no inference).
 
 ## 15. CI state
 
-- Per-repo test subsets all green (§9, `verification/`).
+- Per-repo test subsets: 6/7 repos fully green; the-forge green except
+  4 reproducible portal real-adapter timeouts (§9) — flagged for
+  verification, likely missing browser/portal runtime dependency on
+  this machine rather than a cycle regression.
 - Deterministic fixtures pinned; no CI step depends on a live external
   service (Case E/G prove absent-specialist and no-credentials paths
   offline).
@@ -248,8 +255,10 @@ unresolved** (no host transcript; Bytes ≠ Tokens, no inference).
   no new platform dependency was introduced by lf-0033 (docs+evidence
   only). **Not re-verified end-to-end on Windows in this spec** —
   marked unresolved.
-- Portal compat: explorer pages landed in `23e078b`; the
-  `federation_real` adapter test failure is environmental (§9).
+- Portal compat: explorer pages landed in `23e078b`; the 4
+  `test_browser_real_adapter.py` timeouts (incl.
+  `test_specialists_federation_real`) are reproducible but outside the
+  cycle surfaces — recorded as an open environment item (§9, P2).
 
 ## 16. P0 / P1 / P2 gaps
 
@@ -288,6 +297,9 @@ breaking` is refused `AF-DELEG-USAGE` because no `--baseline` slot
    — environment hygiene note, not a contract issue.
 4. Token-observability hook absent in the host harness — only bytes are
    measurable today.
+5. `test_browser_real_adapter.py` portal real-adapter suite times out
+   (HTTP 504) on this machine — verify whether a browser/portal runtime
+   dependency is missing or a genuine serving-adapter regression (§9).
 
 ## 17. Release readiness
 
