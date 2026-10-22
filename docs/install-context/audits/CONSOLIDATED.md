@@ -6,7 +6,8 @@ forge-cli `4a12652` · forge-portal `2dca5cf` · forge-doctor-data `8d41bde` ·
 forge-doctor-api `c7a05b2` · data-sentinel-forge `92f245f`.
 
 Docs por repo: `docs/audits/FORGE_CONTEXT_BASELINE.md` em cada uma das 5 forges
-+ `docs/install-context/audits/COMPLEMENTARY.md` (cli/portal/doctors/sentinel).
+
+- `docs/install-context/audits/COMPLEMENTARY.md` (cli/portal/doctors/sentinel).
 
 ## Resumo executivo
 
@@ -20,16 +21,16 @@ AGENT_PROTOCOL.md) e handles instalados para knowledge/rules/evals.
 
 ## Matriz de gaps transversais
 
-| Gap | AWS | Azure | api-forge | platform | the-forge |
-|---|---|---|---|---|---|
-| `.forge/context/` registry + `forge-context/v1` | ausente | ausente | ausente | ausente | ausente |
-| Templates AGENTS/CLAUDE/PROTOCOL ao alvo | marker só | marker só | AGENT_PROTOCOL no wheel, não copiado | `marker_files=()` — zero | marker ~5 linhas |
-| Refs mortas `../../knowledge/*` em mirrors instalados | 130 refs/51 SKILL.md | sim | sim (dead refs AGENT_PROTOCOL) | — | — |
-| `install manifest`/`install env` verbs | ausente | ausente | parcial | parcial | existe |
-| `forge.json`/manifestos no wheel | ausente | ausente | ausente | ausente | presente |
-| agents/skills no wheel completos | ok | ok | ok | ok | **P0: `agentic/agents/` ausente** |
-| MCP registration pelo install | ok (.mcp.json) | ok | quebrado (`"command":"python"`) | **nunca registrado** | ok |
-| `~/.forge/installations/` registro | ok | ok | entry stale pós-uninstall | ausente | ok |
+| Gap                                                   | AWS                  | Azure     | api-forge                            | platform                 | the-forge                         |
+| ----------------------------------------------------- | -------------------- | --------- | ------------------------------------ | ------------------------ | --------------------------------- |
+| `.forge/context/` registry + `forge-context/v1`       | ausente              | ausente   | ausente                              | ausente                  | ausente                           |
+| Templates AGENTS/CLAUDE/PROTOCOL ao alvo              | marker só            | marker só | AGENT_PROTOCOL no wheel, não copiado | `marker_files=()` — zero | marker ~5 linhas                  |
+| Refs mortas `../../knowledge/*` em mirrors instalados | 130 refs/51 SKILL.md | sim       | sim (dead refs AGENT_PROTOCOL)       | —                        | —                                 |
+| `install manifest`/`install env` verbs                | ausente              | ausente   | parcial                              | parcial                  | existe                            |
+| `forge.json`/manifestos no wheel                      | ausente              | ausente   | ausente                              | ausente                  | presente                          |
+| agents/skills no wheel completos                      | ok                   | ok        | ok                                   | ok                       | **P0: `agentic/agents/` ausente** |
+| MCP registration pelo install                         | ok (.mcp.json)       | ok        | quebrado (`"command":"python"`)      | **nunca registrado**     | ok                                |
+| `~/.forge/installations/` registro                    | ok                   | ok        | entry stale pós-uninstall            | ausente                  | ok                                |
 
 ## P0s pontuais por repo
 

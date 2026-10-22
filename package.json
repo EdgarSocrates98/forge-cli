@@ -1,6 +1,6 @@
 {
   "name": "theforge-cli",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "CLI interativa para clonar e configurar o ecossistema Forge",
   "type": "module",
   "bin": {

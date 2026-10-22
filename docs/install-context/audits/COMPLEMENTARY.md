@@ -9,13 +9,13 @@ arquivos citados foram executados/lidos nesta auditoria (2026-10-22).
 Nenhum arquivo destes repos foi modificado (este doc é a única exceção,
 conforme a tarefa).
 
-| Repo | SHA auditado | Versão | Nota |
-|---|---|---|---|
-| forge-cli | `e260ce8` (HEAD; spec esperava `4a12652`, ancestral — HEAD = 4a12652 + commit dos specs lf-0034..43) | `theforge-cli` 0.2.6 (npm) | TypeScript/Node ≥20, `bin: forge-cli` |
-| forge-portal | `2dca5cf` | `forge-portal-app` 1.0.0 (private) | Angular; **não publicável** |
-| forge-doctor-data | `8d41bde` | `forge-doctor-data` 1.0.6 (PEP440) | Python ≥3.11 |
-| forge-doctor-api | `c7a05b2` | `forge-doctor-api` 0.2.6 | Python ≥3.11 |
-| data-sentinel-forge | `92f245f` | `data-sentinel` 0.2.1 | Python ≥3.11 — **referência** |
+| Repo                | SHA auditado                                                                                         | Versão                             | Nota                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------- |
+| forge-cli           | `e260ce8` (HEAD; spec esperava `4a12652`, ancestral — HEAD = 4a12652 + commit dos specs lf-0034..43) | `theforge-cli` 0.2.6 (npm)         | TypeScript/Node ≥20, `bin: forge-cli` |
+| forge-portal        | `2dca5cf`                                                                                            | `forge-portal-app` 1.0.0 (private) | Angular; **não publicável**           |
+| forge-doctor-data   | `8d41bde`                                                                                            | `forge-doctor-data` 1.0.6 (PEP440) | Python ≥3.11                          |
+| forge-doctor-api    | `c7a05b2`                                                                                            | `forge-doctor-api` 0.2.6           | Python ≥3.11                          |
+| data-sentinel-forge | `92f245f`                                                                                            | `data-sentinel` 0.2.1              | Python ≥3.11 — **referência**         |
 
 ---
 
@@ -23,9 +23,9 @@ conforme a tarefa).
 
 **O que é:** CLI interativa TypeScript (`package.json`: `name=theforge-cli`,
 `bin=forge-cli → dist/index.js`, deps `@clack/prompts, execa, figlet,
-picocolors`). O prompt-fonte (§0) é explícito: *"O Forge CLI é um
+picocolors`). O prompt-fonte (§0) é explícito: _"O Forge CLI é um
 instalador/gerenciador independente. Não deve ser responsável pela
-inteligência operacional das Forjas."*
+inteligência operacional das Forjas."_
 
 ### Como `forge-cli install` se relaciona com o installkit por-Forge
 
@@ -67,14 +67,14 @@ instalador).
 
 ### O que forge-cli escreve
 
-| Destino | Escritor | Conteúdo |
-|---|---|---|
-| `~/.forge-cli/bin/` | `src/install.ts` (self-install) | shims `forge`/forges + bloco `GUARD_START/END` em `.bashrc/.zshrc/.profile/config.fish` |
-| `~/.forge-cli/forges/<nome>/` | `registry/install.ts` | venvs por Forja + receipts |
-| `~/.forge-cli/cache/wheels/` | idem | wheelhouse offline |
-| Host configs (`~/.claude.json`, `~/.codex`, …) | `src/hosts/*.ts` | merge-json de `mcpServers[forge_id]` + backups com rollback (`types.ts:285-391`) + `copyable_command` manual honesto quando não escreve |
-| `~/.forge/installations/` | **lê** (`doctor2/domains.ts:407`), **não escreve** | o registry do bootstrap pertence às Forjas |
-| Workspace do usuário (skills/agents) | **não escreve** — delega ao `nativeInstall` da Forja |
+| Destino                                        | Escritor                                             | Conteúdo                                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.forge-cli/bin/`                            | `src/install.ts` (self-install)                      | shims `forge`/forges + bloco `GUARD_START/END` em `.bashrc/.zshrc/.profile/config.fish`                                                 |
+| `~/.forge-cli/forges/<nome>/`                  | `registry/install.ts`                                | venvs por Forja + receipts                                                                                                              |
+| `~/.forge-cli/cache/wheels/`                   | idem                                                 | wheelhouse offline                                                                                                                      |
+| Host configs (`~/.claude.json`, `~/.codex`, …) | `src/hosts/*.ts`                                     | merge-json de `mcpServers[forge_id]` + backups com rollback (`types.ts:285-391`) + `copyable_command` manual honesto quando não escreve |
+| `~/.forge/installations/`                      | **lê** (`doctor2/domains.ts:407`), **não escreve**   | o registry do bootstrap pertence às Forjas                                                                                              |
+| Workspace do usuário (skills/agents)           | **não escreve** — delega ao `nativeInstall` da Forja |
 
 `src/contracts/schemas.ts` embute validadores `forge/*` para consumo:
 `ForgeDescriptor/v1` (o `forge.json`), `ForgeInstallContract`,
@@ -96,8 +96,8 @@ por workspace) é um terceiro plano que nenhum dos dois cobre.
 ## 2. forge-portal — componente vendored, não pacote
 
 **O que é:** SPA Angular (`package.json private, name=forge-portal-app`,
-v1.0.0). **Não é publicável** — seu papel no install-2.0 é como *fonte
-canônica de assets que fluem para os pacotes Python*:
+v1.0.0). **Não é publicável** — seu papel no install-2.0 é como _fonte
+canônica de assets que fluem para os pacotes Python_:
 
 - `portal_core/forge_portal.py` + `telemetry.py` — servidor portal
   canônico (stdlib), vendored **byte-idêntico** para cada Forja:
@@ -114,8 +114,8 @@ canônica de assets que fluem para os pacotes Python*:
 - Versão única da verdade: `PORTAL_VERSION` em `portal_core/forge_portal.py`
   (package.json validado por teste contra ela).
 
-**Contribuição ao install-2.0:** padrão de *assets de frontend
-distribuídos dentro do wheel* já resolvido (the-forge carrega 46
+**Contribuição ao install-2.0:** padrão de _assets de frontend
+distribuídos dentro do wheel_ já resolvido (the-forge carrega 46
 `portal_assets` no wheel; doctor-data idem). Sem verbo de install
 próprio — é componente, não Forja instalável.
 
@@ -126,7 +126,7 @@ próprio — é componente, não Forja instalável.
 - `forge.json` (root): `forge_id`, `package=forge_doctor_data`,
   `distribution=forge-doctor-data`, `cli`, `python>=3.11`,
   `mcp_server_name=forge-doctor-data`, `mcp_command=[forge-doctor-data,
-  mcp]`, `extras=[]`, `lab.command` — o driver declarativo do bootstrap.
+mcp]`, `extras=[]`, `lab.command` — o driver declarativo do bootstrap.
 - `forge.agentic.json` — manifesto `forge/SpecialistAgenticManifest/v1`
   (idêntico em espírito ao do doctor-api; lido por
   `theforge/discovery.py` como "bundled-manifest").
@@ -134,16 +134,16 @@ próprio — é componente, não Forja instalável.
   `_SOURCE_SHA256`-stamped; `pyproject.toml:130,133` isenta as duas
   cópias vendored do lint) + `scripts/forge_installkit.py` +
   `scripts/forge_bootstrap.py` + `install.sh/install.ps1/install.windows.sh/
-  setup.sh/setup.ps1` — o pacote completo do vendor.
+setup.sh/setup.ps1` — o pacote completo do vendor.
 - **Verbo:** `forge-doctor-data install` existe
   (`cli/install_cmd.py` — typer sub-app: apply/status/doctor/repair/
   uninstall/update/mcp-verify) sobre `install/service.py`.
-- **O que instala:** `install/service.py:52-62` — *"publishes no host
+- **O que instala:** `install/service.py:52-62` — _"publishes no host
   skill/agent mirrors today — all profiles install the managed MCP key
-  plus AGENTS.md/CLAUDE.md marker blocks"* (`render_assets` retorna `{}`).
+  plus AGENTS.md/CLAUDE.md marker blocks"_ (`render_assets` retorna `{}`).
   Scopes project/workspace/user, profiles minimal/recommended/full,
   gateway profiles economy/balanced/deep, `mcp_verify_tool=
-  get_execution_baseline`.
+get_execution_baseline`.
 - **Wheel real** (`dist/forge_doctor_data-1.0.6-py3-none-any.whl`, 820
   arquivos): `_installkit.py`, `install/`, `cli/install_cmd.py`,
   **`knowledge/` 102 arquivos** (26 domínios — glue, spark, iceberg,
@@ -165,14 +165,14 @@ próprio — é componente, não Forja instalável.
 - `forge.agentic.json` — `forge/SpecialistAgenticManifest/v1`:
   `workflows` (scan/diagnose, `read_only`, `DIAGNOSTIC_ONLY`),
   `skills:[]`, `agents:[]`, `coordinators:[]`, `host_adapters:
-  [claude,devin,codex,copilot]`, `requires_network/credentials:false`,
+[claude,devin,codex,copilot]`, `requires_network/credentials:false`,
   `read_only_default:true`.
 - **Dupla superfície de install:** `scripts/forge_install.py`
   (checkout-level, `import forge_installkit as kit`) **e**
   `forge-doctor-api install` / `python -m forge_doctor_api install`
-  dentro do wheel — *"since cyc11.2 (ADR-0006, recorded RC exception)
+  dentro do wheel — _"since cyc11.2 (ADR-0006, recorded RC exception)
   … backed by the byte-identical vendored engine …
-  `test_package_carries_install_surface` guards parity"*
+  `test_package_carries_install_surface` guards parity"_
   (docstring do script).
 - **Wheel real** (`dist/forge_doctor_api-0.2.6-py3-none-any.whl`, 404
   arquivos): `_installkit.py`, `install/service.py`,
@@ -192,9 +192,9 @@ próprio — é componente, não Forja instalável.
 
 O installkit **mais completo** do ecossistema observado nesta auditoria:
 
-- **Engine vendored:** `src/data_sentinel/_installkit.py` — *"Vendored
+- **Engine vendored:** `src/data_sentinel/_installkit.py` — _"Vendored
   canonical installkit — byte-identical to the-forge/scripts/installkit
-  (drift-checked via _SOURCE_SHA256)"* (`pyproject.toml:95-97`,
+  (drift-checked via \_SOURCE_SHA256)"_ (`pyproject.toml:95-97`,
   `exclude = ["data_sentinel._installkit"]` no mypy/ruff).
 - **Camada própria:** `src/data_sentinel/installation/` —
   `service.py` (494), `contracts.py` (198), `hosts.py` (534),
@@ -242,24 +242,24 @@ O installkit **mais completo** do ecossistema observado nesta auditoria:
 
 ## 6. Quem já resolve o quê (mapa para o install-2.0)
 
-| Requisito install-2.0 | Já resolvido por | Evidência |
-|---|---|---|
-| Engine de install governado (ledger sha256, locks, markers, `.mcp.json` gerenciado, scopes, profiles, receipts, rollback, recusas `FORGE-INSTALL-*`) | **the-forge** (`scripts/installkit/forge_installkit.py`, canônico) | vendored byte-idêntico em doctor-data, doctor-api, data-sentinel (`_SOURCE_SHA256` drift check) |
-| Bootstrap de conta (venv+wheel+shim+registry `~/.forge/installations`) | the-forge `forge_bootstrap.py` + `vendor.py` | `install.sh/setup.sh` em the-forge, doctor-data, doctor-api |
-| Assets versionados dentro do wheel | **data-sentinel** (`installation/assets/` c/ skills+agents+`MANIFEST.sha256`+`manifest/forge.json`); the-forge parcial (skills+portal+knowledge, **sem agents**) | `unzip -l` nos wheels |
-| Manifesto agentic descobrível (`forge.agentic.json`, `SpecialistAgenticManifest/v1`) | doctor-data, doctor-api, data-sentinel | lido por `theforge/discovery.py:466-530` |
-| Orquestração cross-forge da instalação | forge-cli (`nativeInstall` argv + catálogo PyPI); the-forge `install auto` | `constants/repos.ts`; `install/service.py:495-712` |
-| Delegação por argv-template (`install_command`) | forge.json dos doctors + `forge_doctor_api` | `service._delegated_cmd` honra `{python}`/`{checkout}` |
-| Integração MCP nos hosts (merge-json + rollback + comando manual) | forge-cli `src/hosts/*.ts` | claude/codex/cursor/copilot/devin adapters |
-| Registry de instalações de conta | `~/.forge/installations/` (bootstrap) — lido por the-forge e forge-cli doctor | 7 manifests ativos nesta máquina |
-| Wheel E2E/matrix de portabilidade | data-sentinel `test_install_matrix.py`; the-forge `test_installkit*.py` + `test_install_e2e.py` + `test_installkit_schemas.py` | — |
-| Integrity manifest de assets (`MANIFEST.sha256`, `forge/PortalAssets/1`) | data-sentinel; forge-portal `vendor.py` | — |
-| Assets de UI no wheel (`portal_assets` + manifest sha256) | forge-portal → todas as Forjas | `vendor.py`, force-include |
-| Registry de contexto por workspace (`.forge/context/*`, `forge-context/v1`) | **ninguém** — gap aberto | — |
-| Entry points completos AGENTS.md/CLAUDE.md/AGENT_PROTOCOL.md no consumidor | **parcial**: só marker blocks (the-forge, doctors); templates completos em ninguém | — |
-| Handles instalados para knowledge/rules/evals/protocols | **parcial**: knowledge viaja no pacote (sentinel 102 arquivos, doctors, the-forge `forge_knowledge`) mas sem handle no workspace; rules/evals como artefatos instaláveis: ninguém | — |
-| Instalação offline/wheelhouse | forge-cli (`--method registry --offline`, `cache/wheels`) | `docs/installation.md` cenário 10 |
-| Skills/agents com formato nativo por host no install | **ninguém** — data-sentinel copia md único; the-forge copia mirror codex para todos | — |
+| Requisito install-2.0                                                                                                                                | Já resolvido por                                                                                                                                                                  | Evidência                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Engine de install governado (ledger sha256, locks, markers, `.mcp.json` gerenciado, scopes, profiles, receipts, rollback, recusas `FORGE-INSTALL-*`) | **the-forge** (`scripts/installkit/forge_installkit.py`, canônico)                                                                                                                | vendored byte-idêntico em doctor-data, doctor-api, data-sentinel (`_SOURCE_SHA256` drift check) |
+| Bootstrap de conta (venv+wheel+shim+registry `~/.forge/installations`)                                                                               | the-forge `forge_bootstrap.py` + `vendor.py`                                                                                                                                      | `install.sh/setup.sh` em the-forge, doctor-data, doctor-api                                     |
+| Assets versionados dentro do wheel                                                                                                                   | **data-sentinel** (`installation/assets/` c/ skills+agents+`MANIFEST.sha256`+`manifest/forge.json`); the-forge parcial (skills+portal+knowledge, **sem agents**)                  | `unzip -l` nos wheels                                                                           |
+| Manifesto agentic descobrível (`forge.agentic.json`, `SpecialistAgenticManifest/v1`)                                                                 | doctor-data, doctor-api, data-sentinel                                                                                                                                            | lido por `theforge/discovery.py:466-530`                                                        |
+| Orquestração cross-forge da instalação                                                                                                               | forge-cli (`nativeInstall` argv + catálogo PyPI); the-forge `install auto`                                                                                                        | `constants/repos.ts`; `install/service.py:495-712`                                              |
+| Delegação por argv-template (`install_command`)                                                                                                      | forge.json dos doctors + `forge_doctor_api`                                                                                                                                       | `service._delegated_cmd` honra `{python}`/`{checkout}`                                          |
+| Integração MCP nos hosts (merge-json + rollback + comando manual)                                                                                    | forge-cli `src/hosts/*.ts`                                                                                                                                                        | claude/codex/cursor/copilot/devin adapters                                                      |
+| Registry de instalações de conta                                                                                                                     | `~/.forge/installations/` (bootstrap) — lido por the-forge e forge-cli doctor                                                                                                     | 7 manifests ativos nesta máquina                                                                |
+| Wheel E2E/matrix de portabilidade                                                                                                                    | data-sentinel `test_install_matrix.py`; the-forge `test_installkit*.py` + `test_install_e2e.py` + `test_installkit_schemas.py`                                                    | —                                                                                               |
+| Integrity manifest de assets (`MANIFEST.sha256`, `forge/PortalAssets/1`)                                                                             | data-sentinel; forge-portal `vendor.py`                                                                                                                                           | —                                                                                               |
+| Assets de UI no wheel (`portal_assets` + manifest sha256)                                                                                            | forge-portal → todas as Forjas                                                                                                                                                    | `vendor.py`, force-include                                                                      |
+| Registry de contexto por workspace (`.forge/context/*`, `forge-context/v1`)                                                                          | **ninguém** — gap aberto                                                                                                                                                          | —                                                                                               |
+| Entry points completos AGENTS.md/CLAUDE.md/AGENT_PROTOCOL.md no consumidor                                                                           | **parcial**: só marker blocks (the-forge, doctors); templates completos em ninguém                                                                                                | —                                                                                               |
+| Handles instalados para knowledge/rules/evals/protocols                                                                                              | **parcial**: knowledge viaja no pacote (sentinel 102 arquivos, doctors, the-forge `forge_knowledge`) mas sem handle no workspace; rules/evals como artefatos instaláveis: ninguém | —                                                                                               |
+| Instalação offline/wheelhouse                                                                                                                        | forge-cli (`--method registry --offline`, `cache/wheels`)                                                                                                                         | `docs/installation.md` cenário 10                                                               |
+| Skills/agents com formato nativo por host no install                                                                                                 | **ninguém** — data-sentinel copia md único; the-forge copia mirror codex para todos                                                                                               | —                                                                                               |
 
 ### Observações finais
 
@@ -273,8 +273,8 @@ O installkit **mais completo** do ecossistema observado nesta auditoria:
 - **A divisão de trabalho é clara e estável**: forge-cli orquestra
   aquisição e integração MCP de conta; cada Forja é dona do próprio
   installkit vendored e dos seus assets — exatamente o princípio §2.1/2.2
-  do prompt-fonte. O que falta no install-2.0 é a camada de *contexto no
-  workspace* (registry, entry points ricos, handles de conhecimento) —
+  do prompt-fonte. O que falta no install-2.0 é a camada de _contexto no
+  workspace_ (registry, entry points ricos, handles de conhecimento) —
   não o motor de instalação, que já existe e está provado.
 
 ### Comandos executados nesta auditoria (repos read-only)
