@@ -158,15 +158,15 @@ peer schema strings observed in persisted artifacts):
 All commands + logs in `verification/README.md` (subset:
 `pytest -k "deleg or integr or orchestr"`; forge-cli: `vitest run -t integration`).
 
-| Repo                | Result                                             |
-| ------------------- | -------------------------------------------------- |
-| spark-forge-aws     | 236 passed, 7 skipped                              |
-| spark-forge-azure   | 68 passed, 1 skipped                               |
-| api-forge           | 122 passed, 1 skipped                              |
-| data-sentinel-forge | 66 passed                                          |
-| forge-doctor-data   | 84 passed                                          |
-| forge-doctor-api    | 18 passed                                          |
-| forge-cli           | 10 passed (2 files)                                |
+| Repo                | Result                                                     |
+| ------------------- | ---------------------------------------------------------- |
+| spark-forge-aws     | 236 passed, 7 skipped                                      |
+| spark-forge-azure   | 68 passed, 1 skipped                                       |
+| api-forge           | 122 passed, 1 skipped                                      |
+| data-sentinel-forge | 66 passed                                                  |
+| forge-doctor-data   | 84 passed                                                  |
+| forge-doctor-api    | 18 passed                                                  |
+| forge-cli           | 10 passed (2 files)                                        |
 | the-forge           | **4 failed**, 2809 passed, 54 skipped (2867/5425 selected) |
 
 The four the-forge failures are all in
