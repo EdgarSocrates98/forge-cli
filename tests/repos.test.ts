@@ -11,11 +11,15 @@ const EXPECTED_NAMES = [
   'forge-doctor-data',
   'forge-portal',
   'data-sentinel-forge',
+  'forge-lens',
+  'code-atlas-forge',
+  'product-forge',
+  'forge-agent-bridge',
 ];
 
 describe('FORGE_REPOS catalog', () => {
-  it('contains exactly the 9 Forge repositories', () => {
-    expect(FORGE_REPOS).toHaveLength(9);
+  it('contains the complete 13-repository Forge catalog', () => {
+    expect(FORGE_REPOS).toHaveLength(13);
     expect(FORGE_REPOS.map((r) => r.name)).toEqual(EXPECTED_NAMES);
   });
 
@@ -48,21 +52,26 @@ describe('FORGE_REPOS catalog', () => {
     }
   });
 
-  it('marks repo kinds — 8 python + 1 node', () => {
+  it('marks repo kinds — 12 python + 1 node', () => {
     const kinds = FORGE_REPOS.map((r) => r.kind);
-    expect(kinds.filter((k) => k === 'python')).toHaveLength(8);
+    expect(kinds.filter((k) => k === 'python')).toHaveLength(12);
     expect(kinds.filter((k) => k === 'node')).toHaveLength(1);
     expect(FORGE_REPOS.find((r) => r.kind === 'node')?.name).toBe('forge-portal');
   });
 
-  it('catalogs data-sentinel-forge as cloneable but without an install route', () => {
-    // lf-0031: o repositório é clonável (gap G7) mas não tem dist no PyPI
-    // nem script de bootstrap na fonte — sem nativeInstall, nenhum fluxo
-    // finge uma instalação que ainda não existe.
+  it('catalogs the new ecosystem projects with source install routes', () => {
     const sentinel = FORGE_REPOS.find((r) => r.name === 'data-sentinel-forge');
     expect(sentinel).toBeDefined();
     expect(sentinel?.kind).toBe('python');
-    expect(sentinel?.nativeInstall).toBeUndefined();
+    expect(sentinel?.nativeInstall?.command).toEqual(['data-sentinel', 'install']);
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-lens')?.nativeInstall?.command)
+      .toEqual(['forge-lens', 'install']);
+    expect(FORGE_REPOS.find((r) => r.name === 'product-forge')?.nativeInstall?.command)
+      .toEqual(['productforge', 'install']);
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-agent-bridge')?.nativeInstall?.command)
+      .toEqual(['forge-bridge', 'install']);
+    expect(FORGE_REPOS.find((r) => r.name === 'code-atlas-forge')?.verify)
+      .toEqual(['code-atlas', '--help']);
   });
 
   it('defines documented envKeys only for api-forge', () => {

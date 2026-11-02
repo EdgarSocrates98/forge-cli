@@ -117,16 +117,76 @@ export const FORGE_REPOS: ForgeRepo[] = [
     nextSteps: ['npm start'],
   },
   {
-    // lf-0031 (gap G7): o repositório existe e é clonável, mas ainda não tem
-    // rota de instalação — sem setup.sh/forge_bootstrap.py na fonte e sem
-    // dist no PyPI (verificado). Sem `nativeInstall`: o fluxo git reporta
-    // `noSetupSteps` honestamente; o registry recusa com "sem dist no
-    // catálogo". Nenhum caminho finge uma instalação que não existe.
+    // Instalação via fonte até existir uma distribuição oficial no registry.
     name: 'data-sentinel-forge',
     url: 'https://github.com/EdgarSocrates98/data-sentinel-forge',
     description: 'Diagnóstico de runtime (logs/plans Spark, doctor-bundles)',
     kind: 'python',
     verify: ['data-sentinel', '--help'],
-    nextSteps: ['data-sentinel --help'],
+    nativeInstall: {
+      command: ['data-sentinel', 'install'],
+      flags: ['scope', 'profile', 'components', 'host'],
+      ops: {
+        update: ['data-sentinel', 'install', 'update'],
+        uninstall: ['data-sentinel', 'install', 'uninstall'],
+      },
+    },
+    nextSteps: ['data-sentinel install', 'data-sentinel doctor'],
+  },
+  {
+    name: 'forge-lens',
+    url: 'https://github.com/EdgarSocrates98/forge-lens',
+    description: 'Observabilidade, traces, custos e avaliação de agentes',
+    kind: 'python',
+    verify: ['forge-lens', '--help'],
+    nativeInstall: {
+      command: ['forge-lens', 'install'],
+      flags: ['scope', 'profile', 'components', 'host'],
+      ops: {
+        update: ['forge-lens', 'install', 'update'],
+        uninstall: ['forge-lens', 'install', 'uninstall'],
+      },
+    },
+    nextSteps: ['forge-lens install', 'forge-lens doctor'],
+  },
+  {
+    name: 'code-atlas-forge',
+    url: 'https://github.com/EdgarSocrates98/code-atlas-forge',
+    description: 'Índice e exploração estrutural de código',
+    kind: 'python',
+    verify: ['code-atlas', '--help'],
+    nextSteps: ['code-atlas doctor', 'code-atlas status'],
+  },
+  {
+    name: 'product-forge',
+    url: 'https://github.com/EdgarSocrates98/product-forge',
+    description: 'Workspace de PM/PA, produtos, tarefas e agentes',
+    kind: 'python',
+    verify: ['productforge', '--help'],
+    nativeInstall: {
+      command: ['productforge', 'install'],
+      flags: ['scope', 'profile', 'components', 'host'],
+      ops: {
+        update: ['productforge', 'update'],
+        uninstall: ['productforge', 'uninstall'],
+      },
+    },
+    nextSteps: ['productforge install', 'productforge portal'],
+  },
+  {
+    name: 'forge-agent-bridge',
+    url: 'https://github.com/EdgarSocrates98/forge-agent-bridge',
+    description: 'Bridge local para Claude, Codex, Devin e GitHub Copilot',
+    kind: 'python',
+    verify: ['forge-bridge', '--help'],
+    nativeInstall: {
+      command: ['forge-bridge', 'install'],
+      flags: ['scope', 'profile', 'components', 'host'],
+      ops: {
+        update: ['forge-bridge', 'install', 'update'],
+        uninstall: ['forge-bridge', 'uninstall'],
+      },
+    },
+    nextSteps: ['forge-bridge install', 'forge-bridge doctor'],
   },
 ];
