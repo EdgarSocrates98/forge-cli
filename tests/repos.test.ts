@@ -64,14 +64,21 @@ describe('FORGE_REPOS catalog', () => {
     expect(sentinel).toBeDefined();
     expect(sentinel?.kind).toBe('python');
     expect(sentinel?.nativeInstall?.command).toEqual(['data-sentinel', 'install']);
-    expect(FORGE_REPOS.find((r) => r.name === 'forge-lens')?.nativeInstall?.command)
-      .toEqual(['forge-lens', 'install']);
-    expect(FORGE_REPOS.find((r) => r.name === 'product-forge')?.nativeInstall?.command)
-      .toEqual(['productforge', 'install']);
-    expect(FORGE_REPOS.find((r) => r.name === 'forge-agent-bridge')?.nativeInstall?.command)
-      .toEqual(['forge-bridge', 'install']);
-    expect(FORGE_REPOS.find((r) => r.name === 'code-atlas-forge')?.verify)
-      .toEqual(['code-atlas', '--help']);
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-lens')?.nativeInstall?.command).toEqual([
+      'forge-lens',
+      'install',
+    ]);
+    expect(FORGE_REPOS.find((r) => r.name === 'product-forge')?.nativeInstall?.command).toEqual([
+      'productforge',
+      'install',
+    ]);
+    expect(
+      FORGE_REPOS.find((r) => r.name === 'forge-agent-bridge')?.nativeInstall?.command,
+    ).toEqual(['forge-bridge', 'install']);
+    expect(FORGE_REPOS.find((r) => r.name === 'code-atlas-forge')?.verify).toEqual([
+      'code-atlas',
+      '--help',
+    ]);
   });
 
   it('defines documented envKeys only for api-forge', () => {
