@@ -4,7 +4,7 @@
 
 # Forge-CLI
 
-CLI interativa para clonar e configurar o ecossistema **Forge**: oito
+CLI interativa para clonar e configurar o ecossistema **Forge**: treze
 repositórios, um comando. O forge-cli resolve o diretório de destino,
 sincroniza cada repositório (clone ou pull), provisiona o arquivo `.env`
 e executa o script de instalação do sistema operacional — tudo com
@@ -193,7 +193,7 @@ o fluxo interativo:
    clonados. O padrão é `./forge-workspace`; o caminho é convertido
    para absoluto e o diretório criado se não existir.
 3. **Seleção de repositórios.** Marque ou desmarque itens com `Espaço`.
-   Todos os oito vêm selecionados por padrão; ao menos um é obrigatório.
+   Todos os treze vêm selecionados por padrão; ao menos um é obrigatório.
 4. **Confirmação.** Revise o resumo (destino e quantidade) e confirme.
 5. **Execução.** Para cada repositório, um spinner mostra a fase atual:
    `Sincronizando`, `Provisionando .env` e `Executando script`.

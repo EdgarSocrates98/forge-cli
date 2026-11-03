@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-11-02
+
+### Added
+
+- Added source catalog and installation verification for `data-sentinel-forge`,
+  `forge-lens`, `code-atlas-forge`, `product-forge`, and
+  `forge-agent-bridge`.
+- The default git installation flow now discovers each project's native setup
+  scripts and verifies its published CLI entry point after installation.
+
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
