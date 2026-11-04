@@ -105,6 +105,28 @@ describe('processRepo', () => {
     expect(result.detail).toBe(S.nonGitDir);
   });
 
+  it('non-git dir with matching package identity → points to gitless install', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repo: ForgeRepo = { ...baseRepo, name: 'product-forge', packageName: 'product-forge' };
+    const dir = mkdirSync(path.join(target, repo.name), { recursive: true })!;
+    writeFileSync(path.join(dir, 'pyproject.toml'), '[project]\nname = "product-forge"\n');
+    const result = await processRepo(repo, target);
+    expect(result.status).toBe('warning');
+    expect(result.detail).toContain(S.nonGitDirRecognized);
+    expect(result.detail).toContain('forge-cli install');
+  });
+
+  it('non-git dir with wrong package identity → generic skip', async () => {
+    mockExeca();
+    const target = tmpDir();
+    const repo: ForgeRepo = { ...baseRepo, name: 'product-forge', packageName: 'product-forge' };
+    const dir = mkdirSync(path.join(target, repo.name), { recursive: true })!;
+    writeFileSync(path.join(dir, 'pyproject.toml'), '[project]\nname = "impostor"\n');
+    const result = await processRepo(repo, target);
+    expect(result.detail).toBe(S.nonGitDir);
+  });
+
   it('runs npm ci when package-lock.json is present and reports ok', async () => {
     mockExeca();
     const target = tmpDir();

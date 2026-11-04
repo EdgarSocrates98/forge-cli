@@ -425,6 +425,26 @@ function platformCandidates(d: ResolvedPythonDeps): PythonCandidate[] {
         pushIfExists(out, path.join(pf, install, 'python.exe'), 'platform', 6, d.exists);
       }
     }
+    // Raiz de drive — o layout clássico do instalador python.org "for all
+    // users" (`C:\Python312\python.exe`) e variações em ferramentas.
+    // SystemDrive somente: varrer todas as letras pode bloquear em drive
+    // de rede offline (readdir síncrono sem timeout).
+    const systemDrive = (d.env.SystemDrive ?? 'C:').replace(/[\\/]+$/, '');
+    for (const install of sortedEntries(d, `${systemDrive}\\`)) {
+      if (!/^python\d*/i.test(install)) continue;
+      pushIfExists(out, path.join(systemDrive, install, 'python.exe'), 'platform', 6, d.exists);
+    }
+    for (const tools of [`${systemDrive}\\tools`, `${systemDrive}\\dev`]) {
+      for (const install of sortedEntries(d, tools)) {
+        if (!/^python\d*/i.test(install)) continue;
+        pushIfExists(out, path.join(tools, install, 'python.exe'), 'platform', 6, d.exists);
+      }
+    }
+    // Conda system-wide (instalador "para todos os usuários").
+    for (const name of ['anaconda3', 'miniconda3', 'miniforge3']) {
+      const programData = d.env.ProgramData ?? `${systemDrive}\\ProgramData`;
+      pushIfExists(out, path.join(programData, name, 'python.exe'), 'platform', 6, d.exists);
+    }
     return out;
   }
   pushDirPythons('/usr/bin');

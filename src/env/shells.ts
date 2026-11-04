@@ -234,6 +234,15 @@ async function gitBashCandidates(
   candidates.push(
     'C:\\Program Files\\Git\\bin\\bash.exe',
     'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+    // Instalações não-padrão relatadas em campo: raiz customizada C:\GitW
+    // e o alias 8.3 `C:\Progra~1` de Program Files (8.3 pode estar ativo
+    // mesmo quando o nome longo resolve).
+    'C:\\GitW\\bin\\bash.exe',
+    'C:\\GitW\\usr\\bin\\bash.exe',
+    'C:\\GitW\\usr\\bash.exe',
+    'C:\\Progra~1\\Git\\bin\\bash.exe',
+    'C:\\Progra~1\\Git\\usr\\bin\\bash.exe',
+    'C:\\Progra~1\\Git\\usr\\bash.exe',
   );
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
@@ -251,7 +260,28 @@ async function gitBashCandidates(
 async function probeGitBash(d: ResolvedShellDeps, bashPath: string | null): Promise<ShellStatus> {
   const probes: Record<string, ShellProbeResult> = {};
   if (d.platform !== 'win32') return absent(probes);
+  // "Estou dentro do Git Bash?": MSYSTEM é a evidência explícita — quando
+  // o CLI roda num terminal Git Bash, PowerShell ausente/bloqueado deixa
+  // de ser impeditivo porque a própria sessão prova a capacidade. cygpath
+  // traduz $SHELL (path MSYS) para o bash.exe Windows correspondente.
+  const msystem = d.env.MSYSTEM;
+  probes['env:MSYSTEM'] = fsProbe('env:MSYSTEM', !!msystem, msystem ?? null);
+  let insideGitBash: string | null = null;
+  if (msystem) {
+    const shellPath = d.env.SHELL ?? d.env.BASH ?? '/usr/bin/bash';
+    const convArgs = ['-w', shellPath];
+    const conv = await d.run('cygpath', convArgs);
+    probes.cygpath = probeResult('cygpath', convArgs, conv);
+    const resolved = conv.ok ? firstLine(conv.output) : null;
+    if (resolved && /bash(?:\.exe)?$/i.test(resolved)) insideGitBash = resolved;
+  }
   const candidates = await gitBashCandidates(d, bashPath, probes);
+  if (insideGitBash) {
+    const norm = insideGitBash.toLowerCase().replace(/\//g, '\\');
+    if (!candidates.some((c) => c.toLowerCase().replace(/\//g, '\\') === norm)) {
+      candidates.unshift(insideGitBash);
+    }
+  }
   for (const candidate of candidates) {
     const exists = d.exists(candidate);
     probes[`exists:${candidate}`] = fsProbe(`exists ${candidate}`, exists);

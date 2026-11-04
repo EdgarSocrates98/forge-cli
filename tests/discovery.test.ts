@@ -251,3 +251,54 @@ describe('discoverEnvironment — robustez e determinismo', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
+
+describe('discoverEnvironment — checkout sem .git (zip extraído)', () => {
+  it('dir do catálogo com identidade de pacote → detected, não unknown', async () => {
+    write('product-forge/pyproject.toml', '[project]\nname = "product-forge"\n');
+    const report = await discoverEnvironment(dir, { now });
+    const pf = report.forges.find((f) => f.name === 'product-forge');
+    expect(pf?.state).toBe('detected');
+    expect(pf?.evidence).toContain('sem .git');
+    expect(pf?.evidence).toContain('pyproject.toml');
+    expect(report.workspace.forges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'product-forge', git: false, manifest: false }),
+      ]),
+    );
+  });
+
+  it('dir renomeado (product-forge-main/) reconhecido pela identidade', async () => {
+    write('product-forge-main/pyproject.toml', '[project]\nname = "product-forge"\n');
+    const report = await discoverEnvironment(dir, { now });
+    const pf = report.forges.find((f) => f.name === 'product-forge');
+    expect(pf?.state).toBe('detected');
+    expect(pf?.evidence).toContain('product-forge-main/');
+    expect(report.workspace.forges.map((f) => f.name)).toContain('product-forge-main');
+  });
+
+  it('package.json name (forge-portal-app) reconhece checkout node', async () => {
+    write('forge-portal/package.json', JSON.stringify({ name: 'forge-portal-app' }));
+    const report = await discoverEnvironment(dir, { now });
+    const portal = report.forges.find((f) => f.name === 'forge-portal');
+    expect(portal?.state).toBe('detected');
+    expect(portal?.evidence).toContain('package.json');
+  });
+
+  it('identidade diferente do catálogo → não reconhece (fail-closed)', async () => {
+    write('product-forge/pyproject.toml', '[project]\nname = "evil-other"\n');
+    write('random-app/package.json', JSON.stringify({ name: 'random' }));
+    const report = await discoverEnvironment(dir, { now });
+    const pf = report.forges.find((f) => f.name === 'product-forge');
+    expect(pf?.state).toBe('unknown');
+    expect(report.workspace.forges).toEqual([]);
+  });
+
+  it('checkout git continua com evidência de git — identidade não rebaixa', async () => {
+    write('product-forge/.git/HEAD', 'ref: refs/heads/main\n');
+    write('product-forge/pyproject.toml', '[project]\nname = "product-forge"\n');
+    const report = await discoverEnvironment(dir, { now });
+    const pf = report.forges.find((f) => f.name === 'product-forge');
+    expect(pf?.state).toBe('detected');
+    expect(pf?.evidence).toContain('checkout git');
+  });
+});

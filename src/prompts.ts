@@ -4,7 +4,7 @@ import type { RepoStatusInfo } from './status.js';
 import type { ForgeRepo } from './types.js';
 import { S } from './ui/strings.js';
 import { icons, theme } from './ui/theme.js';
-import { ensureDir, resolveTargetDir } from './utils/system.js';
+import { ensureDir, resolveTargetDir, suggestWorkspaceDir } from './utils/system.js';
 
 export function exitCancelled(): never {
   cancel(S.cancelled);
@@ -12,6 +12,21 @@ export function exitCancelled(): never {
 }
 
 export async function askWorkspace(): Promise<string> {
+  // Onde já existem checkouts das Forjas (zip/clones) — o diretório-pai do
+  // próprio forge-cli num checkout, ou o cwd. Pergunta primeiro se instala
+  // ali; só abre o campo livre quando a sugestão é recusada ou inexistente.
+  const suggested = suggestWorkspaceDir(FORGE_REPOS.map((r) => r.name));
+  if (suggested) {
+    const use = await confirm({
+      message: `${S.askDirSuggested} ${theme.accent(suggested)}?`,
+      initialValue: true,
+    });
+    if (isCancel(use)) exitCancelled();
+    if (use) {
+      await ensureDir(suggested);
+      return suggested;
+    }
+  }
   const answer = await text({
     message: S.askDir,
     placeholder: S.askDirDefault,

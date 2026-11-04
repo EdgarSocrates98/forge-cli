@@ -17,6 +17,7 @@ import {
   errorDetail,
   findSetupScript,
   npmInstallArgs,
+  packageIdentity,
   resolvePython,
   runStreamed,
   syncRepo,
@@ -99,7 +100,15 @@ export async function processRepo(
   } catch (error) {
     return finish('error', `${S.cloneFailed}: ${errorDetail(error)}`);
   }
-  if (sync.kind === 'non-git') return finish('warning', S.nonGitDir);
+  if (sync.kind === 'non-git') {
+    // ZIP extraído no workspace: identidade do pacote reconhece a Forja —
+    // o remédio é o caminho gitless já existente (`forge-cli install <dir>`).
+    const recognized = !!repo.packageName && packageIdentity(repoDir)?.name === repo.packageName;
+    return finish(
+      'warning',
+      recognized ? `${S.nonGitDirRecognized} \`forge-cli install ${repoDir}\`` : S.nonGitDir,
+    );
+  }
   const remoteMismatch = sync.kind === 'remote-mismatch';
   if (remoteMismatch) notes.push(S.warnRemoteMismatch);
   head = await currentHead(repoDir);

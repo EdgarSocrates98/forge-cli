@@ -68,6 +68,22 @@ sem spawn de git e sem rede. Fontes parciais (estrutura incompleta)
 exigem `--yes`. O bootstrap roda **no lugar**: nunca `git init`,
 `clone`, `pull` ou rede.
 
+**Checkouts sem `.git` no workspace são reconhecidos.** Um ZIP extraído
+dentro do workspace (`product-forge/`, ou renomeado como
+`product-forge-main/`) é identificado pelo `packageName` do catálogo
+(`[project] name` do pyproject.toml ou `"name"` do package.json) e
+aparece como `detected` na descoberta — nunca inventado: identidade
+divergente não conta. No fluxo de clone, um diretório não-git
+reconhecido aponta o remédio `forge-cli install <dir>` em vez de só
+avisar.
+
+**Workspace sugerido.** No fluxo interativo, antes de perguntar o
+diretório, o CLI detecta onde já existem checkouts das Forjas — o
+próprio diretório corrente ou o pai do pacote do CLI (ex.: forge-cli
+em `E:\projetos\FORJAS\forge-cli` sugere `E:\projetos\FORJAS`) — e
+confirma: aceita → instala ali; recusa → pergunta onde. Sem checkouts
+detectados, o campo livre (`./forge-workspace`) aparece direto.
+
 O receipt registra `source_dir`, `is_git`, `manifest_valid`,
 `source_trust` (A/B/C), `integrity`, `execution_environment`,
 `managed_artifacts` e `source_files` — `forge status` e `forge doctor`

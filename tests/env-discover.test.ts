@@ -149,6 +149,47 @@ describe('shell discovery — Git Bash executado, não adivinhado', () => {
     expect(shells.msys2.present).toBe(false);
     expect(shells.bash.kind).toBe('native');
   });
+
+  it('rodando dentro do Git Bash (MSYSTEM) → evidência + candidato via cygpath', async () => {
+    const bashExe = 'C:\\Program Files\\Git\\usr\\bin\\bash.exe';
+    const shells = await discoverShells({
+      platform: 'win32',
+      run: winRun({
+        'cygpath -w /usr/bin/bash': bashExe,
+        [`${bashExe} --version`]: 'GNU bash, version 5.2.26(1)-release',
+        [`${bashExe} -lc echo forge-gitbash-ok`]: 'forge-gitbash-ok',
+      }),
+      exists: existsMatching(bashExe),
+      env: { MSYSTEM: 'MINGW64', SHELL: '/usr/bin/bash' },
+    });
+    expect(shells.git_bash.present).toBe(true);
+    expect(shells.git_bash.executable).toBe(bashExe);
+    // evidência explícita: dentro do Git Bash, powershell bloqueado não é impeditivo
+    expect(shells.git_bash.probes['env:MSYSTEM']).toMatchObject({ ok: true, output: 'MINGW64' });
+    expect(shells.git_bash.probes.cygpath?.ok).toBe(true);
+    expect(shells.powershell.present).toBe(false);
+    expect(windowsRoute(shells).route).toBe('git_bash');
+  });
+
+  it('MSYSTEM presente mas cygpath não resolve → sem candidato inventado', async () => {
+    const bashExe = 'C:\\Program Files\\Git\\bin\\bash.exe';
+    const shells = await discoverShells({
+      platform: 'win32',
+      run: winRun({
+        'git --exec-path': 'C:/Program Files/Git/mingw64/libexec/git-core',
+        [`${bashExe} --version`]: 'GNU bash, version 5.2.26(1)-release',
+        [`${bashExe} -lc echo forge-gitbash-ok`]: 'forge-gitbash-ok',
+      }),
+      exists: existsMatching(bashExe),
+      env: { MSYSTEM: 'MINGW64' },
+    });
+    // env:MSYSTEM registrado como evidência mesmo sem cygpath
+    expect(shells.git_bash.probes['env:MSYSTEM']?.ok).toBe(true);
+    expect(shells.git_bash.probes.cygpath?.ok).toBe(false);
+    // rota ainda funciona pelos candidatos clássicos (git --exec-path)
+    expect(shells.git_bash.present).toBe(true);
+    expect(windowsRoute(shells).route).toBe('git_bash');
+  });
 });
 
 describe('shell discovery — distinções WSL/Cygwin/MSYS2', () => {
@@ -764,4 +805,37 @@ describe('integração CLI — env discover/paths', () => {
       spy.mockRestore();
     }
   }, 30_000);
+});
+
+describe('shell discovery — instalação não-padrão do Git Bash', () => {
+  it('C:\\GitW\\bin\\bash.exe é candidato verificado', async () => {
+    const bashExe = 'C:\\GitW\\bin\\bash.exe';
+    const shells = await discoverShells({
+      platform: 'win32',
+      run: winRun({
+        [`${bashExe} --version`]: 'GNU bash, version 5.2.26(1)-release',
+        [`${bashExe} -lc echo forge-gitbash-ok`]: 'forge-gitbash-ok',
+      }),
+      exists: existsMatching(bashExe),
+      env: {},
+    });
+    expect(shells.git_bash.present).toBe(true);
+    expect(shells.git_bash.executable).toBe(bashExe);
+    expect(windowsRoute(shells).route).toBe('git_bash');
+  });
+
+  it('alias 8.3 C:\\Progra~1\\Git resolve como candidato', async () => {
+    const bashExe = 'C:\\Progra~1\\Git\\usr\\bin\\bash.exe';
+    const shells = await discoverShells({
+      platform: 'win32',
+      run: winRun({
+        [`${bashExe} --version`]: 'GNU bash, version 5.2.26(1)-release',
+        [`${bashExe} -lc echo forge-gitbash-ok`]: 'forge-gitbash-ok',
+      }),
+      exists: existsMatching(bashExe),
+      env: {},
+    });
+    expect(shells.git_bash.present).toBe(true);
+    expect(shells.git_bash.executable).toBe(bashExe);
+  });
 });

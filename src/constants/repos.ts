@@ -3,6 +3,7 @@ import type { ForgeRepo } from '../types.js';
 export const FORGE_REPOS: ForgeRepo[] = [
   {
     name: 'the-forge',
+    packageName: 'theforge-core',
     url: 'https://github.com/EdgarSocrates98/the-forge',
     description: 'Framework base e utilitários',
     kind: 'python',
@@ -19,6 +20,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'spark-forge-aws',
+    packageName: 'sparkforge-aws',
     url: 'https://github.com/EdgarSocrates98/spark-forge-aws',
     description: 'Pipelines Spark para AWS',
     kind: 'python',
@@ -32,6 +34,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'spark-forge-azure',
+    packageName: 'sparkforge-azure',
     url: 'https://github.com/EdgarSocrates98/spark-forge-azure',
     description: 'Pipelines Spark para Azure',
     kind: 'python',
@@ -48,6 +51,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'platform-forge',
+    packageName: 'platformforge',
     url: 'https://github.com/EdgarSocrates98/platform-forge',
     description: 'Serviços e infra de plataforma',
     kind: 'python',
@@ -61,6 +65,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'api-forge',
+    packageName: 'apiforge-af',
     url: 'https://github.com/EdgarSocrates98/api-forge',
     description: 'Backend central e APIs',
     kind: 'python',
@@ -78,6 +83,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-doctor-api',
+    packageName: 'forge-doctor-api',
     url: 'https://github.com/EdgarSocrates98/forge-doctor-api',
     description: 'API de diagnóstico e telemetria',
     kind: 'python',
@@ -94,6 +100,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-doctor-data',
+    packageName: 'forge-doctor-data',
     url: 'https://github.com/EdgarSocrates98/forge-doctor-data',
     description: 'Pipeline de dados de diagnóstico',
     kind: 'python',
@@ -110,6 +117,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-portal',
+    packageName: 'forge-portal-app',
     url: 'https://github.com/EdgarSocrates98/forge-portal',
     description: 'Frontend / Portal Web',
     kind: 'node',
@@ -119,6 +127,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   {
     // Instalação via fonte até existir uma distribuição oficial no registry.
     name: 'data-sentinel-forge',
+    packageName: 'data-sentinel-forge',
     url: 'https://github.com/EdgarSocrates98/data-sentinel-forge',
     description: 'Diagnóstico de runtime (logs/plans Spark, doctor-bundles)',
     kind: 'python',
@@ -135,6 +144,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-lens',
+    packageName: 'forge-lens',
     url: 'https://github.com/EdgarSocrates98/forge-lens',
     description: 'Observabilidade, traces, custos e avaliação de agentes',
     kind: 'python',
@@ -151,6 +161,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'code-atlas-forge',
+    packageName: 'code-atlas-forge',
     url: 'https://github.com/EdgarSocrates98/code-atlas-forge',
     description: 'Índice e exploração estrutural de código',
     kind: 'python',
@@ -159,6 +170,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'product-forge',
+    packageName: 'product-forge',
     url: 'https://github.com/EdgarSocrates98/product-forge',
     description: 'Workspace de PM/PA, produtos, tarefas e agentes',
     kind: 'python',
@@ -175,6 +187,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-agent-bridge',
+    packageName: 'forge-agent-bridge',
     url: 'https://github.com/EdgarSocrates98/forge-agent-bridge',
     description: 'Bridge local para Claude, Codex, Devin e GitHub Copilot',
     kind: 'python',

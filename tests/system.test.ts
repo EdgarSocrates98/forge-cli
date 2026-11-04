@@ -8,11 +8,15 @@ import {
   commandWorks,
   DEFAULT_PROBE_TIMEOUT_MS,
   DEFAULT_WORKSPACE,
+  findPackageRoot,
   findSetupScript,
   hasGitRepo,
+  nodeExecutables,
   npmInstallArgs,
+  packageIdentity,
   probeTimeoutMs,
   resolveTargetDir,
+  suggestWorkspaceDir,
   withCmdExt,
 } from '../src/utils/system.js';
 
@@ -203,5 +207,125 @@ describe('probes de ambiente — teto de subprocesso (E2E 11.2.1)', () => {
       if (prev === undefined) delete process.env.FORGE_CLI_PROBE_TIMEOUT_MS;
       else process.env.FORGE_CLI_PROBE_TIMEOUT_MS = prev;
     }
+  });
+});
+
+describe('packageIdentity — identidade de conteúdo do checkout', () => {
+  it('lê [project] name do pyproject.toml', () => {
+    const dir = tmpDir();
+    writeFileSync(path.join(dir, 'pyproject.toml'), '[project]\nname = "product-forge"\n');
+    expect(packageIdentity(dir)).toEqual({ name: 'product-forge', file: 'pyproject.toml' });
+  });
+
+  it('lê name do package.json quando não há pyproject', () => {
+    const dir = tmpDir();
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'forge-portal-app' }));
+    expect(packageIdentity(dir)).toEqual({ name: 'forge-portal-app', file: 'package.json' });
+  });
+
+  it('pyproject tem precedência quando ambos existem', () => {
+    const dir = tmpDir();
+    writeFileSync(path.join(dir, 'pyproject.toml'), '[project]\nname = "py-pkg"\n');
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'js-pkg' }));
+    expect(packageIdentity(dir)?.name).toBe('py-pkg');
+  });
+
+  it('sem manifesto ou JSON inválido → null (fail-closed)', () => {
+    const dir = tmpDir();
+    expect(packageIdentity(dir)).toBeNull();
+    writeFileSync(path.join(dir, 'package.json'), '{invalid');
+    expect(packageIdentity(dir)).toBeNull();
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: '1.0.0' }));
+    expect(packageIdentity(dir)).toBeNull();
+  });
+});
+
+describe('findPackageRoot', () => {
+  it('sobe até o package.json do próprio CLI', () => {
+    const root = tmpDir();
+    writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'theforge-cli' }));
+    const nested = path.join(root, 'src', 'utils');
+    mkdirSync(nested, { recursive: true });
+    expect(findPackageRoot(nested)).toBe(root);
+  });
+
+  it('pacote com nome diferente não é raiz → null', () => {
+    const root = tmpDir();
+    writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'other' }));
+    expect(findPackageRoot(root)).toBeNull();
+  });
+});
+
+describe('suggestWorkspaceDir — diretório onde já vivem as Forjas', () => {
+  const repos = ['product-forge', 'forge-lens', 'forge-cli'];
+
+  it('cwd com checkout do catálogo → sugere o cwd', () => {
+    const ws = tmpDir();
+    mkdirSync(path.join(ws, 'product-forge'));
+    expect(suggestWorkspaceDir(repos, { cwd: ws, selfDir: '/nonexistent/self' })).toBe(ws);
+  });
+
+  it('pai do pacote forge-cli com checkouts → sugere o pai', () => {
+    const ws = tmpDir();
+    mkdirSync(path.join(ws, 'product-forge'));
+    mkdirSync(path.join(ws, 'forge-lens'));
+    const pkgRoot = path.join(ws, 'forge-cli');
+    mkdirSync(pkgRoot);
+    writeFileSync(path.join(pkgRoot, 'package.json'), JSON.stringify({ name: 'theforge-cli' }));
+    const selfDir = path.join(pkgRoot, 'dist');
+    mkdirSync(selfDir);
+    const empty = tmpDir();
+    expect(suggestWorkspaceDir(repos, { cwd: empty, selfDir })).toBe(ws);
+  });
+
+  it('sem checkouts em nenhum candidato → null (sem sugestão inventada)', () => {
+    const empty = tmpDir();
+    expect(suggestWorkspaceDir(repos, { cwd: empty, selfDir: '/nonexistent' })).toBeNull();
+  });
+
+  it('cwd tem prioridade sobre o pai do pacote', () => {
+    const a = tmpDir();
+    mkdirSync(path.join(a, 'forge-lens'));
+    const ws = tmpDir();
+    mkdirSync(path.join(ws, 'product-forge'));
+    const pkgRoot = path.join(ws, 'forge-cli');
+    mkdirSync(pkgRoot);
+    writeFileSync(path.join(pkgRoot, 'package.json'), JSON.stringify({ name: 'theforge-cli' }));
+    expect(suggestWorkspaceDir(repos, { cwd: a, selfDir: pkgRoot })).toBe(a);
+  });
+});
+
+describe('nodeExecutables — node fora do PATH', () => {
+  it('process.execPath é o primeiro candidato (o interpretador rodando)', () => {
+    const list = nodeExecutables({}, '/nonexistent-home', 'linux');
+    expect(list[0]).toBe(process.execPath);
+  });
+
+  it('win32: Program Files, alias 8.3, nvm, scoop e choco são candidatos', () => {
+    const list = nodeExecutables(
+      { PROGRAMFILES: 'C:\\PF', APPDATA: 'C:\\AD\\Roaming', ProgramData: 'C:\\PD' },
+      'C:\\home',
+      'win32',
+    );
+    const norm = list.map((p) => p.replace(/\//g, '\\').toLowerCase());
+    expect(norm.some((p) => p.endsWith('nodejs\\node.exe'))).toBe(true);
+    expect(norm.some((p) => p.includes('progra~1'))).toBe(true);
+    expect(norm.some((p) => p.includes('scoop'))).toBe(true);
+    expect(norm.some((p) => p.includes('nvm4w'))).toBe(true);
+  });
+
+  it('env nvm (NVM_HOME/NVM_SYMLINK) vira candidato', () => {
+    const list = nodeExecutables(
+      { NVM_SYMLINK: 'C:\\nvm4w\\nodejs', ProgramData: 'C:\\PD' },
+      'C:\\home',
+      'win32',
+    );
+    expect(list.map((p) => p.toLowerCase())).toContain('c:\\nvm4w\\nodejs\\node.exe'.toLowerCase());
+  });
+
+  it('sem duplicatas (dedup case-insensitive por separador)', () => {
+    const list = nodeExecutables({ PROGRAMFILES: 'C:\\Program Files' }, 'C:\\home', 'win32');
+    const norm = list.map((p) => p.toLowerCase().replace(/\//g, '\\'));
+    expect(new Set(norm).size).toBe(norm.length);
   });
 });

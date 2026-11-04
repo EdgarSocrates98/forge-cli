@@ -11,6 +11,13 @@ export interface ForgeRepo {
   nextSteps?: readonly string[];
   envKeys?: readonly string[];
   origin?: 'builtin' | 'custom';
+  /**
+   * Nome de distribuição do pacote — `[project] name` do pyproject.toml ou
+   * `"name"` do package.json. Identidade de conteúdo do checkout: reconhece
+   * diretório extraído de ZIP (sem `.git`, inclusive renomeado tipo
+   * `repo-main/`/`repo-1.2.3/`) como aquela Forja do catálogo.
+   */
+  packageName?: string;
   /** Instalador nativo documentado pela Forja (após o bootstrap), com as flags realmente suportadas. */
   nativeInstall?: {
     command: readonly string[];

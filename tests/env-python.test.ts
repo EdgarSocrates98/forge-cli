@@ -363,3 +363,32 @@ describe('receipt — proveniência e legado', () => {
     expect(receiptPythonInfo(obj)).toEqual(obj);
   });
 });
+
+describe('locais de plataforma estendidos (win32)', () => {
+  it('raiz de drive, tools/ e ProgramData conda entram como candidatos', async () => {
+    const drivePy = path.join('C:', 'Python312', 'python.exe');
+    const toolsPy = path.join('C:\\tools', 'python311', 'python.exe');
+    const condaPy = path.join('C:\\ProgramData', 'anaconda3', 'python.exe');
+    const fs = fakeFs([drivePy, toolsPy, condaPy], {
+      ['C:\\']: ['Python312'],
+      [path.join('C:\\tools')]: ['python311'],
+    });
+    const run = fakeRun(
+      {},
+      {
+        [`${drivePy} --version`]: ok('Python 3.12.4'),
+        [`${toolsPy} --version`]: ok('Python 3.11.9'),
+        [`${condaPy} --version`]: ok('Python 3.10.14'),
+      },
+    );
+    const d = await discoverPythons(baseDeps({ platform: 'win32', ...fs, run }));
+    for (const exe of [drivePy, toolsPy, condaPy]) {
+      const c = d.candidates.find((x) => x.executable === exe);
+      expect(c, exe).toBeTruthy();
+      expect(c?.source).toBe('platform');
+      expect(c?.valid).toBe(true);
+    }
+    // o mais novo válido vence a seleção
+    expect(d.selected?.executable).toBe(drivePy);
+  });
+});

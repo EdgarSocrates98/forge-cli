@@ -7,10 +7,13 @@ import { resolveDiscovery, type DiscoverySource, type DiscoveryState } from './c
 import { readForgeManifest } from './manifest.js';
 import { isLinkOrJunction, resolveInside } from './safety.js';
 import type { CliState } from './artifacts.js';
+import type { ForgeRepo } from './types.js';
 import {
   commandOutput,
   commandWorks,
   hasGitRepo,
+  nodeExecutables,
+  packageIdentity,
   resolvePython,
   withCmdExt,
 } from './utils/system.js';
@@ -363,13 +366,33 @@ async function probeTool(
   };
 }
 
+/** Node fora do PATH — execPath primeiro (evidência real), instalações depois. */
+async function probeNode(budgetLeft: () => number): Promise<ToolInfo> {
+  const first = await probeTool('node', ['node', '--version'], budgetLeft());
+  if (first.found) return first;
+  for (const exe of nodeExecutables()) {
+    if (!existsSync(exe)) continue;
+    const out = await raced(commandOutput(exe, ['--version']), budgetLeft(), null);
+    if (out !== null) {
+      const version = firstLine(out);
+      return {
+        name: 'node',
+        found: true,
+        ...(version ? { version } : {}),
+        source: `${exe} --version`,
+      };
+    }
+  }
+  return first;
+}
+
 async function probeTools(
   platform: NodeJS.Platform,
   budgetLeft: () => number,
 ): Promise<ToolInfo[]> {
   const tools: ToolInfo[] = [];
   tools.push(await probeTool('git', ['git', '--version'], budgetLeft()));
-  tools.push(await probeTool('node', ['node', '--version'], budgetLeft()));
+  tools.push(await probeNode(budgetLeft));
   tools.push(await probeTool('npm', [withCmdExt('npm'), '--version'], budgetLeft()));
   // python: resolve o interpretador real (python3, python, py -3)
   const pyArgv = await raced(resolvePython(), budgetLeft(), null);
@@ -438,13 +461,30 @@ function registryState(entry: CliState['repos'][string]): DiscoveryState {
   return 'unknown';
 }
 
-function discoverForge(name: string, dir: string | null, state: CliState | null): ForgeDiscovery {
+/** Diretório alternativo encontrado por identidade de pacote (zip renomeado). */
+interface IdentityDir {
+  dir: string;
+  rel: string;
+  file: string;
+}
+
+function discoverForge(
+  repo: ForgeRepo,
+  dir: string | null,
+  state: CliState | null,
+  alt?: IdentityDir,
+): ForgeDiscovery {
+  const name = repo.name;
   const sources: DiscoverySource[] = [];
-  const git = !!dir && hasGitRepo(dir);
-  const manifest = dir && existsSync(dir) ? readForgeManifest(dir) : null;
+  // Checkout local: literal `<name>/` primeiro; senão o dir de identidade
+  // (`product-forge-main/`, `repo-1.2.3/` — zip extraído renomeado).
+  const checkout = dir && existsSync(dir) ? dir : (alt?.dir ?? null);
+  const checkoutRel = checkout ? path.basename(checkout) : name;
+  const git = !!checkout && hasGitRepo(checkout);
+  const manifest = checkout ? readForgeManifest(checkout) : null;
   const entry = state?.repos[name];
   if (entry && entry.phase !== 'not-installed') {
-    const dirExists = !!dir && existsSync(dir);
+    const dirExists = !!checkout;
     sources.push({
       origin: 'manifest',
       // registro diz instalada mas o checkout sumiu → evidência falhando
@@ -460,7 +500,7 @@ function discoverForge(name: string, dir: string | null, state: CliState | null)
       origin: 'manifest',
       state: 'declared',
       forge_id: name,
-      evidence: `${name}/forge.json`,
+      evidence: `${checkoutRel}/forge.json`,
     });
   }
   if (git) {
@@ -468,7 +508,17 @@ function discoverForge(name: string, dir: string | null, state: CliState | null)
       origin: 'catalog',
       state: 'detected',
       forge_id: name,
-      evidence: `${name}/ (checkout git)`,
+      evidence: `${checkoutRel}/ (checkout git)`,
+    });
+  }
+  if (alt && !git) {
+    // ZIP extraído: sem `.git`, mas a identidade do pacote prova que o
+    // diretório É a Forja — reconhecido, nunca inventado.
+    sources.push({
+      origin: 'catalog',
+      state: 'detected',
+      forge_id: name,
+      evidence: `${alt.rel}/ (checkout sem .git — identidade ${alt.file})`,
     });
   }
   sources.push({
@@ -503,9 +553,30 @@ export async function discoverEnvironment(
 
   const state = loadState(root);
   const catalogNames = new Set(FORGE_REPOS.map((r) => r.name));
+  // Identidade de pacote → nome de catálogo (reconhece zips extraídos sem
+  // `.git`, inclusive renomeados: `product-forge-main/` é product-forge).
+  const pkgToRepo = new Map<string, string>();
+  for (const repo of FORGE_REPOS) {
+    if (repo.packageName) pkgToRepo.set(repo.packageName, repo.name);
+  }
+  const identityDirs = new Map<string, IdentityDir>();
+  const dirIdentity = new Map<string, string>();
+  for (const dirName of walk.topDirs) {
+    const dir = resolveInside(root, dirName);
+    if (!dir) continue;
+    const identity = packageIdentity(dir);
+    if (!identity) continue;
+    dirIdentity.set(dirName, identity.name);
+    const catalog = pkgToRepo.get(identity.name);
+    if (catalog && !identityDirs.has(catalog)) {
+      identityDirs.set(catalog, { dir, rel: dirName, file: identity.file });
+    }
+  }
   const forges: ForgeDiscovery[] = [];
   for (const repo of FORGE_REPOS) {
-    forges.push(discoverForge(repo.name, resolveInside(root, repo.name), state));
+    forges.push(
+      discoverForge(repo, resolveInside(root, repo.name), state, identityDirs.get(repo.name)),
+    );
   }
   const presence: ForgePresence[] = [];
   for (const dirName of walk.topDirs) {
@@ -513,7 +584,8 @@ export async function discoverEnvironment(
     if (!dir) continue;
     const git = hasGitRepo(dir);
     const manifest = existsSync(path.join(dir, 'forge.json'));
-    if (!git && !manifest) continue;
+    const identityMatch = dirIdentity.has(dirName) && pkgToRepo.has(dirIdentity.get(dirName)!);
+    if (!git && !manifest && !identityMatch) continue;
     presence.push({ name: dirName, path: dirName, git, manifest });
     // Forja fora do catálogo: só entra em `forges` quando se declara (forge.json válido)
     if (!catalogNames.has(dirName) && manifest) {

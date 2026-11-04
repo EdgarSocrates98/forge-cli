@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
 import { discoverPythons } from '../env/python.js';
 import { isLinkOrJunction, isSafeRepoUrl, redactSecrets, resolveInside } from '../safety.js';
@@ -48,6 +49,166 @@ export async function ensureDir(dir: string): Promise<void> {
 
 export function hasGitRepo(dir: string): boolean {
   return existsSync(path.join(dir, '.git'));
+}
+
+const PKG_FILE_MAX_BYTES = 256 * 1024;
+const PYPROJECT_NAME_RE = /^\s*name\s*=\s*["']([^"']+)["']\s*$/m;
+
+/**
+ * Identidade de conteúdo de um checkout — lê `[project] name` do
+ * `pyproject.toml` ou `"name"` do `package.json` (limitado a 256 KiB,
+ * nunca lança). É o que reconhece um ZIP extraído sem `.git` como uma
+ * Forja do catálogo: `product-forge-main/` com `name = "product-forge"`
+ * é a Forja `product-forge`. `null` = sem evidência (ausente/ilegível).
+ */
+export function packageIdentity(dir: string): { name: string; file: string } | null {
+  try {
+    const pyproject = path.join(dir, 'pyproject.toml');
+    if (existsSync(pyproject)) {
+      const text = readFileSync(pyproject, 'utf8');
+      if (text.length <= PKG_FILE_MAX_BYTES) {
+        const match = PYPROJECT_NAME_RE.exec(text);
+        if (match) return { name: match[1], file: 'pyproject.toml' };
+      }
+    }
+    const pkg = path.join(dir, 'package.json');
+    if (existsSync(pkg)) {
+      const text = readFileSync(pkg, 'utf8');
+      if (text.length <= PKG_FILE_MAX_BYTES) {
+        const parsed: unknown = JSON.parse(text);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof (parsed as { name?: unknown }).name === 'string'
+        ) {
+          return { name: (parsed as { name: string }).name, file: 'package.json' };
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/** Lista nomes de um diretório — determinismo de enumeração, nunca lança. */
+function safeReaddir(dir: string): string[] {
+  try {
+    return readdirSync(dir).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Candidatos de executável node, em ordem — para quando `node` não está no
+ * PATH mas a máquina tem instalação (portable, nvm, scoop, chocolatey…).
+ * O primeiro é sempre `process.execPath`: o interpretador que ESTÁ rodando
+ * este CLI — evidência real de capacidade, nunca palpite. Os literais são
+ * só caminhos prováveis; quem chama filtra por `existsSync` e sonda
+ * `--version` antes de acreditar.
+ */
+export function nodeExecutables(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = os.homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (candidate: string | null | undefined) => {
+    if (!candidate) return;
+    const key = candidate.toLowerCase().replace(/\//g, '\\');
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(candidate);
+  };
+  if (/^node/i.test(path.basename(process.execPath))) push(process.execPath);
+  if (platform === 'win32') {
+    for (const pf of [env.PROGRAMFILES, env.ProgramFiles, env['ProgramFiles(x86)']]) {
+      if (pf) push(path.join(pf, 'nodejs', 'node.exe'));
+    }
+    push('C:\\Program Files\\nodejs\\node.exe');
+    push('C:\\Progra~1\\nodejs\\node.exe');
+    // nvm-windows: symlink (NVM_SYMLINK) + versões instaladas sob NVM_HOME.
+    if (env.NVM_SYMLINK) push(path.join(env.NVM_SYMLINK, 'node.exe'));
+    const nvmRoots = [env.NVM_HOME, env.APPDATA ? path.join(env.APPDATA, 'nvm') : null];
+    for (const root of nvmRoots) {
+      if (!root) continue;
+      for (const ver of safeReaddir(root)) push(path.join(root, ver, 'node.exe'));
+    }
+    push('C:\\nvm4w\\nodejs\\node.exe');
+    // scoop e chocolatey — gerenciadores comuns fora do PATH padrão.
+    push(path.join(home, 'scoop', 'apps', 'nodejs', 'current', 'node.exe'));
+    push(path.join(home, 'scoop', 'apps', 'nodejs-lts', 'current', 'node.exe'));
+    const chocoLib = path.join(env.ProgramData ?? 'C:\\ProgramData', 'chocolatey', 'lib');
+    for (const dir of safeReaddir(chocoLib)) {
+      if (/^nodejs/i.test(dir)) push(path.join(chocoLib, dir, 'tools', 'node.exe'));
+    }
+    push(path.join(home, 'AppData', 'Local', 'Volta', 'bin', 'node.exe'));
+  } else {
+    push('/usr/local/bin/node');
+    push('/opt/homebrew/bin/node');
+    if (platform === 'linux') push('/home/linuxbrew/.linuxbrew/bin/node');
+    const nvmDir = env.NVM_DIR ?? path.join(home, '.nvm');
+    const nvmVersions = path.join(nvmDir, 'versions', 'node');
+    for (const ver of safeReaddir(nvmVersions)) {
+      push(path.join(nvmVersions, ver, 'bin', 'node'));
+    }
+    push(path.join(home, '.volta', 'bin', 'node'));
+    push(path.join(home, '.asdf', 'shims', 'node'));
+    const mise = path.join(home, '.local', 'share', 'mise', 'installs', 'node');
+    for (const ver of safeReaddir(mise)) push(path.join(mise, ver, 'bin', 'node'));
+  }
+  return out;
+}
+
+/** Diretório do pacote instalado — sobe até achar o package.json do próprio CLI. */
+export function findPackageRoot(startDir: string, pkgName = 'theforge-cli'): string | null {
+  let dir = path.resolve(startDir);
+  for (let i = 0; i < 6; i += 1) {
+    const identity = packageIdentity(dir);
+    if (identity?.file === 'package.json' && identity.name === pkgName) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+
+/**
+ * Sugestão de workspace — o diretório onde já vivem checkouts das Forjas.
+ * Caso comum: clone/zip extraído como `E:\projetos\FORJAS\forge-cli` → o
+ * pai `E:\projetos\FORJAS` já contém os irmãos do catálogo. Em instalação
+ * npm global o pai não tem checkouts → `null` (sem sugestão inventada).
+ * Ordem: `cwd` (contexto explícito do usuário), depois o pai do pacote.
+ */
+export function suggestWorkspaceDir(
+  repoNames: readonly string[],
+  opts: { cwd?: string; selfDir?: string; exists?: (dir: string) => boolean } = {},
+): string | null {
+  const exists = opts.exists ?? existsSync;
+  const names = new Set(repoNames.map((n) => n.toLowerCase()));
+  const hasCheckout = (dir: string): boolean => {
+    try {
+      return readdirSync(dir, { withFileTypes: true }).some(
+        (entry) => entry.isDirectory() && names.has(entry.name.toLowerCase()),
+      );
+    } catch {
+      return false;
+    }
+  };
+  const candidates: string[] = [];
+  const cwd = path.resolve(opts.cwd ?? process.cwd());
+  candidates.push(cwd);
+  const selfRoot = findPackageRoot(opts.selfDir ?? path.dirname(fileURLToPath(import.meta.url)));
+  if (selfRoot) {
+    const parent = path.dirname(selfRoot);
+    if (parent !== cwd) candidates.push(parent);
+  }
+  for (const dir of candidates) {
+    if (exists(dir) && hasCheckout(dir)) return dir;
+  }
+  return null;
 }
 
 /**
