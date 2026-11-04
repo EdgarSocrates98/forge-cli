@@ -123,41 +123,46 @@ export function nodeExecutables(
     out.push(candidate);
   };
   if (/^node/i.test(path.basename(process.execPath))) push(process.execPath);
+  // path.win32.join / path.posix.join: candidates must carry the TARGET
+  // platform's separators even when discovery is simulated off-OS (tests,
+  // CI on Linux) — bare path.join leaks host separators into the list.
+  const wj = path.win32.join;
   if (platform === 'win32') {
     for (const pf of [env.PROGRAMFILES, env.ProgramFiles, env['ProgramFiles(x86)']]) {
-      if (pf) push(path.join(pf, 'nodejs', 'node.exe'));
+      if (pf) push(wj(pf, 'nodejs', 'node.exe'));
     }
     push('C:\\Program Files\\nodejs\\node.exe');
     push('C:\\Progra~1\\nodejs\\node.exe');
     // nvm-windows: symlink (NVM_SYMLINK) + versões instaladas sob NVM_HOME.
-    if (env.NVM_SYMLINK) push(path.join(env.NVM_SYMLINK, 'node.exe'));
-    const nvmRoots = [env.NVM_HOME, env.APPDATA ? path.join(env.APPDATA, 'nvm') : null];
+    if (env.NVM_SYMLINK) push(wj(env.NVM_SYMLINK, 'node.exe'));
+    const nvmRoots = [env.NVM_HOME, env.APPDATA ? wj(env.APPDATA, 'nvm') : null];
     for (const root of nvmRoots) {
       if (!root) continue;
-      for (const ver of safeReaddir(root)) push(path.join(root, ver, 'node.exe'));
+      for (const ver of safeReaddir(root)) push(wj(root, ver, 'node.exe'));
     }
     push('C:\\nvm4w\\nodejs\\node.exe');
     // scoop e chocolatey — gerenciadores comuns fora do PATH padrão.
-    push(path.join(home, 'scoop', 'apps', 'nodejs', 'current', 'node.exe'));
-    push(path.join(home, 'scoop', 'apps', 'nodejs-lts', 'current', 'node.exe'));
-    const chocoLib = path.join(env.ProgramData ?? 'C:\\ProgramData', 'chocolatey', 'lib');
+    push(wj(home, 'scoop', 'apps', 'nodejs', 'current', 'node.exe'));
+    push(wj(home, 'scoop', 'apps', 'nodejs-lts', 'current', 'node.exe'));
+    const chocoLib = wj(env.ProgramData ?? 'C:\\ProgramData', 'chocolatey', 'lib');
     for (const dir of safeReaddir(chocoLib)) {
-      if (/^nodejs/i.test(dir)) push(path.join(chocoLib, dir, 'tools', 'node.exe'));
+      if (/^nodejs/i.test(dir)) push(wj(chocoLib, dir, 'tools', 'node.exe'));
     }
-    push(path.join(home, 'AppData', 'Local', 'Volta', 'bin', 'node.exe'));
+    push(wj(home, 'AppData', 'Local', 'Volta', 'bin', 'node.exe'));
   } else {
+    const pj = path.posix.join;
     push('/usr/local/bin/node');
     push('/opt/homebrew/bin/node');
     if (platform === 'linux') push('/home/linuxbrew/.linuxbrew/bin/node');
-    const nvmDir = env.NVM_DIR ?? path.join(home, '.nvm');
-    const nvmVersions = path.join(nvmDir, 'versions', 'node');
+    const nvmDir = env.NVM_DIR ?? pj(home, '.nvm');
+    const nvmVersions = pj(nvmDir, 'versions', 'node');
     for (const ver of safeReaddir(nvmVersions)) {
-      push(path.join(nvmVersions, ver, 'bin', 'node'));
+      push(pj(nvmVersions, ver, 'bin', 'node'));
     }
-    push(path.join(home, '.volta', 'bin', 'node'));
-    push(path.join(home, '.asdf', 'shims', 'node'));
-    const mise = path.join(home, '.local', 'share', 'mise', 'installs', 'node');
-    for (const ver of safeReaddir(mise)) push(path.join(mise, ver, 'bin', 'node'));
+    push(pj(home, '.volta', 'bin', 'node'));
+    push(pj(home, '.asdf', 'shims', 'node'));
+    const mise = pj(home, '.local', 'share', 'mise', 'installs', 'node');
+    for (const ver of safeReaddir(mise)) push(pj(mise, ver, 'bin', 'node'));
   }
   return out;
 }

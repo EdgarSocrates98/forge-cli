@@ -209,7 +209,12 @@ async function gitBashCandidates(
   if (execDir) {
     let dir = execDir;
     for (let i = 0; i < 4; i += 1) {
-      candidates.push(path.join(dir, 'bin', 'bash.exe'), path.join(dir, 'usr', 'bin', 'bash.exe'));
+      // win32-join: candidates must be Windows paths even when the discovery
+      // runs (or is simulated) off-Windows — path.join would leak host seps.
+      candidates.push(
+        path.win32.join(dir, 'bin', 'bash.exe'),
+        path.win32.join(dir, 'usr', 'bin', 'bash.exe'),
+      );
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
@@ -220,15 +225,15 @@ async function gitBashCandidates(
   );
   for (const pf of pfVariants) {
     candidates.push(
-      path.join(pf, 'Git', 'bin', 'bash.exe'),
-      path.join(pf, 'Git', 'usr', 'bin', 'bash.exe'),
+      path.win32.join(pf, 'Git', 'bin', 'bash.exe'),
+      path.win32.join(pf, 'Git', 'usr', 'bin', 'bash.exe'),
     );
   }
   const local = d.env.LOCALAPPDATA;
   if (local) {
     candidates.push(
-      path.join(local, 'Programs', 'Git', 'bin', 'bash.exe'),
-      path.join(local, 'Programs', 'Git', 'usr', 'bin', 'bash.exe'),
+      path.win32.join(local, 'Programs', 'Git', 'bin', 'bash.exe'),
+      path.win32.join(local, 'Programs', 'Git', 'usr', 'bin', 'bash.exe'),
     );
   }
   candidates.push(
