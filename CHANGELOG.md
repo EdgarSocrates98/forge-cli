@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-11-04
+
+### Fixed
+
+- Deterministic target-platform paths in environment discovery.
+
 ## 0.4.0 — 2026-11-02
 
 ### Added
