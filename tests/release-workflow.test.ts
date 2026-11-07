@@ -125,9 +125,13 @@ const makeFake = (pkgVersion: string, lockVersion: string | null = pkgVersion) =
 const gate = (fake: string, args: string[]) => {
   try {
     return JSON.parse(
-      execFileSync(process.execPath, [path.join(fake, 'scripts', 'release', 'verify-version.mjs'), ...args], {
-        encoding: 'utf8',
-      }),
+      execFileSync(
+        process.execPath,
+        [path.join(fake, 'scripts', 'release', 'verify-version.mjs'), ...args],
+        {
+          encoding: 'utf8',
+        },
+      ),
     ) as { ok: boolean; code?: string; sha?: string };
   } catch (e) {
     return JSON.parse((e as { stdout: string }).stdout) as { ok: boolean; code?: string };
