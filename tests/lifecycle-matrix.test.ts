@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GIT_BIN } from './git-bin.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ENTRY = path.join(ROOT, 'src', 'index.ts');
@@ -24,7 +25,7 @@ afterEach(() => {
 });
 
 async function cli(...args: string[]) {
-  const res = await execa('node', ['--import', 'tsx', ENTRY, ...args], {
+  const res = await execa(process.execPath, ['--import', 'tsx', ENTRY, ...args], {
     cwd: ROOT,
     reject: false,
     timeout: 60_000,
@@ -37,7 +38,7 @@ async function cli(...args: string[]) {
 }
 
 const git = (dir: string, ...a: string[]) =>
-  execFileSync('git', ['-C', dir, ...a], {
+  execFileSync(GIT_BIN, ['-C', dir, ...a], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
@@ -67,7 +68,7 @@ function fakeRemote(name: string): {
   gitInit(work);
   writeFileSync(path.join(work, 'forge.json'), JSON.stringify({ forge_id: name }));
   commit(work, 'VERSION', '0.1.0\n', 'v0.1.0');
-  execFileSync('git', ['clone', '-q', '--bare', work, bare], { stdio: 'ignore' });
+  execFileSync(GIT_BIN, ['clone', '-q', '--bare', work, bare], { stdio: 'ignore' });
   git(work, 'remote', 'add', 'origin', bare);
   return {
     url: bare,
@@ -100,7 +101,7 @@ const CATALOG_URLS: Record<string, string> = {
  */
 function fakeClone(name: string, url: string, opts: { keepLocalOrigin?: boolean } = {}): string {
   const dir = path.join(ws, name);
-  execFileSync('git', ['clone', '-q', url, dir], { stdio: 'ignore' });
+  execFileSync(GIT_BIN, ['clone', '-q', url, dir], { stdio: 'ignore' });
   git(dir, 'config', 'user.email', 't@t');
   git(dir, 'config', 'user.name', 't');
   const catalog = CATALOG_URLS[name];

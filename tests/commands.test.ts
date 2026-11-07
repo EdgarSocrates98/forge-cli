@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GIT_BIN } from './git-bin.js';
 import { resolveCommand } from '../src/commands.js';
 import { collectStatus, phaseOf } from '../src/status.js';
 import type { ForgeRepo } from '../src/types.js';
@@ -63,7 +64,7 @@ describe('collectStatus', () => {
     const dir = path.join(tmp, 'demo');
     mkdirSync(dir);
     const git = (...args: string[]) =>
-      execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
+      execFileSync(GIT_BIN, ['-C', dir, ...args], { stdio: 'ignore' });
     git('init', '-q');
     git('config', 'user.email', 't@t');
     git('config', 'user.name', 't');

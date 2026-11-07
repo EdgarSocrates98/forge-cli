@@ -18,6 +18,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { execa } from 'execa';
+import { commandEnv, gitExecutable } from '../utils/system.js';
 import { isSafeRepoName, redactSecrets, resolveInside, writeFileAtomic } from '../safety.js';
 import type { RegistryEntry } from './catalog.js';
 import {
@@ -590,9 +591,10 @@ export async function execaRun(
   args: string[],
   opts: RunOpts = {},
 ): Promise<RunResult> {
-  const res = await execa(cmd, args, {
+  const res = await execa(cmd.toLowerCase() === 'git' ? gitExecutable() : cmd, args, {
     reject: false,
     timeout: opts.timeoutMs ?? 300_000,
+    env: commandEnv(cmd),
     ...(opts.cwd ? { cwd: opts.cwd } : {}),
   });
   return {

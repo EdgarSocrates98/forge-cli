@@ -10,6 +10,45 @@ import type { ForgeRepo, SetupScript, SyncFailure, SyncResult } from '../types.j
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
 
+/** Keep Windows subprocess lookup stable when a host exposes both PATH/Path. */
+export function portableEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env = { ...process.env, ...extra };
+  if (process.platform === 'win32') {
+    const winPath = env.Path ?? env.PATH;
+    delete env.PATH;
+    delete env.Path;
+    if (winPath) env.Path = winPath;
+  }
+  return env;
+}
+
+/** Resolve git by absolute path on Windows hosts with unreliable PATH lookup. */
+export function gitExecutable(): string {
+  if (process.platform !== 'win32') return 'git';
+  const raw = process.env.Path ?? process.env.PATH ?? '';
+  for (const dir of raw.split(path.delimiter)) {
+    const candidate = path.join(dir, 'git.exe');
+    if (existsSync(candidate)) return candidate;
+  }
+  return 'git';
+}
+
+export function commandEnv(command: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env = portableEnv(extra);
+  if (process.platform === 'win32' && command.toLowerCase() === 'git') {
+    const git = gitExecutable();
+    if (path.isAbsolute(git)) {
+      const current = env.Path ?? '';
+      env.Path = `${path.dirname(git)}${path.delimiter}${current}`;
+    }
+  }
+  return env;
+}
+
+function executable(command: string): string {
+  return command.toLowerCase() === 'git' ? gitExecutable() : command;
+}
+
 /** Home do estado forge-cli — `FORGE_CLI_HOME` permite home hermético
  * (bench, testes, containers). Hosts continuam no home real do usuário. */
 export function cliHome(): string {
@@ -288,9 +327,10 @@ export async function commandWorks(
   opts: { timeoutMs?: number } = {},
 ): Promise<boolean> {
   try {
-    const result = await execa(command, args, {
+    const result = await execa(executable(command), args, {
       reject: false,
       timeout: opts.timeoutMs ?? probeTimeoutMs(),
+      env: commandEnv(command),
     });
     return result.exitCode === 0;
   } catch {
@@ -318,9 +358,10 @@ export async function commandOutput(
   try {
     // Sem timeout um shim de host pode girar para sempre (host Electron
     // travado manteve `doctor`/`hosts list` bloqueados >4 min — E2E-A).
-    const result = await execa(command, args, {
+    const result = await execa(executable(command), args, {
       reject: false,
       timeout: opts.timeoutMs ?? probeTimeoutMs(),
+      env: commandEnv(command),
     });
     if (result.exitCode !== 0) return null;
     return (result.stdout || result.stderr || '').trim() || 'ok';
@@ -346,7 +387,11 @@ export async function commandProbe(
 ): Promise<CommandProbeResult> {
   const timeoutMs = opts.timeoutMs ?? probeTimeoutMs();
   try {
-    const result = await execa(command, args, { reject: false, timeout: timeoutMs });
+    const result = await execa(executable(command), args, {
+      reject: false,
+      timeout: timeoutMs,
+      env: commandEnv(command),
+    });
     if (result.timedOut) return { output: null, timedOut: true };
     if (result.exitCode !== 0) return { output: null, timedOut: false };
     return { output: (result.stdout || result.stderr || '').trim() || 'ok', timedOut: false };
@@ -357,7 +402,10 @@ export async function commandProbe(
 
 export async function isGitDirty(repoDir: string): Promise<boolean> {
   try {
-    const { stdout } = await execa('git', ['status', '--porcelain'], { cwd: repoDir });
+    const { stdout } = await execa(gitExecutable(), ['status', '--porcelain'], {
+      cwd: repoDir,
+      env: commandEnv('git'),
+    });
     return stdout.trim().length > 0;
   } catch {
     return false;
@@ -427,15 +475,15 @@ export async function syncRepo(
     }
     if (opts.offline) return { kind: 'fixed-ref', dirty };
     if (opts.noPull) {
-      await execa('git', ['fetch', '--quiet', '--tags'], {
+      await execa(gitExecutable(), ['fetch', '--quiet', '--tags'], {
         cwd: repoDir,
         reject: false,
-        env: { GIT_TERMINAL_PROMPT: '0' },
+        env: commandEnv('git', { GIT_TERMINAL_PROMPT: '0' }),
       });
       return { kind: 'fixed-ref', dirty };
     }
     try {
-      await execa('git', ['pull', '--ff-only'], { cwd: repoDir });
+      await execa(gitExecutable(), ['pull', '--ff-only'], { cwd: repoDir, env: commandEnv('git') });
       return { kind: 'pulled', dirty };
     } catch (error) {
       return { kind: 'pull-failed', dirty, failure: classifyGitFailure(errorDetail(error)) };
@@ -443,7 +491,7 @@ export async function syncRepo(
   }
   if (opts.offline) throw new Error(`modo offline: ${repo.name} não está clonada localmente`);
   const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];
-  await execa('git', [...cloneArgs, '--', repo.url, repoDir]);
+  await execa(gitExecutable(), [...cloneArgs, '--', repo.url, repoDir], { env: commandEnv('git') });
   return { kind: 'cloned', dirty: false };
 }
 
@@ -454,11 +502,12 @@ export async function runStreamed(
   timeoutMs?: number,
 ): Promise<void> {
   const [bin, ...args] = argv;
-  const sub = execa(withCmdExt(bin), args, {
+  const sub = execa(bin.toLowerCase() === 'git' ? gitExecutable() : withCmdExt(bin), args, {
     cwd,
     all: true,
     buffer: false,
     timeout: timeoutMs,
+    env: commandEnv(bin),
   });
   for await (const line of sub.iterable({ from: 'all' })) {
     onLine?.(redactSecrets(line));

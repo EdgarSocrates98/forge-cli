@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { classifyGitFailure, errorDetail } from './utils/system.js';
+import { classifyGitFailure, commandEnv, errorDetail, gitExecutable } from './utils/system.js';
 import type { SyncFailure } from './types.js';
 
 const REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/;
@@ -25,19 +25,24 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
   // `@{u}` primeiro: resolve até sem remote nomeado (branch.<name>.remote
   // pode ser '.' ou uma URL). Sem upstream configurado → 'no-upstream'
   // honesto, nunca 'unknown' (que implicaria erro transitório de rede/auth).
-  const up = await execa('git', ['rev-parse', '--abbrev-ref', '@{u}'], {
+  const up = await execa(gitExecutable(), ['rev-parse', '--abbrev-ref', '@{u}'], {
     cwd: repoDir,
     reject: false,
+    env: commandEnv('git'),
   });
   if (up.exitCode !== 0) return { behind: 0, ahead: 0, failure: 'no-upstream' };
   try {
-    await execa('git', ['fetch', '--quiet', '--tags'], { cwd: repoDir, env: NO_PROMPT });
+    await execa(gitExecutable(), ['fetch', '--quiet', '--tags'], {
+      cwd: repoDir,
+      env: commandEnv('git', NO_PROMPT),
+    });
   } catch (error) {
     return { behind: 0, ahead: 0, failure: classifyGitFailure(errorDetail(error)) };
   }
-  const counts = await execa('git', ['rev-list', '--left-right', '--count', 'HEAD...@{u}'], {
+  const counts = await execa(gitExecutable(), ['rev-list', '--left-right', '--count', 'HEAD...@{u}'], {
     cwd: repoDir,
     reject: false,
+    env: commandEnv('git'),
   });
   const [ahead, behind] = String(counts.stdout ?? '')
     .trim()
@@ -47,7 +52,7 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
 }
 
 export async function localTags(repoDir: string, limit = 10): Promise<string[]> {
-  const res = await execa('git', ['tag', '--list'], { cwd: repoDir, reject: false });
+  const res = await execa(gitExecutable(), ['tag', '--list'], { cwd: repoDir, reject: false, env: commandEnv('git') });
   if (res.exitCode !== 0) return [];
   return String(res.stdout)
     .split('\n')
@@ -58,9 +63,9 @@ export async function localTags(repoDir: string, limit = 10): Promise<string[]> 
 }
 
 export async function remoteTags(url: string, limit = 10): Promise<string[] | null> {
-  const res = await execa('git', ['ls-remote', '--tags', '--refs', '--', url], {
+  const res = await execa(gitExecutable(), ['ls-remote', '--tags', '--refs', '--', url], {
     reject: false,
-    env: NO_PROMPT,
+    env: commandEnv('git', NO_PROMPT),
     timeout: 30_000,
   });
   if (res.exitCode !== 0) return null;
@@ -78,13 +83,14 @@ export async function checkoutRef(repoDir: string, ref: string): Promise<string>
   const candidates = [ref, ref.startsWith('v') ? ref.slice(1) : `v${ref}`];
   for (const candidate of candidates) {
     const verify = await execa(
-      'git',
+      gitExecutable(),
       ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`],
-      { cwd: repoDir, reject: false },
+      { cwd: repoDir, reject: false, env: commandEnv('git') },
     );
     if (verify.exitCode === 0) {
-      await execa('git', ['checkout', '--detach', String(verify.stdout).trim()], {
+      await execa(gitExecutable(), ['checkout', '--detach', String(verify.stdout).trim()], {
         cwd: repoDir,
+        env: commandEnv('git'),
       });
       return candidate;
     }

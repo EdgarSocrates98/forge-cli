@@ -11,6 +11,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GIT_BIN } from './git-bin.js';
 import { clearPin, loadState, recordResult, setPin } from '../src/artifacts.js';
 import { executeUninstall, planUninstall, rollbackRepo } from '../src/lifecycle.js';
 import type { ForgeRepo, RepoResult } from '../src/types.js';
@@ -20,7 +21,7 @@ const repo: ForgeRepo = { name: 'demo', url: URL, description: '', kind: 'node' 
 
 let tmp: string;
 const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
+  execFileSync(GIT_BIN, args, { cwd, stdio: 'pipe' }).toString().trim();
 
 function makeClone(origin = URL): string {
   const dir = path.join(tmp, 'demo');
