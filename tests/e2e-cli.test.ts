@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GIT_BIN } from './git-bin.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ENTRY = path.join(ROOT, 'src', 'index.ts');
@@ -30,7 +31,7 @@ afterEach(() => {
 });
 
 async function cli(...args: string[]) {
-  const res = await execa('node', ['--import', 'tsx', ENTRY, ...args], {
+  const res = await execa(process.execPath, ['--import', 'tsx', ENTRY, ...args], {
     cwd: ROOT,
     reject: false,
     timeout: 60_000,
@@ -46,7 +47,7 @@ async function cli(...args: string[]) {
 function fakeClone(name: string, url: string): string {
   const dir = path.join(ws, name);
   mkdirSync(dir, { recursive: true });
-  const git = (...a: string[]) => execFileSync('git', ['-C', dir, ...a], { stdio: 'ignore' });
+  const git = (...a: string[]) => execFileSync(GIT_BIN, ['-C', dir, ...a], { stdio: 'ignore' });
   git('init', '-q', '-b', 'main');
   git('config', 'user.email', 't@t');
   git('config', 'user.name', 't');
@@ -183,7 +184,7 @@ describe('saída --json dos comandos de consulta', { timeout: 180_000 }, () => {
   it('update --check reporta no-upstream honesto para clone sem remote', async () => {
     const dir = path.join(ws, 'api-forge');
     mkdirSync(dir, { recursive: true });
-    const git = (...a: string[]) => execFileSync('git', ['-C', dir, ...a], { stdio: 'ignore' });
+    const git = (...a: string[]) => execFileSync(GIT_BIN, ['-C', dir, ...a], { stdio: 'ignore' });
     git('init', '-q', '-b', 'main');
     git('config', 'user.email', 't@t');
     git('config', 'user.name', 't');

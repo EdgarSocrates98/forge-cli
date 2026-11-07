@@ -11,6 +11,9 @@ import type { ForgeRepo } from '../src/types.js';
 import { S } from '../src/ui/strings.js';
 
 const mockedExeca = vi.mocked(execa);
+
+const isGitCommand = (cmd: unknown): boolean =>
+  String(cmd) === 'git' || /[\\/]git\.exe$/i.test(String(cmd));
 const tmpDirs: string[] = [];
 
 function tmpDir(): string {
@@ -38,17 +41,17 @@ interface GitState {
 function mockExeca(state: GitState = {}) {
   mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
     const joined = args.join(' ');
-    if (cmd === 'git' && joined.startsWith('clone')) {
+    if (isGitCommand(cmd) && joined.startsWith('clone')) {
       mkdirSync(args[args.length - 1], { recursive: true });
       return proc({ stdout: '' });
     }
-    if (cmd === 'git' && args[0] === '-C' && joined.includes('rev-parse')) {
+    if (isGitCommand(cmd) && args[0] === '-C' && joined.includes('rev-parse')) {
       return proc({ stdout: state.head ?? 'sha-1' });
     }
-    if (cmd === 'git' && joined.startsWith('status')) {
+    if (isGitCommand(cmd) && joined.startsWith('status')) {
       return proc({ stdout: state.dirty ? ' M dirty.ts' : '' });
     }
-    if (cmd === 'git' && joined.startsWith('pull')) {
+    if (isGitCommand(cmd) && joined.startsWith('pull')) {
       return state.pullFails ? proc(new Error('pull boom')) : proc({ stdout: '' });
     }
     if (cmd === 'verify-bad') return proc(new Error('verify boom'));
@@ -228,8 +231,8 @@ describe('processRepo', () => {
     writeFileSync(path.join(repoDir, 'package-lock.json'), '{}');
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
-      if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
-      if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      if (isGitCommand(cmd) && joined.startsWith('status')) return proc({ stdout: '' });
+      if (isGitCommand(cmd) && joined.startsWith('pull')) return proc({ stdout: '' });
       // lf-0017: `where.exe` (win32) / `command -v` (POSIX) resolve o
       // nome antes do --version — o cenário pretendido é "interpretador
       // encontrado mas abaixo do piso", não "ausente".
@@ -260,8 +263,8 @@ describe('processRepo', () => {
     writeFileSync(path.join(repoDir, 'pyproject.toml'), '[project]\nrequires-python = ">=3.10"\n');
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
-      if (cmd === 'git' && joined.startsWith('status')) return proc({ stdout: '' });
-      if (cmd === 'git' && joined.startsWith('pull')) return proc({ stdout: '' });
+      if (isGitCommand(cmd) && joined.startsWith('status')) return proc({ stdout: '' });
+      if (isGitCommand(cmd) && joined.startsWith('pull')) return proc({ stdout: '' });
       // Pipeline lf-0017: `command -v` (POSIX) / `where.exe` (win32)
       // resolve o nome antes do --version.
       if (cmd === 'sh' && args[1] === 'command -v python') {
@@ -340,7 +343,7 @@ describe('processRepo', () => {
   it('returns error and skips npm when the setup script fails', async () => {
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       const joined = args.join(' ');
-      if (cmd === 'git') {
+      if (isGitCommand(cmd)) {
         if (joined.startsWith('status')) return proc({ stdout: '' });
         return proc({ stdout: '' });
       }
@@ -367,7 +370,7 @@ describe('--shallow clones', () => {
     const target = tmpDir();
     await processRepo(baseRepo, target, {}, { shallow: true });
     const clone = mockedExeca.mock.calls.find(
-      ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
+      ([cmd, args]) => isGitCommand(cmd) && (args as string[])[0] === 'clone',
     );
     expect(clone?.[1]).toEqual(['clone', '--depth', '1', '--', baseRepo.url, expect.any(String)]);
   });
@@ -377,7 +380,7 @@ describe('--shallow clones', () => {
     const target = tmpDir();
     await processRepo(baseRepo, target);
     const clone = mockedExeca.mock.calls.find(
-      ([cmd, args]) => cmd === 'git' && (args as string[])[0] === 'clone',
+      ([cmd, args]) => isGitCommand(cmd) && (args as string[])[0] === 'clone',
     );
     expect(clone?.[1]).toEqual(['clone', '--', baseRepo.url, expect.any(String)]);
   });
@@ -554,7 +557,7 @@ describe('instalador nativo (--profile/--scope/--components)', () => {
   it('falha do instalador nativo vira aviso, não erro', async () => {
     mockedExeca.mockImplementation(((cmd: string, args: string[] = []) => {
       if (cmd === 'demo-cli') return proc(new Error('native boom'));
-      if (cmd === 'git' && args[0] === 'status') return proc({ stdout: '' });
+      if (isGitCommand(cmd) && args[0] === 'status') return proc({ stdout: '' });
       return proc({ stdout: 'sha-1' });
     }) as never);
     const target = tmpDir();

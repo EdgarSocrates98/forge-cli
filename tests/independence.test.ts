@@ -11,6 +11,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GIT_BIN } from './git-bin.js';
 import { loadState, recordResult } from '../src/artifacts.js';
 import { FORGE_REPOS } from '../src/constants/repos.js';
 import { install, installDir, uninstall } from '../src/install.js';
@@ -23,7 +24,7 @@ import type { ForgeRepo, RepoResult } from '../src/types.js';
 let ws: string;
 let home: string;
 const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
+  execFileSync(GIT_BIN, args, { cwd, stdio: 'pipe' }).toString().trim();
 
 /** Simula uma Forge instalada "à mão" (sem nenhum estado do forge-cli). */
 function manualForge(repo: ForgeRepo): string {

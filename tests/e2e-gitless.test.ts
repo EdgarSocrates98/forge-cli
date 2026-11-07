@@ -58,7 +58,7 @@ afterEach(() => {
 
 /** Spawns o CLI real com home isolado e o stub de git primeiro no PATH. */
 async function cli(...args: string[]) {
-  const res = await execa('node', ['--import', 'tsx', ENTRY, ...args], {
+  const res = await execa(process.execPath, ['--import', 'tsx', ENTRY, ...args], {
     cwd: ROOT,
     reject: false,
     timeout: 90_000,
