@@ -39,11 +39,15 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
   } catch (error) {
     return { behind: 0, ahead: 0, failure: classifyGitFailure(errorDetail(error)) };
   }
-  const counts = await execa(gitExecutable(), ['rev-list', '--left-right', '--count', 'HEAD...@{u}'], {
-    cwd: repoDir,
-    reject: false,
-    env: commandEnv('git'),
-  });
+  const counts = await execa(
+    gitExecutable(),
+    ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],
+    {
+      cwd: repoDir,
+      reject: false,
+      env: commandEnv('git'),
+    },
+  );
   const [ahead, behind] = String(counts.stdout ?? '')
     .trim()
     .split(/\s+/)
@@ -52,7 +56,11 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
 }
 
 export async function localTags(repoDir: string, limit = 10): Promise<string[]> {
-  const res = await execa(gitExecutable(), ['tag', '--list'], { cwd: repoDir, reject: false, env: commandEnv('git') });
+  const res = await execa(gitExecutable(), ['tag', '--list'], {
+    cwd: repoDir,
+    reject: false,
+    env: commandEnv('git'),
+  });
   if (res.exitCode !== 0) return [];
   return String(res.stdout)
     .split('\n')
