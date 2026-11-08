@@ -10,6 +10,8 @@ import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { resolveTargetDir, type WinSetupShells } from '../utils/system.js';
 
+const nativeProcessExit = process.exit;
+
 export const BANNER_LINE_DELAY_MS = 30;
 
 export async function printBanner(): Promise<void> {
@@ -47,22 +49,27 @@ export async function checkEnvironment(): Promise<{ winShells?: WinSetupShells }
   return env;
 }
 
+export class JsonExit extends Error {
+  constructor(readonly exitCode: number) {
+    super('json output complete');
+    this.name = 'JsonExit';
+  }
+}
+
 export function emitJson(data: unknown, exitCode = 0): never {
-  // stdout num pipe POSIX é stream ASSÍNCRONO — `process.exit` logo após
-  // `write` descarta o que ficou na fila do Socket (no macOS + Node ≤20 o
-  // JSON do `doctor --json`, ~12 KB, era engolido/truncado e o CI lia
-  // "Unexpected end of JSON input"). `setBlocking(true)` torna o fd
-  // bloqueante — o chunk inteiro chega ao kernel antes do exit; é o mesmo
-  // mecanismo que já torna stdout síncrono em TTY/arquivo/Windows. Sem
-  // `_handle` (stream substituída ou exótica) o comportamento anterior vale.
-  const handle = (
-    process.stdout as unknown as {
-      _handle?: { setBlocking?: (blocking: boolean) => void };
-    }
-  )._handle;
-  handle?.setBlocking?.(true);
+  // Do not call process.exit immediately after write: stdout can still be an
+  // asynchronous pipe and Node/libuv may be closing another handle at the
+  // same time. A sentinel lets the top-level handler set exitCode while the
+  // event loop drains the already-enqueued JSON on POSIX and Windows alike.
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
-  process.exit(exitCode);
+  // Unit tests intentionally replace process.exit so command functions can
+  // be exercised in-process. Preserve that contract; the real process uses
+  // JsonExit and the top-level handler below.
+  if (process.exit !== nativeProcessExit) {
+    process.exit(exitCode);
+    return undefined as never;
+  }
+  throw new JsonExit(exitCode);
 }
 
 export function catalogFor(targetDir: string): ForgeRepo[] {
