@@ -14,6 +14,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseCliArgs, usageFor, type CliOptions } from '../src/cli-args.js';
 import { runEnvCommand } from '../src/cmd/env.js';
+import { emitJson, JsonExit } from '../src/cmd/shared.js';
 import { shouldShowMenu } from '../src/menu.js';
 import { setColorEnabled, theme } from '../src/ui/theme.js';
 
@@ -151,6 +152,16 @@ describe('env wizard — recusa nomeada fora de TTY', () => {
 });
 
 describe('--json sai JSON puro', () => {
+  it('emite JSON sem process.exit abrupto no processo real', () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      expect(() => emitJson({ ok: true }, 0)).toThrow(JsonExit);
+      expect(write).toHaveBeenCalledWith('{\n  "ok": true\n}\n');
+    } finally {
+      write.mockRestore();
+    }
+  });
+
   it('env inspect --json não emite ANSI', async () => {
     const ws = tmpDir();
     mkdirSync(path.join(ws, 'myrepo'));

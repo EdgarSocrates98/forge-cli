@@ -19,7 +19,7 @@ import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
 import { componentsLines } from './native-install.js';
 import { ADVANCED_MENU_ITEMS, applyMenu, askMenu, menuItemsFor, shouldShowMenu } from './menu.js';
 import { resolveInside } from './safety.js';
-import { printBanner, emitJson, catalogFor, reposByNames } from './cmd/shared.js';
+import { printBanner, emitJson, JsonExit, catalogFor, reposByNames } from './cmd/shared.js';
 import { setTaskLogLimit } from './cmd/batch.js';
 import {
   runListCommand,
@@ -570,6 +570,10 @@ process.on('SIGINT', () => {
 });
 
 main().catch((error: unknown) => {
+  if (error instanceof JsonExit) {
+    process.exitCode = error.exitCode;
+    return;
+  }
   log.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });
