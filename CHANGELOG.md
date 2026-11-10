@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.3 — 2026-11-10
+
+### Fixed
+
+- Extended npm registry propagation polling so a successful trusted publish is
+  not reported as failed while the package metadata converges.
+
 ## 0.4.2 — 2026-11-10
 
 ### Fixed

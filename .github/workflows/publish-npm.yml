@@ -123,9 +123,9 @@ jobs:
         run: |
           TARBALL="theforge-cli-$RELEASE_VERSION.tgz"
           # propagação do registry pode levar alguns minutos — poll com backoff
-          for i in $(seq 1 18); do
+          for i in $(seq 1 36); do
             npm view "theforge-cli@$RELEASE_VERSION" version --registry https://registry.npmjs.org 2>/dev/null | grep -qx "$RELEASE_VERSION" && break
-            [ "$i" = 18 ] && { echo 'versão não encontrada no registry'; exit 1; }
+            [ "$i" = 36 ] && { echo 'versão não encontrada no registry'; exit 1; }
             sleep 10
           done
           # attestation (provenance) é obrigatória — ausência é falha, nunca warning
