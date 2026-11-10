@@ -205,16 +205,22 @@ encerra de forma limpa (código `130` em `SIGINT`).
 
 ## Repositórios do ecossistema
 
-| Repositório         | Descrição                        |
-| ------------------- | -------------------------------- |
-| `the-forge`         | Framework base e utilitários     |
-| `spark-forge-aws`   | Pipelines Spark para AWS         |
-| `spark-forge-azure` | Pipelines Spark para Azure       |
-| `platform-forge`    | Serviços e infra de plataforma   |
-| `api-forge`         | Backend central e APIs           |
-| `forge-doctor-api`  | API de diagnóstico e telemetria  |
-| `forge-doctor-data` | Pipeline de dados de diagnóstico |
-| `forge-portal`      | Frontend / Portal Web            |
+| Repositório           | Descrição                                           |
+| --------------------- | --------------------------------------------------- |
+| `the-forge`           | Framework base e utilitários                        |
+| `spark-forge-aws`     | Pipelines Spark para AWS                            |
+| `spark-forge-azure`   | Pipelines Spark para Azure                          |
+| `platform-forge`      | Serviços e infra de plataforma                      |
+| `api-forge`           | Backend central e APIs                              |
+| `api-sentinel-forge`  | Inteligência operacional de APIs, SLOs e incidentes |
+| `forge-doctor-api`    | API de diagnóstico e telemetria                     |
+| `forge-doctor-data`   | Pipeline de dados de diagnóstico                    |
+| `forge-portal`        | Frontend / Portal Web                               |
+| `data-sentinel-forge` | Diagnóstico de runtime Spark                        |
+| `forge-lens`          | Observabilidade e avaliação de agentes              |
+| `code-atlas-forge`    | Índice estrutural de código                         |
+| `product-forge`       | Produtos, tarefas e agentes                         |
+| `forge-agent-bridge`  | Bridge local para agentes                           |
 
 Todos os repositórios ficam na organização
 [`EdgarSocrates98`](https://github.com/EdgarSocrates98) no GitHub.
@@ -274,7 +280,7 @@ src/
     theme.ts         # paleta de cores e ícones (picocolors)
     strings.ts       # todas as mensagens PT-BR
   constants/
-    repos.ts         # catálogo dos 8 repositórios
+    repos.ts         # catálogo dos 14 repositórios
   utils/
     system.ts        # caminhos, .git, scripts por SO, execução
   types.ts           # tipos compartilhados

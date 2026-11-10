@@ -82,6 +82,20 @@ export const FORGE_REPOS: ForgeRepo[] = [
     nextSteps: ['apiforge install --yes'],
   },
   {
+    // Instalação via fonte até existir uma distribuição oficial no registry.
+    name: 'api-sentinel-forge',
+    packageName: 'api-sentinel-forge',
+    url: 'https://github.com/EdgarSocrates98/api-sentinel-forge',
+    description: 'Inteligência operacional de APIs, SLOs e investigação de incidentes',
+    kind: 'python',
+    verify: ['api-sentinel', '--help'],
+    nextSteps: [
+      'api-sentinel install --yes',
+      'api-sentinel doctor --json',
+      'api-sentinel mcp serve',
+    ],
+  },
+  {
     name: 'forge-doctor-api',
     packageName: 'forge-doctor-api',
     url: 'https://github.com/EdgarSocrates98/forge-doctor-api',

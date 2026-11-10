@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added `api-sentinel-forge` to the source-install catalog, with CLI
+  verification and guided next steps for workspace initialization, doctor and
+  MCP.
+
 ## 0.4.1 — 2026-11-04
 
 ### Fixed

@@ -44,7 +44,7 @@ flowchart TD
     B -->|falha| Z1[log.error + exit 1]
     B -->|ok| C[Prompt: diretório de destino]
     C --> D[Resolve caminho + mkdir -p]
-    D --> E[Multiselect: 8 repositórios]
+    D --> E[Multiselect: 14 repositórios]
     E --> F[Resumo + confirmar]
     F -->|cancelou| Z2[cancel + exit 0]
     F -->|confirmou| G[Para cada repositório]

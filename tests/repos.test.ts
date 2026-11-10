@@ -7,6 +7,7 @@ const EXPECTED_NAMES = [
   'spark-forge-azure',
   'platform-forge',
   'api-forge',
+  'api-sentinel-forge',
   'forge-doctor-api',
   'forge-doctor-data',
   'forge-portal',
@@ -18,8 +19,8 @@ const EXPECTED_NAMES = [
 ];
 
 describe('FORGE_REPOS catalog', () => {
-  it('contains the complete 13-repository Forge catalog', () => {
-    expect(FORGE_REPOS).toHaveLength(13);
+  it('contains the complete 14-repository Forge catalog', () => {
+    expect(FORGE_REPOS).toHaveLength(14);
     expect(FORGE_REPOS.map((r) => r.name)).toEqual(EXPECTED_NAMES);
   });
 
@@ -52,9 +53,9 @@ describe('FORGE_REPOS catalog', () => {
     }
   });
 
-  it('marks repo kinds — 12 python + 1 node', () => {
+  it('marks repo kinds — 13 python + 1 node', () => {
     const kinds = FORGE_REPOS.map((r) => r.kind);
-    expect(kinds.filter((k) => k === 'python')).toHaveLength(12);
+    expect(kinds.filter((k) => k === 'python')).toHaveLength(13);
     expect(kinds.filter((k) => k === 'node')).toHaveLength(1);
     expect(FORGE_REPOS.find((r) => r.kind === 'node')?.name).toBe('forge-portal');
   });
@@ -79,6 +80,12 @@ describe('FORGE_REPOS catalog', () => {
       'code-atlas',
       '--help',
     ]);
+    expect(FORGE_REPOS.find((r) => r.name === 'api-sentinel-forge')).toMatchObject({
+      packageName: 'api-sentinel-forge',
+      kind: 'python',
+      verify: ['api-sentinel', '--help'],
+    });
+    expect(FORGE_REPOS.find((r) => r.name === 'api-sentinel-forge')?.nativeInstall).toBeUndefined();
   });
 
   it('defines documented envKeys only for api-forge', () => {
