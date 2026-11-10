@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.2 — 2026-11-10
+
+### Fixed
+
+- Published the Cycle 2.7 release certification baseline.
+
 ### Added
 
 - Added `api-sentinel-forge` to the source-install catalog, with CLI
