@@ -1,0 +1,9 @@
+{
+  "cycle": "2.7",
+  "repository": "forge-cli",
+  "version": "0.4.1",
+  "tag": "v0.4.1",
+  "source_commit": "43702e325541fac2777e4201716c6ea0ecf57989",
+  "version_source": "package.json",
+  "verified_at": "2026-11-10"
+}
