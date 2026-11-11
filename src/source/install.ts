@@ -10,7 +10,8 @@
  * `LocalFailure` sem `code` é falha operacional (script saiu não-zero)
  * — não é uma recusa nomeada e não deve ganhar código inventado.
  */
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, readFileSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { copyConfigExamples } from '../configs.js';
@@ -32,7 +33,7 @@ import {
 } from '../registry/install.js';
 import { emitForgeShim, removeForgeShim } from '../registry/shims.js';
 import { parseVersion, satisfiesRequiresPython } from '../registry/versions.js';
-import { resolveInside, writeFileAtomic } from '../safety.js';
+import { redactSecrets, resolveInside, writeFileAtomic } from '../safety.js';
 import { normalizePythonFloor } from '../env/python.js';
 import { errorDetail, findSetupScript, type WinSetupShells } from '../utils/system.js';
 import { detectSource, type SourceDetection } from './detect.js';
@@ -213,6 +214,20 @@ export function snapshotSourceFiles(dir: string, managedTop: Set<string>): strin
   return out.sort();
 }
 
+function sourceDigest(dir: string, files: readonly string[]): string {
+  const hash = createHash('sha256');
+  for (const file of [...files].sort()) {
+    hash.update(file).update('\0');
+    try {
+      hash.update(readFileSync(safeJoinInside(dir, file)!));
+    } catch {
+      hash.update('<missing>');
+    }
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
 /**
  * Normaliza a injeção de interpretador: `LocalPython` do pipeline ou
  * argv nu legado (`['python3']` — sem versão/origem, nunca sondado).
@@ -381,6 +396,7 @@ function buildReceipt(
     setup_script: script.file,
     managed_artifacts: managed,
     source_files: sourceFiles,
+    source_digest: sourceDigest(det.path, sourceFiles),
   };
 }
 
@@ -515,15 +531,12 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
   const floorFailure = pythonFloorFailure(det, deps.python);
   if (floorFailure) return fail(floorFailure, det);
 
+  const platform = deps.platform ?? process.platform;
+  const script = selectSetup(det, platform, deps.python, deps.winShells);
+  if (!script) return fail(noScriptFailure(det, platform, deps.winShells, deps.pythonIssue), det);
   const before = topLevelEntries(det.path);
   const envFailure = await provisionOrRefuse(det.path, det.forge_id);
   if (envFailure) return fail(envFailure, det);
-
-  const platform = deps.platform ?? process.platform;
-  const script = selectSetup(det, platform, deps.python, deps.winShells);
-  if (!script) {
-    return fail(noScriptFailure(det, platform, deps.winShells, deps.pythonIssue), det);
-  }
   const res = await run(script.command, script.args, {
     cwd: det.path,
     timeoutMs: deps.timeoutMs,
@@ -531,7 +544,7 @@ export async function localInstall(dir: string, deps: LocalDeps): Promise<LocalO
   if (res.exitCode !== 0) {
     return fail(
       {
-        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${res.stderr.slice(0, 400)}` : ''}`,
+        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${redactSecrets(res.stderr.slice(0, 400))}` : ''}`,
         remedy: `rode ${script.file} manualmente em ${det.path} para ver o erro`,
       },
       det,
@@ -613,6 +626,14 @@ export async function localUpdate(dir: string, deps: LocalDeps): Promise<LocalOu
   const gate = await partialGate(det, deps);
   if (gate) return fail(gate, det);
 
+  // Validate the new source's executable route before reconciling files in the
+  // registered source. The update remains a no-mutation refusal when the new
+  // checkout cannot be bootstrapped on this host.
+  const updatePlatform = deps.platform ?? process.platform;
+  if (!selectSetup(det, updatePlatform, deps.python, deps.winShells)) {
+    return fail(noScriptFailure(det, updatePlatform, deps.winShells, deps.pythonIssue), det);
+  }
+
   const targetDir = prior.source_dir;
   // Fonte mais nova ≠ fonte registrada: reconciliação por substituição —
   // copia o que a nova traz e remove só o que o RECEIPT registrou e a
@@ -628,6 +649,21 @@ export async function localUpdate(dir: string, deps: LocalDeps): Promise<LocalOu
         },
         det,
       );
+    }
+    if (prior.source_digest) {
+      // Compare only the files owned by the previous source snapshot. Files
+      // added later by the user are intentionally outside this conflict
+      // boundary and must survive reconciliation untouched.
+      if (sourceDigest(targetDir, prior.source_files) !== prior.source_digest) {
+        return fail(
+          {
+            code: 'FORGE-SOURCE-CONFLICT',
+            cause: `${forgeId}: a fonte registrada divergiu desde a última operação — atualização recusada sem sobrescrita`,
+            remedy: `preserve as alterações e execute novamente após resolver o conflito em ${targetDir}`,
+          },
+          det,
+        );
+      }
     }
     const newFiles = snapshotSourceFiles(det.path, new Set());
     const keep = new Set(newFiles);
@@ -694,7 +730,7 @@ async function runUpdateAt(
   if (res.exitCode !== 0) {
     return fail(
       {
-        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${res.stderr.slice(0, 400)}` : ''}`,
+        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${redactSecrets(res.stderr.slice(0, 400))}` : ''}`,
         remedy: `rode ${script.file} manualmente em ${det.path}`,
       },
       det,
@@ -774,6 +810,9 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
   if (gate) return fail(gate, det);
   const floorFailure = pythonFloorFailure(det, deps.python);
   if (floorFailure) return fail(floorFailure, det);
+  const platform = deps.platform ?? process.platform;
+  const script = selectSetup(det, platform, deps.python, deps.winShells);
+  if (!script) return fail(noScriptFailure(det, platform, deps.winShells, deps.pythonIssue), det);
   // Artefatos gerenciados quebrados (venv parcial etc.) saem antes do
   // bootstrap — só o que o RECEIPT registrou; arquivo do usuário não
   // listado permanece mesmo dentro da fonte.
@@ -784,32 +823,6 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
   const before = topLevelEntries(dir);
   const envFailure = await provisionOrRefuse(dir, det.forge_id);
   if (envFailure) return fail(envFailure, det);
-  const platform = deps.platform ?? process.platform;
-  const script = selectSetup(det, platform, deps.python, deps.winShells);
-  if (!script) {
-    if (
-      platform === 'win32' &&
-      deps.winShells !== undefined &&
-      !deps.winShells.ps &&
-      !deps.winShells.bash
-    ) {
-      return fail(winShellNotFound(dir), det);
-    }
-    return fail(
-      {
-        code: (deps.pythonIssue?.code as LocalFailure['code']) ?? 'FORGE-SOURCE-INVALID',
-        cause:
-          `${dir}: sem script de setup para o repair` +
-          (deps.pythonIssue
-            ? ` — descoberta de interpretador: ${deps.pythonIssue.code ? `${deps.pythonIssue.code}: ` : ''}${deps.pythonIssue.cause}`
-            : ''),
-        remedy:
-          deps.pythonIssue?.remedy ??
-          'restaure install.sh/setup.sh/install.windows.sh na fonte ou reinstale com `install <dir>`',
-      },
-      det,
-    );
-  }
   const res = await run(script.command, script.args, {
     cwd: dir,
     timeoutMs: deps.timeoutMs,
@@ -817,7 +830,7 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
   if (res.exitCode !== 0) {
     return fail(
       {
-        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${res.stderr.slice(0, 400)}` : ''}`,
+        cause: `${script.file} saiu com código ${res.exitCode}${res.stderr ? ` — ${redactSecrets(res.stderr.slice(0, 400))}` : ''}`,
         remedy: `rode ${script.file} manualmente em ${dir}`,
       },
       det,
@@ -894,45 +907,43 @@ export async function localUninstall(
   const dir = prior.source_dir;
   const removed: string[] = [];
   let backup: string | undefined;
-  if (dir && existsSync(dir)) {
-    // Configs que criamos podem ter sido editadas pelo usuário — backup
-    // antes de remover (mesma cortesia do uninstall git, que preserva
-    // .env/configs em .forge-cli/backups).
-    const filesToBackup = prior.managed_artifacts.filter((rel) => {
-      const target = safeJoinInside(dir, rel);
-      try {
-        return target !== null && statSync(target).isFile();
-      } catch {
-        return false;
-      }
-    });
-    if (filesToBackup.length) {
-      backup = path.join(
-        deps.home,
-        '.forge-cli',
-        'backups',
-        `${name}-${(deps.now ?? (() => new Date().toISOString()))().replace(/[:.]/g, '-')}`,
-      );
-      for (const rel of filesToBackup) {
-        const dest = path.join(backup, rel);
-        mkdirSync(path.dirname(dest), { recursive: true });
-        const src = safeJoinInside(dir, rel);
-        if (src) await copyFile(src, dest);
-      }
-    }
-    for (const rel of prior.managed_artifacts) {
-      const target = safeJoinInside(dir, rel);
-      if (target && existsSync(target)) {
-        rmSync(target, { recursive: true, force: true });
-        removed.push(rel);
-      }
-    }
-  }
   const res = await acquireForgeLock(deps.home, deps.lifecycleLock);
-  if (!res.ok) {
-    return { ok: false, failure: { cause: res.detail } };
-  }
+  if (!res.ok) return { ok: false, failure: { cause: res.detail } };
   try {
+    if (dir && existsSync(dir)) {
+      // Configs que criamos podem ter sido editadas pelo usuário — backup
+      // antes de remover (mesma cortesia do uninstall git, que preserva
+      // .env/configs em .forge-cli/backups).
+      const filesToBackup = prior.managed_artifacts.filter((rel) => {
+        const target = safeJoinInside(dir, rel);
+        try {
+          return target !== null && statSync(target).isFile();
+        } catch {
+          return false;
+        }
+      });
+      if (filesToBackup.length) {
+        backup = path.join(
+          deps.home,
+          '.forge-cli',
+          'backups',
+          `${name}-${(deps.now ?? (() => new Date().toISOString()))().replace(/[:.]/g, '-')}`,
+        );
+        for (const rel of filesToBackup) {
+          const dest = path.join(backup, rel);
+          mkdirSync(path.dirname(dest), { recursive: true });
+          const src = safeJoinInside(dir, rel);
+          if (src) await copyFile(src, dest);
+        }
+      }
+      for (const rel of prior.managed_artifacts) {
+        const target = safeJoinInside(dir, rel);
+        if (target && existsSync(target)) {
+          rmSync(target, { recursive: true, force: true });
+          removed.push(rel);
+        }
+      }
+    }
     // Shim gravado no receipt sai junto — nunca deriva nome de bin.
     removeForgeShim(deps.home, prior.shim ?? prior.bin, deps.platform ?? process.platform);
     // Envelope do receipt (~/.forge-cli/forges/<nome>) — a fonte fica.

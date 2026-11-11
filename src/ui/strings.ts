@@ -433,6 +433,8 @@ Uso:
   forge-cli ai <tarefa>         Modo IA opcional (opt-in via forge-cli.config.json)
   forge-cli bundle <verbo>      Portabilidade: export [chaves-não-secretas...]|import|verify
   forge-cli learning <verbo>    Observações locais opt-in: status|enable|disable|report
+  forge-cli workspace <verbo>   scan|list|use|status|doctor — inventário adaptativo
+  forge-cli pack <verbo>        create|inspect|verify|import — ZIP portátil verificável
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
   forge-cli registry            Lista o catálogo PyPI e o que está instalado via registry
   forge-cli registry lock <f>   Gera <forja>.offline-lock.json (fecho transitivo,
@@ -463,6 +465,7 @@ Opções:
                      no método git só usa clones já existentes (cache parcial)
   --lock <arquivo>   Com --offline: instalação travada por offline-lock.json
   --out <path>       Com 'registry lock': destino do lock (arquivo ou dir)
+  --python <exe>     Interpretador explícito para bootstrap/registry
   --no-color         Desativa ANSI (NO_COLOR no ambiente também vale)
   --clean            Com 'reinstall': remove e reclona na mesma revisão (com backup)
   --profile <p>      Instalador nativo da Forja: minimal|recommended|full

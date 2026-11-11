@@ -190,6 +190,8 @@ export interface LocalInstallReceipt {
   managed_artifacts: string[];
   /** Arquivos da fonte (relativos) — update por substituição os reconcilia. */
   source_files: string[];
+  /** Digest of the source snapshot used by the last successful operation. */
+  source_digest?: string;
 }
 
 export type InstallReceipt = RegistryInstallReceipt | LocalInstallReceipt;

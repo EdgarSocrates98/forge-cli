@@ -169,8 +169,23 @@ forge-cli update api-forge --native           # também a operação nativa (--d
 forge-cli uninstall api-forge --native --yes # desinstala nativamente e depois remove o clone
 forge-cli status --json                      # saída estruturada (também list, versions, components, doctor)
 forge-cli self install | self uninstall | self update
+forge-cli workspace scan --dir ./FORJAS --json
+forge-cli workspace status --dir ./FORJAS
+forge-cli workspace doctor --dir ./FORJAS
+forge-cli workspace federation --dir ./FORJAS --json
+forge-cli workspace use api-forge --dir ./FORJAS --yes
+forge-cli pack create forge-cli-portable.zip --dir .
+forge-cli pack verify forge-cli-portable.zip
+forge-cli pack import forge-cli-portable.zip --dir ./portable-cli --yes
 forge-cli help
 ```
+
+`workspace` é somente leitura por padrão: reconhece checkouts Git, ZIPs e
+pastas gitless com identidade declarada/derivada, informa capacidades e não
+executa comandos encontrados em manifests. `workspace use` grava somente uma
+seleção explícita após `--yes`. `pack` cria um ZIP autocontido com launchers
+CMD/POSIX e hashes SHA-256; a importação verifica tudo antes de extrair e não
+executa scripts.
 
 Segurança: scripts não rodam após falha de sync (`--run-after-sync-failure`
 libera) e repositórios de `forge-cli.repos.json` só executam scripts com

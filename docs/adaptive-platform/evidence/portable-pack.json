@@ -1,0 +1,16 @@
+{
+  "schema": "forge/PortableDistributionPack/v1",
+  "package": "theforge-cli",
+  "version": "0.5.0",
+  "platform": "win32",
+  "node": "v24.16.0",
+  "verification": "PASS",
+  "checks": [
+    "create",
+    "inspect",
+    "sha256 verification",
+    "transactional import",
+    "corruption refusal"
+  ],
+  "truth": "LOCAL_REAL"
+}

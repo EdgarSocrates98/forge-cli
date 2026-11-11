@@ -77,6 +77,7 @@ import {
   runPredictCommand,
 } from './cmd/intel2.js';
 import { runWizard } from './wizard.js';
+import { runPackCommand, runWorkspaceCommand } from './cmd/adaptive.js';
 
 const JSON_QUERY_COMMANDS = new Set([
   'status',
@@ -103,6 +104,8 @@ const JSON_QUERY_COMMANDS = new Set([
   'ai',
   'bundle',
   'learning',
+  'workspace',
+  'pack',
 ]);
 
 async function main(): Promise<void> {
@@ -399,6 +402,14 @@ async function main(): Promise<void> {
   }
   if (resolved.command === 'learning') {
     process.exitCode = await runLearningCommand(cli);
+    return;
+  }
+  if (resolved.command === 'workspace') {
+    process.exitCode = await runWorkspaceCommand(cli, resolved.names);
+    return;
+  }
+  if (resolved.command === 'pack') {
+    process.exitCode = await runPackCommand(cli, resolved.names);
     return;
   }
   if (resolved.command === 'list') {
