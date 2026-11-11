@@ -78,7 +78,7 @@ jobs:
       - name: npm pack — tarball imutável que será publicado (sem rebuild)
         run: |
           npm pack --json > /tmp/pack.json
-          node -e "const p=require('/tmp/pack.json')[0]; if(!p.files.length) throw new Error('pacote vazio'); console.log(p.filename, p.size+'B', p.integrity)"
+          node -e "const raw=require('/tmp/pack.json'); const p=Array.isArray(raw)?raw[0]:(raw&&raw.files?raw:raw&&raw[Object.keys(raw)[0]]); if(!p||!p.files||!p.files.length) throw new Error('pacote vazio'); console.log(p.filename, p.size+'B', p.integrity)"
       - name: Upload do tarball validado (binding validate→publish)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

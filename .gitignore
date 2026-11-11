@@ -8,4 +8,7 @@ forge-workspace/
 .env
 .env.*
 *.tgz
+*.zip
+pack-dry-run.json
 graphify-out/
+.codebase-memory/

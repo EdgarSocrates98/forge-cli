@@ -1,6 +1,6 @@
 {
   "name": "theforge-cli",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "CLI interativa para clonar e configurar o ecossistema Forge",
   "type": "module",
   "bin": {
@@ -10,10 +10,11 @@
     "node": ">=20"
   },
   "files": [
+    "bin",
     "dist",
     "README.md",
     "CHANGELOG.md",
-    "docs/*.md",
+    "docs",
     "LICENSE"
   ],
   "scripts": {
@@ -27,7 +28,8 @@
     "lint": "eslint .",
     "coverage": "vitest run --coverage",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "pack": "npm pack --dry-run"
+    "pack": "npm pack --dry-run",
+    "pack:portable": "npm run build && node dist/index.js pack create forge-cli-portable.zip --dir . --json && node dist/index.js pack verify forge-cli-portable.zip --json"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",

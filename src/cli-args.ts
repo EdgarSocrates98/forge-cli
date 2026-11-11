@@ -230,6 +230,9 @@ const COMMAND_USAGE: Record<string, string> = {
     '\nuninstall <forjas> — remove clones limpos com backup (exige --yes).\n' +
     '  --method registry remove venv + receipt + wheel cache.',
   self: '\nself install|uninstall|update — registra/remove/atualiza o próprio forge-cli.',
+  workspace:
+    '\nworkspace scan|list|use|activate|status|doctor|federation — inventário bounded e matriz das Forjas sem executar manifests.',
+  pack: '\npack create|inspect|verify|import — distribuição portátil verificável; import exige --yes e não executa scripts.',
 };
 
 /** Ajuda contextual: posicionais vazios → global; com comando → global + bloco. */

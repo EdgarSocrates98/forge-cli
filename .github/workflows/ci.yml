@@ -32,6 +32,32 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run build
+      - name: Build and verify portable distribution pack
+        shell: bash
+        run: |
+          node dist/index.js pack create "$RUNNER_TEMP/forge-cli-portable.zip" --dir . --json > "$RUNNER_TEMP/portable-create.json"
+          node dist/index.js pack verify "$RUNNER_TEMP/forge-cli-portable.zip" --json
+      - name: Federated capability matrix contract
+        shell: bash
+        run: |
+          node dist/index.js workspace federation --dir . --json > "$RUNNER_TEMP/federated-matrix.json"
+          node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (value.schema !== "forge/FederatedCapabilityMatrix/v1") throw new Error("schema inválido");
+            if (!Array.isArray(value.entries) || value.entries.length < 1) throw new Error("matriz vazia");
+            if (!value.contract_ids.includes("forge/ForgeInstallContract/v1")) throw new Error("contrato de instalação ausente");
+            console.log(JSON.stringify({ entries: value.entries.length, contracts: value.contract_ids }, null, 2));
+          ' "$RUNNER_TEMP/federated-matrix.json"
+      - name: Upload local evidence artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: forge-cli-evidence-${{ matrix.os }}-${{ matrix.node }}
+          path: |
+            ${{ runner.temp }}/portable-create.json
+            ${{ runner.temp }}/forge-cli-portable.zip
+            ${{ runner.temp }}/federated-matrix.json
+          if-no-files-found: error
       - run: npm test
       - run: npm run lint
       - run: npm run format:check

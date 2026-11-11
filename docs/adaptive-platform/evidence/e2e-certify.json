@@ -1,0 +1,13 @@
+{
+  "schema": "forge-cli/E2ECertify/v1",
+  "platform": "win32",
+  "node": "v24.16.0",
+  "scenarios": 8,
+  "pass": 8,
+  "fail": 0,
+  "skip": 0,
+  "truth": "LOCAL_REAL",
+  "limitations": [
+    "provider externo e execução em outro sistema operacional não foram exercitados neste checkout"
+  ]
+}

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -188,6 +188,26 @@ describe('localInstall', () => {
 });
 
 describe('localUpdate — o diretório É a fonte mais nova', () => {
+  it('recusa divergência em arquivo registrado sem sobrescrever a fonte', async () => {
+    const v1 = path.join(tmp, 'v1-conflict');
+    makeSource(v1, 'custom-forge', { 'keep.py': 'original' });
+    const { run, calls } = fakeRun();
+    const d = deps(run);
+    const inst = await localInstall(v1, d);
+    expect(inst.ok).toBe(true);
+    writeFileSync(path.join(v1, 'keep.py'), 'edited locally');
+    const v2 = path.join(tmp, 'v2-conflict');
+    makeSource(v2, 'custom-forge', { 'keep.py': 'replacement' });
+
+    const out = await localUpdate(v2, d);
+
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.failure.code).toBe('FORGE-SOURCE-CONFLICT');
+    expect(readFileSync(path.join(v1, 'keep.py'), 'utf8')).toBe('edited locally');
+    expect(calls).toHaveLength(2); // bootstrap + --help from the initial install only
+  });
+
   it('reconcilia arquivos por substituição: novo copiado, removido só o registrado, usuário preservado', async () => {
     const v1 = path.join(tmp, 'v1');
     makeSource(v1, 'custom-forge', { 'old.py': 'v1', 'keep.py': 'a' });

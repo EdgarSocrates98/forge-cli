@@ -1,0 +1,15 @@
+{
+  "schema": "forge/AdaptivePlatformEvidence/v1",
+  "head": "bceecb123a6a5ed6f8df0ffda13356776fbd15b2",
+  "version": "0.4.3",
+  "platform": "win32",
+  "node": "v24.16.0",
+  "baseline": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "tests": "PASS: 1215 passed, 2 skipped",
+    "lint": "BLOCKED_ENVIRONMENT: incomplete installed eslint plugin",
+    "format": "BLOCKED_ENVIRONMENT: generated codebase-memory artifact"
+  },
+  "truth": "LOCAL_REAL"
+}

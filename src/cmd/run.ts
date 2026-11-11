@@ -74,7 +74,7 @@ export async function runInstallFlow(
   resolved: ResolvedCommand,
   cloneOnly: boolean,
 ): Promise<void> {
-  const env = await checkEnvironment();
+  const env = await checkEnvironment(cli.jsonReport);
 
   const interactive = !isNonInteractive(cli);
   // --yes nunca pergunta: sem seleção explícita (--all/--only/nomes) é erro
@@ -131,7 +131,7 @@ export async function runInstallFlow(
       log.info(S.noFailedRepos);
       process.exit(0);
     }
-    log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
+    if (!cli.jsonReport) log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
   } else {
     const selection = resolveSelection(effectiveCli, catalog);
     if ('error' in selection) {
@@ -139,7 +139,7 @@ export async function runInstallFlow(
       process.exit(2);
     }
     repos = selection.repos;
-    log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
+    if (!cli.jsonReport) log.info(`${S.selectedRepos}: ${repos.map((r) => r.name).join(', ')}`);
     if (interactive && !cli.yes) {
       review = await reviewExecution(repos, targetDir, cli);
       await askConfirm(targetDir, repos.length, catalog.length);
@@ -188,6 +188,27 @@ export async function runInstallFlow(
   }
 
   if (planOnly) {
+    if (effectiveCli.jsonReport) {
+      console.log(
+        JSON.stringify(
+          {
+            schema: 'forge-cli/OperationPlan/v1',
+            plan: true,
+            command: resolved.command,
+            target: targetDir,
+            repositories: repos.map((repo) => ({
+              name: repo.name,
+              kind: repo.kind,
+              url: repo.url,
+            })),
+            mutates: false,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
     const body = repos
       .map(
         (repo) =>

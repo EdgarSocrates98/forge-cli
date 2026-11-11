@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.5.0 — 2026-11-11
+
+### Added
+
+- Added bounded `workspace scan|list|use|status|doctor|federation` commands
+  with `forge/WorkspaceInventory/v1` and explicit environment capabilities.
+- Added `forge/PortableDistributionPack/v1` ZIP create/inspect/verify/import
+  with SHA-256 checksums, Windows/POSIX launchers and transactional extraction.
+- Added adaptive-platform evidence and compatibility documentation.
+
+### Fixed
+
+- Local source install/update/repair now validate the bootstrap route before
+  provisioning or replacing managed files.
+- Local bootstrap errors redact secret-like values before reaching CLI output.
+
 ## 0.4.3 — 2026-11-10
 
 ### Fixed

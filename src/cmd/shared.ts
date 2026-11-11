@@ -28,11 +28,11 @@ export async function printBanner(): Promise<void> {
  * shells Windows sondadas pelo preflight para o chamador reutilizar na
  * rota de setup — em POSIX devolve `undefined`.
  */
-export async function checkEnvironment(): Promise<{ winShells?: WinSetupShells }> {
-  log.step(`${icons.gear} ${S.preflightTitle}`);
+export async function checkEnvironment(quietMode = false): Promise<{ winShells?: WinSetupShells }> {
+  if (!quietMode) log.step(`${icons.gear} ${S.preflightTitle}`);
   const env: { winShells?: WinSetupShells } = {};
   const checks = await runPreflight(process.platform, undefined, env);
-  for (const check of checks) {
+  for (const check of quietMode ? [] : checks) {
     const hint = !check.ok && check.hint ? ` ${theme.dim(`→ ${check.hint}`)}` : '';
     if (check.ok) {
       log.success(`${icons.ok} ${check.name} ${theme.dim(`(${check.detail})`)}`);
@@ -43,7 +43,7 @@ export async function checkEnvironment(): Promise<{ winShells?: WinSetupShells }
     }
   }
   if (checks.some((check) => !check.ok && check.severity === 'fatal')) {
-    log.error(S.preflightFailed);
+    if (!quietMode) log.error(S.preflightFailed);
     process.exit(1);
   }
   return env;

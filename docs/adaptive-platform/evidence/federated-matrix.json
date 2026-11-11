@@ -1,0 +1,14 @@
+{
+  "schema": "forge/FederatedCapabilityMatrix/v1",
+  "entries": 14,
+  "contract_ids": [
+    "forge/ForgeDescriptor/v1",
+    "forge/ForgeCapability/v1",
+    "forge/ForgeInstallContract/v1"
+  ],
+  "source": "catalog+local-observation",
+  "truth": "LOCAL_REAL",
+  "limitations": [
+    "entries não representam homologação de runtime dos peers; a matriz separa observação local de execução externa"
+  ]
+}
