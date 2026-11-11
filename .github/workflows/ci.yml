@@ -46,7 +46,7 @@ jobs:
             const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             if (value.schema !== "forge/FederatedCapabilityMatrix/v1") throw new Error("schema inválido");
             if (!Array.isArray(value.entries) || value.entries.length < 1) throw new Error("matriz vazia");
-            if (!value.contract_ids.includes("ForgeInstallContract/v1")) throw new Error("contrato de instalação ausente");
+            if (!value.contract_ids.includes("forge/ForgeInstallContract/v1")) throw new Error("contrato de instalação ausente");
             console.log(JSON.stringify({ entries: value.entries.length, contracts: value.contract_ids }, null, 2));
           ' "$RUNNER_TEMP/federated-matrix.json"
       - name: Upload local evidence artifacts
