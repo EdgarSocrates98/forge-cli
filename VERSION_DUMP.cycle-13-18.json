@@ -1,0 +1,15 @@
+{
+  "cycle": "13-18",
+  "repository": "forge-cli",
+  "version": "0.5.0",
+  "tag": "v0.5.0",
+  "source_commit": "d44e62e32923d81970e38ee6d3ad0cf4e724ab7b",
+  "version_source": "package.json",
+  "verified_at": "2026-11-11",
+  "evidence": {
+    "tests": "1219 passed, 2 skipped",
+    "coverage": "87.4% statements, 89.8% lines",
+    "portable_pack": "verified",
+    "e2e": "8 passed, 0 failed, 0 skipped"
+  }
+}
