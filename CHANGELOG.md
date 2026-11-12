@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.5.2 — 2026-11-12
+
+### Added
+
+- Live install board upgrade: per-Forge elapsed time, gradient progress bar
+  with linear ETA and cursor-safe in-place re-render (TTY-only, silent in
+  pipes and `--json`).
+- New UI primitives: `progress` (bar/duration/ETA), `table` (ANSI-aware
+  alignment), `spin` (`withSpinner`, quiet when non-TTY/JSON), `fx` (state
+  chips, banner tagline, ember celebration) and `usage` (themed help applied
+  at print time — `usage()` output stays plain text).
+- `status` renders an aligned table with colored state chips; guided menu
+  items gained per-action icons; clean installs end with a short celebration
+  and a next-steps hint.
+- Spinners on previously silent waits: status collection, execution review,
+  update-check and version tag listing.
+
 ## 0.5.0 — 2026-11-11
 
 ### Added
@@ -55,6 +72,10 @@
 
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
+
+## [0.5.2] - 2026-11-12
+
+UI/UX polish cycle: live install board with per-Forge elapsed, gradient progress footer + ETA, ANSI-aware status table with state chips, spinners on silent waits, menu icons, banner tagline and clean-install celebration — all gated TTY-only, `--json` stays byte-pure.
 
 ## [0.5.1] - 2026-11-12
 
