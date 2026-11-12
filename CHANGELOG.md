@@ -56,6 +56,10 @@
 Todas as mudanças notáveis deste projeto são documentadas aqui, no
 formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.5.1] - 2026-11-12
+
+Cycle 2.7 patch release: federated SDD contracts and adapters, forge-context kind taxonomy, universal Obsidian export verbs, portal and install UX improvements, provider context-registry wiring, CI hardening and generated-artifact refresh.
+
 ## [0.2.6] - 2026-10-21
 
 ### Added
