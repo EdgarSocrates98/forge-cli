@@ -16,6 +16,7 @@ import { deriveSchema } from '../envintel/schema.js';
 import type { HostDetection } from '../hosts/types.js';
 import { checkEnvLock, interruptedRuns, type EnvLock } from '../maintenance.js';
 import { classifyIntegrationsSync } from '../integrations.js';
+import { loadContextStates } from '../context-registry.js';
 import { loadForgeState, type LocalInstallReceipt } from '../registry/install.js';
 import { resolveInside } from '../safety.js';
 import { hasGitRepo } from '../utils/system.js';
@@ -680,6 +681,72 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
                 reversible: null,
               },
       ),
+    );
+  }
+
+  // Estados granulares do Forge Context (GAP-06): projeta
+  // `.forge/context/registry.json` + manifests `forge/context/v1` —
+  // state=available|degraded|unavailable, health=healthy|degraded|
+  // unverified|broken. AUSENTE é opcional (workspace sem install de
+  // contexto); registro inválido ou estados degradados viram warn.
+  const contextStates = loadContextStates(ctx.root);
+  if (contextStates.status === 'absent') {
+    checks.push(
+      mkCheck(ctx.now, {
+        id: 'installation.context-registry.states',
+        domain: 'installation',
+        result: 'skip',
+        severity: 'info',
+        diagnosis: 'sem registry de contexto Forge (.forge/context/registry.json ausente)',
+        evidence: [`${path.join(ctx.root, '.forge', 'context', 'registry.json')} ausente`],
+        reversible: null,
+      }),
+    );
+  } else if (contextStates.status === 'invalid') {
+    checks.push(
+      mkCheck(ctx.now, {
+        id: 'installation.context-registry.states',
+        domain: 'installation',
+        result: 'warn',
+        severity: 'medium',
+        diagnosis: 'registry de contexto Forge presente mas inválido',
+        evidence: [
+          `${path.join(ctx.root, '.forge', 'context', 'registry.json')}: ${contextStates.detail ?? 'inválido'}`,
+        ],
+        correctiveAction: 'repair via `forge context repair` (installkit repair_context)',
+        reversible: true,
+      }),
+    );
+  } else {
+    const entries = Object.entries(contextStates.forges).sort(([a], [b]) => a.localeCompare(b));
+    const lines = entries.map(
+      ([fid, s]) =>
+        `${fid}: state=${s.state} health=${s.health ?? '—'}` +
+        `${s.scope ? ` scope=${s.scope}` : ''}${s.kind ? ` kind=${s.kind}` : ''}` +
+        `${s.degradedReasons.length ? ` reasons=${s.degradedReasons.join('; ')}` : ''}` +
+        ` [${s.source}]`,
+    );
+    if (contextStates.skipped)
+      lines.push(`entradas malformadas ignoradas=${contextStates.skipped}`);
+    if (contextStates.truncated) lines.push('registry truncado pelo limite de leitura');
+    const degraded = entries.filter(
+      ([, s]) => s.state !== 'available' || s.health === 'degraded' || s.health === 'broken',
+    );
+    checks.push(
+      mkCheck(ctx.now, {
+        id: 'installation.context-registry.states',
+        domain: 'installation',
+        result: degraded.length ? 'warn' : 'pass',
+        severity: degraded.length ? 'low' : 'info',
+        diagnosis: degraded.length
+          ? `${degraded.length} Forja(s) com estado granular degradado no registry de contexto`
+          : `registry de contexto íntegro — ${entries.length} Forja(s) com estados granulares`,
+        evidence: boundEntries(ctx, lines).shown,
+        ...(degraded.length
+          ? { correctiveAction: 'inspect degraded forge states via `forge context status/doctor`' }
+          : {}),
+        reversible: degraded.length ? true : null,
+      }),
     );
   }
 

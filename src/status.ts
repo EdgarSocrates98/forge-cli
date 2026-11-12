@@ -23,6 +23,17 @@ export interface RepoStatusInfo {
   manifest_valid?: boolean;
   integrity?: string;
   source_dir?: string;
+  /**
+   * Estados granulares do Forge Context (`.forge/context/registry.json` +
+   * manifest `forge/context/v1`) — projetados por mergeContextStates;
+   * ausentes quando o workspace não tem registry de contexto.
+   */
+  context?: {
+    state: 'available' | 'degraded' | 'unavailable';
+    health: 'healthy' | 'degraded' | 'unverified' | 'broken' | null;
+    scope: string | null;
+    kind: string | null;
+  };
 }
 
 export function phaseOf(cloned: boolean, entry?: CliState['repos'][string]): InstallPhase {

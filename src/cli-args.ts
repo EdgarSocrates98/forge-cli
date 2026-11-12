@@ -231,7 +231,9 @@ const COMMAND_USAGE: Record<string, string> = {
     '  --method registry remove venv + receipt + wheel cache.',
   self: '\nself install|uninstall|update — registra/remove/atualiza o próprio forge-cli.',
   workspace:
-    '\nworkspace scan|list|use|activate|status|doctor|federation — inventário bounded e matriz das Forjas sem executar manifests.',
+    '\nworkspace scan|list|use|activate|install|status|doctor|federation — inventário bounded e\n' +
+    '  matriz das Forjas. install <forja> roda o instalador nativo com scope=workspace\n' +
+    '  (plano sem --yes; executa só com --yes).',
   pack: '\npack create|inspect|verify|import — distribuição portátil verificável; import exige --yes e não executa scripts.',
 };
 

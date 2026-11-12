@@ -89,6 +89,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Inteligência operacional de APIs, SLOs e investigação de incidentes',
     kind: 'python',
     verify: ['api-sentinel', '--help'],
+    // O `install` é init de workspace (profile local|aws|opentelemetry,
+    // scope project|user). components/host/gateway-profile não se aplicam —
+    // flags não suportadas caem em `ignored` (degradação honesta).
+    nativeInstall: {
+      command: ['api-sentinel', 'install'],
+      flags: ['scope', 'profile'],
+      ops: {
+        update: ['api-sentinel', 'update'],
+        uninstall: ['api-sentinel', 'uninstall'],
+      },
+    },
     nextSteps: [
       'api-sentinel install --yes',
       'api-sentinel doctor --json',

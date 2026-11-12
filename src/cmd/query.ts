@@ -13,6 +13,7 @@ import { localTags, remoteTags, updateCheck } from '../git-revs.js';
 import { resolveInside } from '../safety.js';
 import { existsSync } from 'node:fs';
 import { loadForgeState, type InstallReceipt } from '../registry/install.js';
+import { loadContextStates } from '../context-registry.js';
 import { emitJson, catalogFor, reposByNames } from './shared.js';
 import { processBatch } from './batch.js';
 import {
@@ -245,12 +246,38 @@ export function mergeRegistryPhase(
   }
 }
 
+/**
+ * Projeta os estados granulares do Forge Context sobre as linhas de status
+ * (GAP-06 — projeção aditiva: `phase` continua a fonte primária; `context`
+ * mostra o que o engine de contexto registrou para a Forja).
+ */
+export function mergeContextStates(
+  infos: {
+    name: string;
+    context?: {
+      state: 'available' | 'degraded' | 'unavailable';
+      health: 'healthy' | 'degraded' | 'unverified' | 'broken' | null;
+      scope: string | null;
+      kind: string | null;
+    };
+  }[],
+  root: string,
+): void {
+  const states = loadContextStates(root).forges;
+  for (const i of infos) {
+    const ctx = Object.hasOwn(states, i.name) ? states[i.name] : undefined;
+    if (!ctx) continue;
+    i.context = { state: ctx.state, health: ctx.health, scope: ctx.scope, kind: ctx.kind };
+  }
+}
+
 export async function runStatusCommand(cli: CliOptions, names: string[]): Promise<void> {
   const targetDir = resolveTargetDir(cli.dir);
   const catalog = catalogFor(targetDir);
   const wanted = names.length ? catalog.filter((r) => names.includes(r.name)) : catalog;
   const infos = await collectStatus(wanted, targetDir, loadState(targetDir));
   mergeRegistryPhase(infos, loadForgeState(cliHome()).forges);
+  mergeContextStates(infos, targetDir);
   const label: Record<string, string> = {
     'not-installed': S.statusNotInstalled,
     cloned: S.statusCloned,
@@ -264,7 +291,10 @@ export async function runStatusCommand(cli: CliOptions, names: string[]): Promis
   const body = infos
     .map((i) => {
       const ver = i.describe ?? i.head;
-      const extra = [ver, i.dirty ? S.warnDirtyTree : undefined].filter(Boolean).join(' · ');
+      const ctxTag = i.context ? `ctx:${i.context.state}/${i.context.health ?? '—'}` : undefined;
+      const extra = [ver, ctxTag, i.dirty ? S.warnDirtyTree : undefined]
+        .filter(Boolean)
+        .join(' · ');
       return `${i.name} — ${label[i.phase]}${extra ? theme.dim(` (${extra})`) : ''}`;
     })
     .join('\n');
