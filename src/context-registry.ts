@@ -60,7 +60,10 @@ export interface ContextRegistry {
   truncated: boolean;
 }
 
-function readJsonBounded(file: string, maxBytes: number): { ok: true; value: unknown } | { ok: false; error: string } {
+function readJsonBounded(
+  file: string,
+  maxBytes: number,
+): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
     const st = statSync(file);
     if (!st.isFile() || st.size > maxBytes) {
@@ -87,7 +90,10 @@ function resolveContextPath(contextDir: string, rel: unknown): string | null {
   return target;
 }
 
-function manifestStateFor(contextDir: string, rel: unknown): {
+function manifestStateFor(
+  contextDir: string,
+  rel: unknown,
+): {
   state: ManifestState | null;
   health: HealthStatus | null;
   degradedReasons: string[];
@@ -96,7 +102,12 @@ function manifestStateFor(contextDir: string, rel: unknown): {
   const file = resolveContextPath(contextDir, rel);
   if (!file || !existsSync(file)) return none;
   const parsed = readJsonBounded(file, MAX_MANIFEST_BYTES);
-  if (!parsed.ok || !parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) {
+  if (
+    !parsed.ok ||
+    !parsed.value ||
+    typeof parsed.value !== 'object' ||
+    Array.isArray(parsed.value)
+  ) {
     return none;
   }
   const doc = parsed.value as Record<string, unknown>;
@@ -130,11 +141,23 @@ export function loadContextStates(rootInput: string): ContextRegistry {
   }
   const parsed = readJsonBounded(registryFile, MAX_REGISTRY_BYTES);
   if (!parsed.ok) {
-    return { status: 'invalid', detail: `JSON ilegível: ${parsed.error}`, forges: {}, skipped: 0, truncated: false };
+    return {
+      status: 'invalid',
+      detail: `JSON ilegível: ${parsed.error}`,
+      forges: {},
+      skipped: 0,
+      truncated: false,
+    };
   }
   const doc = parsed.value;
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    return { status: 'invalid', detail: 'registry não é um objeto JSON', forges: {}, skipped: 0, truncated: false };
+    return {
+      status: 'invalid',
+      detail: 'registry não é um objeto JSON',
+      forges: {},
+      skipped: 0,
+      truncated: false,
+    };
   }
   const header = doc as Record<string, unknown>;
   if (header.schema !== REGISTRY_SCHEMA) {
@@ -147,7 +170,13 @@ export function loadContextStates(rootInput: string): ContextRegistry {
     };
   }
   if (!Array.isArray(header.forges)) {
-    return { status: 'invalid', detail: 'forges ausente ou não é array', forges: {}, skipped: 0, truncated: false };
+    return {
+      status: 'invalid',
+      detail: 'forges ausente ou não é array',
+      forges: {},
+      skipped: 0,
+      truncated: false,
+    };
   }
   const forges: Record<string, ContextForgeState> = {};
   let skipped = 0;

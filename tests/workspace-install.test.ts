@@ -86,13 +86,7 @@ describe('workspace install <forja> — GAP-07', () => {
       const doc = lastJson(spy);
       expect((doc.plan as { operation: string }).operation).toBe('install');
       expect((doc.receipt as { status: string }).status).toBe('planned');
-      expect(doc.argv).toEqual([
-        'data-sentinel',
-        'install',
-        '--scope',
-        'workspace',
-        '--dry-run',
-      ]);
+      expect(doc.argv).toEqual(['data-sentinel', 'install', '--scope', 'workspace', '--dry-run']);
       expect(streamed).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();

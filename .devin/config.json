@@ -1,8 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Exec(forge-cli --version)",
-      "Exec(forge-cli doctor)"
-    ]
+    "allow": ["Exec(forge-cli --version)", "Exec(forge-cli doctor)"]
   }
 }

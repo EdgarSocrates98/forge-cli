@@ -726,11 +726,11 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
         `${s.degradedReasons.length ? ` reasons=${s.degradedReasons.join('; ')}` : ''}` +
         ` [${s.source}]`,
     );
-    if (contextStates.skipped) lines.push(`entradas malformadas ignoradas=${contextStates.skipped}`);
+    if (contextStates.skipped)
+      lines.push(`entradas malformadas ignoradas=${contextStates.skipped}`);
     if (contextStates.truncated) lines.push('registry truncado pelo limite de leitura');
     const degraded = entries.filter(
-      ([, s]) =>
-        s.state !== 'available' || s.health === 'degraded' || s.health === 'broken',
+      ([, s]) => s.state !== 'available' || s.health === 'degraded' || s.health === 'broken',
     );
     checks.push(
       mkCheck(ctx.now, {

@@ -19,12 +19,7 @@ import type { WorkspaceInventory } from '../adaptive/contracts.js';
 import { buildNativeInstall } from '../native-install.js';
 import { catalogFor, reposByNames } from './shared.js';
 import { theme } from '../ui/theme.js';
-import {
-  errorDetail,
-  resolvePython,
-  resolveTargetDir,
-  runStreamed,
-} from '../utils/system.js';
+import { errorDetail, resolvePython, resolveTargetDir, runStreamed } from '../utils/system.js';
 
 function workspaceRoot(cli: CliOptions): string {
   return cli.dir ? resolveTargetDir(cli.dir) : process.cwd();
@@ -41,9 +36,7 @@ function inventoryText(inventory: WorkspaceInventory): string {
         : project.state === 'DEGRADED'
           ? '!'
           : '○';
-    const ctx = project.context
-      ? `${project.context.state}/${project.context.health ?? '—'}`
-      : '—';
+    const ctx = project.context ? `${project.context.state}/${project.context.health ?? '—'}` : '—';
     return `${marker} ${project.id.padEnd(24)} ${project.state.padEnd(10)} ${project.kind.padEnd(8)} ${project.identity.level.padEnd(10)} ${ctx}`;
   });
   return [
@@ -251,7 +244,9 @@ async function runWorkspaceInstall(
       { plan, receipt: receiptForPlan(plan, 'planned'), argv, ignored: built.ignored },
       `${plan.actions.map((action) => `· ${action.description}`).join('\n')}` +
         `\ncwd: ${root}` +
-        (built.ignored.length ? `\nflags ignoradas: ${built.ignored.map((f) => `--${f}`).join(', ')}` : '') +
+        (built.ignored.length
+          ? `\nflags ignoradas: ${built.ignored.map((f) => `--${f}`).join(', ')}`
+          : '') +
         '\n\nNada foi executado — use --yes para instalar em scope=workspace' +
         ' (sem ele o instalador nativo recebe --dry-run, como no argv acima).',
       'Workspace install plan',

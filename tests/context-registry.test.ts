@@ -114,7 +114,9 @@ describe('loadContextStates — registry de contexto Forge', () => {
 
   it('manifesto divergente do registry: o manifesto (granular) vence', () => {
     const root = temp();
-    writeContext(root, [{ fid: 'the-forge', regState: 'available', state: 'unavailable', health: 'unverified' }]);
+    writeContext(root, [
+      { fid: 'the-forge', regState: 'available', state: 'unavailable', health: 'unverified' },
+    ]);
     const res = loadContextStates(root);
     expect(res.forges['the-forge'].state).toBe('unavailable');
     expect(res.forges['the-forge'].health).toBe('unverified');
@@ -122,7 +124,9 @@ describe('loadContextStates — registry de contexto Forge', () => {
 
   it('manifesto ausente → fallback honesto ao estado do registry (health=null)', () => {
     const root = temp();
-    writeContext(root, [{ fid: 'the-forge', regState: 'degraded', manifestPath: 'capabilities/nope.json' }]);
+    writeContext(root, [
+      { fid: 'the-forge', regState: 'degraded', manifestPath: 'capabilities/nope.json' },
+    ]);
     const res = loadContextStates(root);
     expect(res.forges['the-forge']).toMatchObject({
       state: 'degraded',
@@ -134,7 +138,9 @@ describe('loadContextStates — registry de contexto Forge', () => {
   it('manifest.path com escape é recusado — nunca lê fora de .forge/context', () => {
     const root = temp();
     writeFileSync(path.join(root, 'evil.json'), JSON.stringify({ state: 'broken' }));
-    writeContext(root, [{ fid: 'the-forge', regState: 'available', manifestPath: '../../evil.json' }]);
+    writeContext(root, [
+      { fid: 'the-forge', regState: 'available', manifestPath: '../../evil.json' },
+    ]);
     const res = loadContextStates(root);
     expect(res.forges['the-forge'].source).toBe('registry');
     expect(res.forges['the-forge'].health).toBeNull();
