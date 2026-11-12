@@ -18,7 +18,8 @@ import { buildFederatedMatrix } from '../adaptive/federation.js';
 import type { WorkspaceInventory } from '../adaptive/contracts.js';
 import { buildNativeInstall } from '../native-install.js';
 import { catalogFor, reposByNames } from './shared.js';
-import { theme } from '../ui/theme.js';
+import type { ForgeRepo } from '../types.js';
+import { icons, theme } from '../ui/theme.js';
 import { errorDetail, resolvePython, resolveTargetDir, runStreamed } from '../utils/system.js';
 
 function workspaceRoot(cli: CliOptions): string {
@@ -117,7 +118,7 @@ export async function runWorkspaceCommand(cli: CliOptions, args: string[]): Prom
     return conflicts.length ? 1 : 0;
   }
   if (verb === 'install') {
-    return runWorkspaceInstall(cli, args[1], root, inventory);
+    return runWorkspaceInstall(cli, args.slice(1), root, inventory);
   }
   if (verb === 'use') {
     const target = args[1];
@@ -189,20 +190,56 @@ export async function runWorkspaceCommand(cli: CliOptions, args: string[]): Prom
  */
 async function runWorkspaceInstall(
   cli: CliOptions,
-  target: string | undefined,
+  targets: string[],
   root: string,
   inventory: WorkspaceInventory,
 ): Promise<number> {
-  if (!target) {
-    log.error('WORKSPACE-INSTALL-NEEDS-FORGE: informe a Forja — workspace install <forja>');
+  if (!targets.length) {
+    log.error(
+      'WORKSPACE-INSTALL-NEEDS-FORGE: informe a Forja — workspace install <forja> [...|all]',
+    );
     return 2;
   }
-  const picked = reposByNames(catalogFor(root), [target]);
+  // Multi-forge workspace install (Onda 07): `all` expands to every catalog
+  // forge whose native installer is documented; named targets stay ordered.
+  let names = targets;
+  const catalog = catalogFor(root);
+  if (targets.includes('all')) {
+    if (targets.length > 1) {
+      log.error('WORKSPACE-INSTALL-ALL-MIXED: `all` não combina com alvos nomeados');
+      return 2;
+    }
+    names = catalog.map((repo) => repo.name);
+  }
+  const picked = reposByNames(catalog, names);
   if ('error' in picked) {
     log.error(`WORKSPACE-FORGE-UNKNOWN: ${picked.error}`);
     return 2;
   }
-  const repo = picked[0];
+  let worst = 0;
+  const summary: { forge: string; code: number }[] = [];
+  for (const repo of picked) {
+    const code = await workspaceInstallOne(cli, repo, root, inventory);
+    summary.push({ forge: repo.name, code });
+    if (code > worst) worst = code;
+  }
+  if (picked.length > 1) {
+    emit(
+      cli,
+      { results: summary, ok: summary.filter((s) => s.code === 0).map((s) => s.forge) },
+      summary.map((s) => `${s.code === 0 ? icons.ok : icons.err} ${s.forge}`).join('\n'),
+      'Workspace install — resumo',
+    );
+  }
+  return worst;
+}
+
+async function workspaceInstallOne(
+  cli: CliOptions,
+  repo: ForgeRepo,
+  root: string,
+  inventory: WorkspaceInventory,
+): Promise<number> {
   if (cli.scope && cli.scope !== 'workspace') {
     log.error(
       `WORKSPACE-SCOPE-CONFLICT: workspace install fixa scope=workspace (recebido --scope ${cli.scope})`,
