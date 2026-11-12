@@ -517,5 +517,6 @@ Extras:
   learningEmpty: 'Nenhuma observação registrada',
   tagline: 'forje o seu ecossistema',
   boardEta: 'restantes',
+  overallProgress: 'concluído',
   nextStepsHint: 'próximos: forge-cli status · forge-cli doctor',
 };
