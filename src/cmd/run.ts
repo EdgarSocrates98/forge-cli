@@ -16,6 +16,8 @@ import { askConfirm, askRepos, askTrustCustom, askWorkspace } from '../prompts.j
 import { mergeResults, renderReport, resultLine } from '../report.js';
 import { processPool, type RunOptions } from '../runner.js';
 import type { ForgeRepo, RepoResult } from '../types.js';
+import { celebrate } from '../ui/fx.js';
+import { withSpinner } from '../ui/spin.js';
 import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { currentHead, hasGitRepo, resolveTargetDir, cliHome } from '../utils/system.js';
@@ -38,17 +40,22 @@ export async function reviewExecution(
 ): Promise<{ trusted: Set<string>; denied: Set<string> }> {
   const trusted = new Set<string>();
   const denied = new Set<string>();
-  const summaries = await Promise.all(
-    repos.map((repo) =>
-      executionSummary(repo, targetDir, {
-        profile: cli.profile,
-        scope: cli.scope,
-        components: cli.components,
-        host: cli.host,
-        gatewayProfile: cli.gatewayProfile,
-        approve: cli.yes,
-      }),
-    ),
+  const summaries = await withSpinner(
+    `${S.approvalTitle}…`,
+    () =>
+      Promise.all(
+        repos.map((repo) =>
+          executionSummary(repo, targetDir, {
+            profile: cli.profile,
+            scope: cli.scope,
+            components: cli.components,
+            host: cli.host,
+            gatewayProfile: cli.gatewayProfile,
+            approve: cli.yes,
+          }),
+        ),
+      ),
+    { quiet: cli.jsonReport },
   );
   note(
     summaries
@@ -113,7 +120,11 @@ export async function runInstallFlow(
   let repos: ForgeRepo[];
   let review: { trusted: Set<string>; denied: Set<string> } | undefined;
   if (!nonInteractive) {
-    const infos = await collectStatus(catalog, targetDir, loadState(targetDir));
+    const infos = await withSpinner(
+      `${S.statusTitle}…`,
+      () => collectStatus(catalog, targetDir, loadState(targetDir)),
+      { quiet: cli.jsonReport },
+    );
     repos = await askRepos(catalog, { status: new Map(infos.map((i) => [i.name, i])) });
     if (!cli.yes) {
       review = await reviewExecution(repos, targetDir, cli);
@@ -303,7 +314,9 @@ export async function runInstallFlow(
   log.info(`${S.logSaved}: ${theme.dim(runLog.file)}`);
 
   const hasErrors = results.some((r) => r.status === 'error');
+  if (!hasErrors && !cli.jsonReport) await celebrate();
   outro(`${icons.rocket} ${hasErrors ? S.outroWithErrors : S.outroOk}`);
+  if (!hasErrors && !cli.jsonReport) log.info(theme.dim(S.nextStepsHint));
 
   // lf-0031: integrações opcionais — oferta checkbox-style pós-install com
   // consentimento explícito; nada instala sem marcação. Só install/clone

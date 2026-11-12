@@ -515,4 +515,7 @@ Extras:
   learningOn: 'ativado',
   learningOff: 'desativado',
   learningEmpty: 'Nenhuma observação registrada',
+  tagline: 'forje o seu ecossistema',
+  boardEta: 'restantes',
+  nextStepsHint: 'próximos: forge-cli status · forge-cli doctor',
 };
