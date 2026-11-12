@@ -191,6 +191,14 @@ export const FORGE_REPOS: ForgeRepo[] = [
     description: 'Índice e exploração estrutural de código',
     kind: 'python',
     verify: ['code-atlas', '--help'],
+    nativeInstall: {
+      command: ['code-atlas', 'install'],
+      flags: ['scope', 'profile', 'components'],
+      ops: {
+        update: ['code-atlas', 'install'],
+        uninstall: ['code-atlas', 'install', 'uninstall'],
+      },
+    },
     nextSteps: ['code-atlas doctor', 'code-atlas status'],
   },
   {
