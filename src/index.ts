@@ -13,6 +13,7 @@ import { resolveCommand } from './commands.js';
 import { collectStatus } from './status.js';
 import { askRepos, askWorkspace } from './prompts.js';
 import { S } from './ui/strings.js';
+import { styledUsage } from './ui/usage.js';
 import { setColorEnabled, theme } from './ui/theme.js';
 import { CLI_NAME, CLI_VERSION } from './version.js';
 import { cliHome, hasGitRepo, resolveTargetDir } from './utils/system.js';
@@ -116,7 +117,7 @@ async function main(): Promise<void> {
     await printBanner();
     intro(theme.accent(S.intro));
     log.error(error instanceof CliError ? error.message : String(error));
-    console.log(usage());
+    console.log(styledUsage(usage()));
     process.exit(2);
   }
   // --no-color/NO_COLOR valem para todo ANSI (banner, theme, clack).
@@ -132,7 +133,7 @@ async function main(): Promise<void> {
     intro(theme.accent(S.intro));
   }
   if (cli.help) {
-    console.log(usageFor(cli.positionals));
+    console.log(styledUsage(usageFor(cli.positionals)));
     process.exit(0);
   }
   if (shouldShowMenu(cli, Boolean(process.stdin.isTTY && process.stdout.isTTY))) {
@@ -188,7 +189,7 @@ async function main(): Promise<void> {
   let resolved = resolveCommand(cli);
   if (resolved.command === 'unknown') {
     log.error(`${S.errUnknownCommand}: ${resolved.unknown}`);
-    console.log(usage());
+    console.log(styledUsage(usage()));
     process.exit(2);
   }
   const REGISTRY_COMMANDS = new Set([
@@ -421,7 +422,7 @@ async function main(): Promise<void> {
     return;
   }
   if (resolved.command === 'help') {
-    console.log(usageFor(cli.positionals));
+    console.log(styledUsage(usageFor(cli.positionals)));
     process.exit(0);
   }
   if (resolved.command === 'components') {

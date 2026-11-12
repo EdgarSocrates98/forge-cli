@@ -28,28 +28,64 @@ export type MenuAction =
  * superfícies de integração (hosts/MCP/skills), diagnóstico e o submenu
  * 'advanced' (env, MCP --verify).
  */
+const MENU_ICON: Record<MenuAction, string> = {
+  install: '🚀',
+  installed: '📦',
+  wizard: '🧙',
+  update: '⬆️',
+  reinstall: '🔁',
+  repair: '🩹',
+  versions: '🏷️',
+  status: '📊',
+  uninstall: '🧹',
+  doctor: '🩺',
+  hosts: '🔌',
+  mcp: '🧩',
+  skills: '🛠️',
+  env: '🔐',
+  advanced: '⚙️',
+  'mcp-verify': '🧪',
+  exit: '🚪',
+};
+
 export const MENU_ITEMS: { value: MenuAction; label: string; hint?: string }[] = [
-  { value: 'install', label: S.menuInstall, hint: S.menuInstallHint },
-  { value: 'installed', label: S.menuInstalled, hint: S.menuInstalledHint },
-  { value: 'update', label: S.menuUpdate },
-  { value: 'hosts', label: S.menuHosts, hint: S.menuHostsHint },
-  { value: 'mcp', label: S.menuMcp, hint: S.menuMcpHint },
-  { value: 'skills', label: S.menuSkills, hint: S.menuSkillsHint },
-  { value: 'wizard', label: S.menuWizard, hint: S.menuWizardHint },
-  { value: 'reinstall', label: S.menuReinstall, hint: S.menuReinstallHint },
-  { value: 'repair', label: S.menuRepair, hint: S.menuRepairHint },
-  { value: 'versions', label: S.menuVersions },
-  { value: 'status', label: S.menuStatus },
-  { value: 'uninstall', label: S.menuUninstall, hint: S.menuUninstallHint },
-  { value: 'doctor', label: S.menuDoctor },
-  { value: 'advanced', label: S.menuAdvanced, hint: S.menuAdvancedHint },
-  { value: 'exit', label: S.menuExit },
+  { value: 'install', label: `${MENU_ICON.install} ${S.menuInstall}`, hint: S.menuInstallHint },
+  {
+    value: 'installed',
+    label: `${MENU_ICON.installed} ${S.menuInstalled}`,
+    hint: S.menuInstalledHint,
+  },
+  { value: 'update', label: `${MENU_ICON.update} ${S.menuUpdate}` },
+  { value: 'hosts', label: `${MENU_ICON.hosts} ${S.menuHosts}`, hint: S.menuHostsHint },
+  { value: 'mcp', label: `${MENU_ICON.mcp} ${S.menuMcp}`, hint: S.menuMcpHint },
+  { value: 'skills', label: `${MENU_ICON.skills} ${S.menuSkills}`, hint: S.menuSkillsHint },
+  { value: 'wizard', label: `${MENU_ICON.wizard} ${S.menuWizard}`, hint: S.menuWizardHint },
+  {
+    value: 'reinstall',
+    label: `${MENU_ICON.reinstall} ${S.menuReinstall}`,
+    hint: S.menuReinstallHint,
+  },
+  { value: 'repair', label: `${MENU_ICON.repair} ${S.menuRepair}`, hint: S.menuRepairHint },
+  { value: 'versions', label: `${MENU_ICON.versions} ${S.menuVersions}` },
+  { value: 'status', label: `${MENU_ICON.status} ${S.menuStatus}` },
+  {
+    value: 'uninstall',
+    label: `${MENU_ICON.uninstall} ${S.menuUninstall}`,
+    hint: S.menuUninstallHint,
+  },
+  { value: 'doctor', label: `${MENU_ICON.doctor} ${S.menuDoctor}` },
+  { value: 'advanced', label: `${MENU_ICON.advanced} ${S.menuAdvanced}`, hint: S.menuAdvancedHint },
+  { value: 'exit', label: `${MENU_ICON.exit} ${S.menuExit}` },
 ];
 
 /** Submenu 'advanced': superfícies de baixo nível — env wizard e MCP --verify. */
 export const ADVANCED_MENU_ITEMS: { value: MenuAction; label: string; hint?: string }[] = [
-  { value: 'env', label: S.menuEnv, hint: S.menuEnvHint },
-  { value: 'mcp-verify', label: S.menuMcpVerify, hint: S.menuMcpVerifyHint },
+  { value: 'env', label: `${MENU_ICON.env} ${S.menuEnv}`, hint: S.menuEnvHint },
+  {
+    value: 'mcp-verify',
+    label: `${MENU_ICON['mcp-verify']} ${S.menuMcpVerify}`,
+    hint: S.menuMcpVerifyHint,
+  },
 ];
 
 /**

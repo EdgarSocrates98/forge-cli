@@ -6,9 +6,11 @@ import { type CliOptions } from '../cli-args.js';
 import { FORGE_REPOS } from '../constants/repos.js';
 import { runPreflight } from '../preflight.js';
 import type { ForgeRepo } from '../types.js';
+import { printTagline } from '../ui/fx.js';
 import { S } from '../ui/strings.js';
 import { gradient, icons, theme } from '../ui/theme.js';
 import { resolveTargetDir, type WinSetupShells } from '../utils/system.js';
+import { CLI_VERSION } from '../version.js';
 
 const nativeProcessExit = process.exit;
 
@@ -23,6 +25,7 @@ export async function printBanner(): Promise<void> {
     console.log(line.trim() ? gradient(line, i / last) : line);
     await new Promise((resolve) => setTimeout(resolve, BANNER_LINE_DELAY_MS));
   }
+  await printTagline(`${S.tagline} · v${CLI_VERSION}`);
 }
 
 /**

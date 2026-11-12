@@ -8,3 +8,5 @@ graphify-out/
 # captured evidence/logs — byte-exact artifacts, not authored source
 docs/integration/cases/
 docs/integration/verification/
+# generated release evidence — byte-exact
+VERSION_DUMP*.json

@@ -1,4 +1,7 @@
 import { log, note } from '@clack/prompts';
+import { chip } from '../ui/fx.js';
+import { renderTable } from '../ui/table.js';
+import { withSpinner } from '../ui/spin.js';
 import { loadState, openRunLog } from '../artifacts.js';
 import { type CliOptions } from '../cli-args.js';
 import { reposNeedingFix, runDoctor } from '../doctor.js';
@@ -288,16 +291,31 @@ export async function runStatusCommand(cli: CliOptions, names: string[]): Promis
     failed: S.statusFailed,
     drifted: S.statusDrifted,
   };
-  const body = infos
-    .map((i) => {
+  const toneFor = (phase: string): 'ok' | 'warn' | 'err' | 'accent' | 'dim' =>
+    phase === 'installed' || phase === 'validated'
+      ? 'ok'
+      : phase === 'failed' || phase === 'drifted'
+        ? 'err'
+        : phase === 'partial' || phase === 'prepared'
+          ? 'warn'
+          : phase === 'not-installed'
+            ? 'dim'
+            : 'accent';
+  const body = renderTable(
+    infos.map((i) => {
       const ver = i.describe ?? i.head;
       const ctxTag = i.context ? `ctx:${i.context.state}/${i.context.health ?? '—'}` : undefined;
       const extra = [ver, ctxTag, i.dirty ? S.warnDirtyTree : undefined]
         .filter(Boolean)
         .join(' · ');
-      return `${i.name} — ${label[i.phase]}${extra ? theme.dim(` (${extra})`) : ''}`;
-    })
-    .join('\n');
+      return [
+        theme.accent(i.name),
+        chip(label[i.phase], toneFor(i.phase)),
+        extra ? theme.dim(extra) : '',
+      ];
+    }),
+    { indent: 0 },
+  );
   if (cli.jsonReport) emitJson(infos);
   note(body, S.statusTitle);
   process.exit(0);
@@ -339,7 +357,11 @@ export async function runUpdateCheckCommand(cli: CliOptions, names: string[]): P
       continue;
     }
     const compat = compatOf(repo.name, dir);
-    const check = await updateCheck(dir);
+    const check = await withSpinner(
+      `${repo.name} — ${S.updateCheckTitle.toLowerCase()}…`,
+      () => updateCheck(dir),
+      { quiet: cli.jsonReport },
+    );
     if (check.failure) {
       const label =
         check.failure === 'no-upstream'
@@ -400,13 +422,21 @@ export async function runVersionsCommand(cli: CliOptions, names: string[]): Prom
     const dir = resolveInside(targetDir, repo.name);
     if (dir && hasGitRepo(dir)) {
       const head = (await currentHead(dir))?.slice(0, 7) ?? '?';
-      const tags = await localTags(dir);
+      const tags = await withSpinner(`${repo.name} — ${S.versionsTags}…`, () => localTags(dir), {
+        quiet: cli.jsonReport,
+      });
       rows.push({ name: repo.name, source: 'local', revision: head, tags });
       lines.push(
         `${theme.accent(repo.name)} — ${S.versionsRevision} ${head} · ${S.versionsTags}: ${tags.length ? tags.join(', ') : S.planNone}`,
       );
     } else {
-      const tags = await remoteTags(repo.url);
+      const tags = await withSpinner(
+        `${repo.name} — ${S.versionsTags}…`,
+        () => remoteTags(repo.url),
+        {
+          quiet: cli.jsonReport,
+        },
+      );
       rows.push({ name: repo.name, source: tags === null ? 'unavailable' : 'remote', tags });
       lines.push(
         `${theme.accent(repo.name)} — ${S.statusNotInstalled} · ${S.versionsTags}: ${tags === null ? S.versionsUnavailable : tags.length ? tags.join(', ') : S.planNone}`,
