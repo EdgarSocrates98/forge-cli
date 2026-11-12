@@ -433,7 +433,9 @@ Uso:
   forge-cli ai <tarefa>         Modo IA opcional (opt-in via forge-cli.config.json)
   forge-cli bundle <verbo>      Portabilidade: export [chaves-não-secretas...]|import|verify
   forge-cli learning <verbo>    Observações locais opt-in: status|enable|disable|report
-  forge-cli workspace <verbo>   scan|list|use|status|doctor — inventário adaptativo
+  forge-cli workspace <verbo>   scan|list|use|activate|install|status|doctor|federation —
+                                inventário adaptativo; install <forja> executa o
+                                instalador nativo em scope=workspace (--yes aplica)
   forge-cli pack <verbo>        create|inspect|verify|import — ZIP portátil verificável
   forge-cli uninstall           Sem nomes: remove o registro do PATH (legado)
   forge-cli registry            Lista o catálogo PyPI e o que está instalado via registry

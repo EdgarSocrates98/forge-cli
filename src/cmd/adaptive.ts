@@ -16,7 +16,15 @@ import {
 import { scanWorkspace } from '../adaptive/workspace.js';
 import { buildFederatedMatrix } from '../adaptive/federation.js';
 import type { WorkspaceInventory } from '../adaptive/contracts.js';
-import { resolveTargetDir } from '../utils/system.js';
+import { buildNativeInstall } from '../native-install.js';
+import { catalogFor, reposByNames } from './shared.js';
+import { theme } from '../ui/theme.js';
+import {
+  errorDetail,
+  resolvePython,
+  resolveTargetDir,
+  runStreamed,
+} from '../utils/system.js';
 
 function workspaceRoot(cli: CliOptions): string {
   return cli.dir ? resolveTargetDir(cli.dir) : process.cwd();
@@ -33,13 +41,16 @@ function inventoryText(inventory: WorkspaceInventory): string {
         : project.state === 'DEGRADED'
           ? '!'
           : '○';
-    return `${marker} ${project.id.padEnd(24)} ${project.state.padEnd(10)} ${project.kind.padEnd(8)} ${project.identity.level}`;
+    const ctx = project.context
+      ? `${project.context.state}/${project.context.health ?? '—'}`
+      : '—';
+    return `${marker} ${project.id.padEnd(24)} ${project.state.padEnd(10)} ${project.kind.padEnd(8)} ${project.identity.level.padEnd(10)} ${ctx}`;
   });
   return [
     `root  ${inventory.root}`,
     `git   ${inventory.git.present ? `${inventory.git.branch ?? 'detached'} ${inventory.git.head ?? ''}` : 'gitless'}`,
     '',
-    'PROJECT                  STATE      KIND     IDENTITY',
+    'PROJECT                  STATE      KIND     IDENTITY   CONTEXT(state/health)',
     ...rows,
     '',
     `capabilities: ${inventory.capabilities.join(', ') || '—'}`,
@@ -112,6 +123,9 @@ export async function runWorkspaceCommand(cli: CliOptions, args: string[]): Prom
     );
     return conflicts.length ? 1 : 0;
   }
+  if (verb === 'install') {
+    return runWorkspaceInstall(cli, args[1], root, inventory);
+  }
   if (verb === 'use') {
     const target = args[1];
     const project = inventory.projects.find((item) => item.id === target || item.path === target);
@@ -167,9 +181,104 @@ export async function runWorkspaceCommand(cli: CliOptions, args: string[]): Prom
     return 0;
   }
   log.error(
-    `WORKSPACE-COMMAND-UNKNOWN: ${verb} (use scan|list|use|activate|status|doctor|federation)`,
+    `WORKSPACE-COMMAND-UNKNOWN: ${verb} (use scan|list|use|activate|install|status|doctor|federation)`,
   );
   return 2;
+}
+
+/**
+ * `workspace install <forja>` — fase 'install' do contrato
+ * forge/WorkspaceOperationPlan/v1 (GAP-07). Dirige o MESMO fluxo do
+ * instalador nativo da Forja (installkit) forçando `scope=workspace`:
+ * os host-assets caem na raiz do workspace, não no projeto nem no user.
+ * Sem `--yes` (ou com `--plan`/`--dry-run`) só o plano é emitido — o
+ * executor de terceiros nunca roda sem aprovação explícita.
+ */
+async function runWorkspaceInstall(
+  cli: CliOptions,
+  target: string | undefined,
+  root: string,
+  inventory: WorkspaceInventory,
+): Promise<number> {
+  if (!target) {
+    log.error('WORKSPACE-INSTALL-NEEDS-FORGE: informe a Forja — workspace install <forja>');
+    return 2;
+  }
+  const picked = reposByNames(catalogFor(root), [target]);
+  if ('error' in picked) {
+    log.error(`WORKSPACE-FORGE-UNKNOWN: ${picked.error}`);
+    return 2;
+  }
+  const repo = picked[0];
+  if (cli.scope && cli.scope !== 'workspace') {
+    log.error(
+      `WORKSPACE-SCOPE-CONFLICT: workspace install fixa scope=workspace (recebido --scope ${cli.scope})`,
+    );
+    return 2;
+  }
+  const built = buildNativeInstall(repo, {
+    scope: 'workspace',
+    profile: cli.profile,
+    components: cli.components,
+    host: cli.host,
+    gatewayProfile: cli.gatewayProfile,
+    approve: cli.yes,
+  });
+  if (!built) {
+    log.error(
+      `WORKSPACE-INSTALL-UNSUPPORTED: ${repo.name} — sem instalador nativo documentado no catálogo`,
+    );
+    return 2;
+  }
+  const argv = [...built.argv];
+  if (argv[0] === '{python}') {
+    const py = await resolvePython();
+    if (!py) {
+      log.error(`WORKSPACE-INSTALL-NO-PYTHON: interpretador não resolvido para ${repo.name}`);
+      return 1;
+    }
+    argv.splice(0, 1, ...py);
+  }
+  const plan = buildWorkspacePlan(inventory, 'install', repo.name, {
+    command: argv.join(' '),
+  });
+  for (const flag of built.ignored) {
+    plan.restrictions = [...plan.restrictions, `flag não suportada pela Forja: --${flag}`];
+  }
+  if (cli.plan || !cli.yes) {
+    emit(
+      cli,
+      { plan, receipt: receiptForPlan(plan, 'planned'), argv, ignored: built.ignored },
+      `${plan.actions.map((action) => `· ${action.description}`).join('\n')}` +
+        `\ncwd: ${root}` +
+        (built.ignored.length ? `\nflags ignoradas: ${built.ignored.map((f) => `--${f}`).join(', ')}` : '') +
+        '\n\nNada foi executado — use --yes para instalar em scope=workspace' +
+        ' (sem ele o instalador nativo recebe --dry-run, como no argv acima).',
+      'Workspace install plan',
+    );
+    return 0;
+  }
+  try {
+    // cwd = raiz do workspace: o installkit resolve scope=workspace a
+    // partir daí (state root `.forge/` ascendente mais próximo).
+    await runStreamed(argv, root, (line) => log.info(theme.dim(line)), cli.timeoutSecs * 1000);
+  } catch (error) {
+    const detail = errorDetail(error);
+    emit(
+      cli,
+      { plan, receipt: receiptForPlan(plan, 'failed'), argv, error: detail },
+      `Falha no instalador nativo de ${repo.name}: ${detail}`,
+      'Workspace install',
+    );
+    return 1;
+  }
+  emit(
+    cli,
+    { plan, receipt: receiptForPlan(plan, 'applied'), argv, ignored: built.ignored },
+    `Host-assets de ${repo.name} instalados no workspace (scope=workspace).\nexecutado: ${argv.join(' ')}`,
+    'Workspace install',
+  );
+  return 0;
 }
 
 export async function runPackCommand(cli: CliOptions, args: string[]): Promise<number> {

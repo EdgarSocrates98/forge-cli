@@ -42,6 +42,17 @@ export interface WorkspaceProject {
   git: { present: boolean; branch: string | null; dirty: boolean | null };
   version: string | null;
   state: ExperienceState;
+  /**
+   * Estados granulares do Forge Context (`.forge/context/registry.json` +
+   * manifest `forge/context/v1`) — aditivo; ausente quando o workspace não
+   * tem registry de contexto ou a Forja não está registrada nele.
+   */
+  context?: {
+    state: 'available' | 'degraded' | 'unavailable';
+    health: 'healthy' | 'degraded' | 'unverified' | 'broken' | null;
+    scope: string | null;
+    kind: string | null;
+  };
   evidence: string[];
 }
 

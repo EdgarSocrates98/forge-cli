@@ -7,7 +7,7 @@ import { FORGE_REPOS } from '../constants/repos.js';
 import { runPreflight } from '../preflight.js';
 import type { ForgeRepo } from '../types.js';
 import { S } from '../ui/strings.js';
-import { icons, theme } from '../ui/theme.js';
+import { gradient, icons, theme } from '../ui/theme.js';
 import { resolveTargetDir, type WinSetupShells } from '../utils/system.js';
 
 const nativeProcessExit = process.exit;
@@ -17,8 +17,10 @@ export const BANNER_LINE_DELAY_MS = 30;
 export async function printBanner(): Promise<void> {
   figlet.parseFont('Standard', standardFont);
   const art = figlet.textSync(S.bannerWord, { font: 'Standard' });
-  for (const line of art.split('\n')) {
-    console.log(theme.brand(line));
+  const lines = art.split('\n');
+  const last = Math.max(1, lines.length - 1);
+  for (const [i, line] of lines.entries()) {
+    console.log(line.trim() ? gradient(line, i / last) : line);
     await new Promise((resolve) => setTimeout(resolve, BANNER_LINE_DELAY_MS));
   }
 }

@@ -85,7 +85,14 @@ describe('FORGE_REPOS catalog', () => {
       kind: 'python',
       verify: ['api-sentinel', '--help'],
     });
-    expect(FORGE_REPOS.find((r) => r.name === 'api-sentinel-forge')?.nativeInstall).toBeUndefined();
+    expect(FORGE_REPOS.find((r) => r.name === 'api-sentinel-forge')?.nativeInstall).toEqual({
+      command: ['api-sentinel', 'install'],
+      flags: ['scope', 'profile'],
+      ops: {
+        update: ['api-sentinel', 'update'],
+        uninstall: ['api-sentinel', 'uninstall'],
+      },
+    });
   });
 
   it('defines documented envKeys only for api-forge', () => {

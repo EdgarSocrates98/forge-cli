@@ -18,25 +18,40 @@ export function buildWorkspacePlan(
   inventory: WorkspaceInventory,
   operation: WorkspaceOperationPlan['operation'],
   target: string,
+  detail?: { command?: string },
 ): WorkspaceOperationPlan {
   const project = inventory.projects.find((item) => item.id === target || item.path === target);
-  const actions = project
-    ? [
-        {
-          id: `inspect-${project.id}`,
-          kind: 'inspect',
-          description: `confirmar ${project.path || project.id} sem executar comandos não confiáveis`,
-          mutates: false,
-        },
-      ]
-    : [
-        {
-          id: 'select-workspace',
-          kind: 'select',
-          description: `selecionar workspace ${inventory.root}`,
-          mutates: true,
-        },
-      ];
+  // `install` executa o instalador nativo da Forja (installkit) em
+  // scope=workspace — ação mutante real, não uma seleção de workspace.
+  const actions =
+    operation === 'install'
+      ? [
+          {
+            id: `workspace-install-${target}`,
+            kind: 'native-install',
+            description: detail?.command
+              ? `executar instalador nativo em scope=workspace: ${detail.command}`
+              : `instalar ${target} em scope=workspace`,
+            mutates: true,
+          },
+        ]
+      : project
+        ? [
+            {
+              id: `inspect-${project.id}`,
+              kind: 'inspect',
+              description: `confirmar ${project.path || project.id} sem executar comandos não confiáveis`,
+              mutates: false,
+            },
+          ]
+        : [
+            {
+              id: 'select-workspace',
+              kind: 'select',
+              description: `selecionar workspace ${inventory.root}`,
+              mutates: true,
+            },
+          ];
   return {
     schema: 'forge/WorkspaceOperationPlan/v1',
     operation,
@@ -44,11 +59,18 @@ export function buildWorkspacePlan(
     created_at: new Date().toISOString(),
     reversible: true,
     actions,
-    preconditions: [
-      'workspace existe',
-      'path não é symlink/junction',
-      'nenhum comando dinâmico de manifesto será executado',
-    ],
+    preconditions:
+      operation === 'install'
+        ? [
+            'workspace existe',
+            'instalador nativo declarado no catálogo da Forja',
+            'confirmação explícita (--yes) exigida para executar',
+          ]
+        : [
+            'workspace existe',
+            'path não é symlink/junction',
+            'nenhum comando dinâmico de manifesto será executado',
+          ],
     restrictions: inventory.warnings,
   };
 }

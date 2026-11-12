@@ -114,6 +114,20 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     extras: ['mcp'],
     origin: 'official',
   },
+  {
+    name: 'data-sentinel-forge',
+    dist: 'data-sentinel-forge',
+    bin: 'data-sentinel',
+    minPython: '3.11',
+    mcp: ['{bin}', 'mcp', 'serve'],
+    // pyproject do sibling: mcp = ["mcp>=1.9"]
+    extras: ['mcp'],
+    // Toda tool registrada é LOCAL_READ sem side_effects — o dispatcher
+    // nunca escreve (src/data_sentinel/tools/registry.py). estimate_cost é
+    // tabela estática sem I/O de arquivo.
+    mcp_safe_tools: ['sentinel.emr.estimate_cost', 'sentinel.sql.analyze'],
+    origin: 'official',
+  },
 ];
 
 const BY_NAME = new Map(REGISTRY_PACKAGES.map((e) => [e.name, e]));

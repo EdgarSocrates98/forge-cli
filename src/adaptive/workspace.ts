@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync, type Dirent } from 'no
 import path from 'node:path';
 import { FORGE_REPOS } from '../constants/repos.js';
 import { loadState } from '../artifacts.js';
+import { loadContextStates } from '../context-registry.js';
 import { commandOutput, currentHead, hasGitRepo, isGitDirty } from '../utils/system.js';
 import { isLinkOrJunction } from '../safety.js';
 import type {
@@ -260,6 +261,21 @@ export async function scanWorkspace(
     }
   }
   if (projects.length >= maxProjects || entriesSeen >= maxEntries) truncated = true;
+  // Estados granulares do Forge Context (install-2.0): uma leitura bounded
+  // de `.forge/context/registry.json` + manifests — projetada por Forja,
+  // nunca substitui o ExperienceState derivado localmente.
+  const contextStates = loadContextStates(root);
+  for (const project of projects) {
+    const ctx = contextStates.forges[project.id];
+    if (ctx) {
+      project.context = {
+        state: ctx.state,
+        health: ctx.health,
+        scope: ctx.scope,
+        kind: ctx.kind,
+      };
+    }
+  }
   projects.sort((a, b) => a.path.localeCompare(b.path));
   const git = hasGitRepo(root);
   const head = git ? await currentHead(root) : null;

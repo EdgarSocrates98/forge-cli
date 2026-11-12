@@ -7,6 +7,7 @@ import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { confirm, isCancel, multiselect } from '@clack/prompts';
 import { log, note, outro, spinner } from '@clack/prompts';
+import { ForgeBoard } from '../ui/board.js';
 import type { CliOptions } from '../cli-args.js';
 import { exitCancelled } from '../prompts.js';
 import { discoverPythons, type PythonDiscovery, type PythonRefusal } from '../env/python.js';
@@ -341,6 +342,7 @@ export async function runRegistryInstall(
 ): Promise<RegistryInstallResult[]> {
   const home = deps.home ?? cliHome();
   const quiet = registryQuiet(cli);
+  const installStartedAt = Date.now();
   const reportTo = (doc: unknown) => {
     if (cli.reportPath !== undefined) writeRegistryReport(cli.reportPath, doc);
   };
@@ -495,9 +497,18 @@ export async function runRegistryInstall(
   }
 
   const results: RegistryInstallResult[] = [];
+  const board = quiet
+    ? null
+    : new ForgeBoard(
+        `Instalando ${deduped.length} ${deduped.length === 1 ? 'forja' : 'forjas'}`,
+        deduped.map((d) => d.name),
+      );
+  const boardLog = (fn: (m: string) => void, message: string) => {
+    if (board) board.log(message);
+    else if (!quiet) fn(message);
+  };
   for (const { name, entry } of deduped) {
-    const spin = spinner();
-    if (!quiet) spin.start(`${name}: resolvendo ${entry!.dist}…`);
+    board?.start(name, `resolvendo ${entry!.dist}…`);
     const receipt = await registryInstall(entry!, pin, {
       home,
       cacheDir: registryCacheDir(home),
@@ -509,20 +520,26 @@ export async function runRegistryInstall(
       run: deps.run,
     });
     if ('stage' in receipt) {
-      if (!quiet) spin.stop(`${name}: ${theme.err('falhou')}`);
+      board?.fail(name);
+      boardLog(log.error, `${name}: ${theme.err('falhou')}`);
       results.push({ forge: name, ok: false, detail: describeInstallError(receipt) });
       continue;
     }
+    board?.stage(name, 'instalador nativo…');
     // Fase 2: delegação ao instalador nativo (skills/agents/hosts/components).
     receipt.native = await delegateNative(cli, entry!, receipt, 'install', deps.run);
     if (receipt.native) {
       await persistReceipt(home, receipt);
       const n = receipt.native;
       if (!quiet) {
-        if (n.skipped) log.warn(`${name}: ${n.skipped}`);
-        else if (n.exitCode !== 0) log.warn(`${name}: instalador nativo saiu ${n.exitCode}`);
+        if (n.skipped) boardLog(log.warn, `${name}: ${n.skipped}`);
+        else if (n.exitCode !== 0)
+          boardLog(log.warn, `${name}: instalador nativo saiu ${n.exitCode}`);
         else
-          log.info(`${name}: nativo ${n.dryRun ? '(dry-run)' : 'aplicado'} — ${n.argv.join(' ')}`);
+          boardLog(
+            log.info,
+            `${name}: nativo ${n.dryRun ? '(dry-run)' : 'aplicado'} — ${n.argv.join(' ')}`,
+          );
       }
       if (n.skipped) warnings.push(`${name}: ${n.skipped}`);
       if (n.ran && n.exitCode !== 0) warnings.push(`${name}: instalador nativo saiu ${n.exitCode}`);
@@ -530,10 +547,11 @@ export async function runRegistryInstall(
     if (receipt.staleCache) {
       const w = `${S.registryStaleCache} (${entry!.dist})`;
       warnings.push(w);
-      if (!quiet) log.warn(w);
+      if (!quiet) boardLog(log.warn, w);
     }
-    if (!quiet) {
-      spin.stop(
+    board?.done(name, `${receipt.dist}==${receipt.version}`);
+    if (!board && !quiet) {
+      log.info(
         `${name}: ${theme.ok('instalado')} ${theme.dim(`${receipt.dist}==${receipt.version}`)}`,
       );
     }
@@ -545,6 +563,7 @@ export async function runRegistryInstall(
       ...(receipt.native ? { native: receipt.native } : {}),
     });
   }
+  board?.close();
 
   // lf-0031: integrações opcionais — classificadas por evidência (receipt /
   // checkout / PATH), reportadas no doc JSON e oferecidas com consentimento
@@ -582,7 +601,14 @@ export async function runRegistryInstall(
     bins.filter(Boolean).join('\n'),
     'Launchers em ~/.forge-cli/bin (no PATH do forge-cli); sem shim, invoque o caminho da venv',
   );
-  outro(`${icons.ok} instalação registry-first concluída`);
+  const elapsed = ((Date.now() - installStartedAt) / 1000).toFixed(1);
+  const okCount = results.filter((r) => r.ok).length;
+  const summaryParts = [
+    `${okCount}/${results.length} ${results.length === 1 ? 'forja' : 'forjas'}`,
+    `${elapsed}s`,
+    ...(warnings.length ? [`${warnings.length} aviso(s)`] : []),
+  ];
+  outro(`${icons.ok} instalação registry-first concluída — ${theme.dim(summaryParts.join(' · '))}`);
 
   // Oferta checkbox-style: só em TTY interativo e sem --yes — consentimento
   // nunca é presumido. Nos demais modos a lista vira nota (opcional, informativa).
