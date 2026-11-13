@@ -128,6 +128,65 @@ export const REGISTRY_PACKAGES: RegistryEntry[] = [
     mcp_safe_tools: ['sentinel.emr.estimate_cost', 'sentinel.sql.analyze'],
     origin: 'official',
   },
+  {
+    name: 'api-sentinel-forge',
+    dist: 'api-sentinel-forge',
+    bin: 'api-sentinel',
+    minPython: '3.11',
+    mcp: ['{bin}', 'mcp', 'serve'],
+    // pyproject do sibling: mcp = ["mcp>=1.9"]
+    extras: ['mcp'],
+    // Read-only, zero params — src/api_sentinel/mcp_server.py.
+    mcp_safe_tools: ['sentinel_health', 'sentinel_list_services'],
+    origin: 'official',
+  },
+  {
+    name: 'forge-agent-bridge',
+    dist: 'forge-agent-bridge',
+    bin: 'forge-bridge',
+    minPython: '3.11',
+    mcp: ['{bin}', 'mcp', 'serve'],
+    // Catálogo estático stdlib-only — mcp/tool_registry.py marca
+    // readOnlyHint/kind:'pure' nas duas tools abaixo.
+    mcp_safe_tools: ['forge_health', 'forge_architecture_review'],
+    origin: 'official',
+  },
+  {
+    name: 'code-atlas-forge',
+    dist: 'code-atlas-forge',
+    bin: 'code-atlas',
+    minPython: '3.12',
+    mcp: ['{bin}', 'mcp', 'serve'],
+    // Servidor MCP ndjson próprio (sem pacote mcp) — sem extra no pyproject.
+    // atlas_status/atlas_dependencies: todos os params opcionais, read-only —
+    // src/code_atlas/mcp.py.
+    mcp_safe_tools: ['atlas_status', 'atlas_dependencies'],
+    origin: 'official',
+  },
+  {
+    name: 'product-forge',
+    dist: 'product-forge',
+    bin: 'productforge',
+    minPython: '3.11',
+    mcp: ['{bin}', 'mcp', 'serve'],
+    // pyproject do sibling: mcp = ["mcp>=1.9"]
+    extras: ['mcp'],
+    // Zero-arg/opcionais read-only — src/product_forge/mcp/server.py.
+    mcp_safe_tools: ['productforge_status', 'product_list'],
+    origin: 'official',
+  },
+  {
+    name: 'forge-lens',
+    dist: 'forge-lens-fl',
+    bin: 'forge-lens',
+    minPython: '3.11',
+    mcp: ['{bin}', 'mcp-serve'],
+    // Servidor MCP stdio próprio (stdlib) — sem extra mcp no pyproject.
+    // lens.capabilities zero-arg; lens.stats só opcionais — ambas leem a
+    // store local. src/forge_lens/mcp_server.py.
+    mcp_safe_tools: ['lens.capabilities', 'lens.stats'],
+    origin: 'official',
+  },
 ];
 
 const BY_NAME = new Map(REGISTRY_PACKAGES.map((e) => [e.name, e]));

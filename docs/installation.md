@@ -177,10 +177,12 @@ do orquestrador, fallbacks). Regras invioláveis:
   (receipt sem prova ou binário no PATH), `checkout` (clone presente),
   `degraded` (receipt com verify falho ou fonte ausente) e `absent`.
   O que já está saudável não é oferecido de novo.
-- **Fonte e registry separados honestamente.** `data-sentinel-forge`,
-  `forge-lens`, `code-atlas-forge`, `product-forge` e
-  `forge-agent-bridge` usam `--method git` enquanto não houver dist publicada
-  no PyPI; o bootstrap detecta os scripts nativos e valida o CLI após instalar.
+- **Fonte e registry separados honestamente.** As Forjas com dist publicada
+  no PyPI — incluindo `data-sentinel-forge`, `api-sentinel-forge`,
+  `forge-lens` (`forge-lens-fl`), `code-atlas-forge`, `product-forge` e
+  `forge-agent-bridge` — instalam pelo caminho registry; `--method git`
+  segue disponível para checkouts de desenvolvimento. O bootstrap detecta
+  os scripts nativos e valida o CLI após instalar.
 
 ```bash
 forge-cli install the-forge          # instala → oferece os delegates do orquestrador
