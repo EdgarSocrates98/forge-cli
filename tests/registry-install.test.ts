@@ -499,12 +499,19 @@ describe('extras PEP 508 — [mcp] no pedido, dist limpa na identidade', () => {
       'spark-forge-aws',
       'spark-forge-azure',
       'forge-doctor-api',
+      'api-sentinel-forge',
+      'product-forge',
     ]) {
       expect(registryEntry(name)!.extras).toEqual(['mcp']);
     }
     // forge-doctor-data tem servidor MCP mas NÃO declara extra `mcp` no
     // pyproject (watch/lsp/schemas/sql) — extra nunca é inventado de `mcp`.
+    // forge-agent-bridge/code-atlas-forge/forge-lens servem MCP por transporte
+    // próprio stdlib — também sem extra.
     expect(registryEntry('forge-doctor-data')!.extras).toBeUndefined();
+    expect(registryEntry('forge-agent-bridge')!.extras).toBeUndefined();
+    expect(registryEntry('code-atlas-forge')!.extras).toBeUndefined();
+    expect(registryEntry('forge-lens')!.extras).toBeUndefined();
     expect(registryEntry('the-forge')!.extras).toBeUndefined();
   });
 
@@ -568,6 +575,12 @@ describe('catálogo — pisos reais publicados', () => {
     ['spark-forge-azure', '3.10'],
     ['forge-doctor-data', '3.11'],
     ['forge-doctor-api', '3.11'],
+    ['data-sentinel-forge', '3.11'],
+    ['api-sentinel-forge', '3.11'],
+    ['forge-agent-bridge', '3.11'],
+    ['code-atlas-forge', '3.12'],
+    ['product-forge', '3.11'],
+    ['forge-lens', '3.11'],
   ])('%s declara piso %s', (name, min) => {
     expect(registryEntry(name)?.minPython).toBe(min);
     expect(registryEntry(name)?.dist).toBeTruthy();

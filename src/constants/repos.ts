@@ -82,7 +82,8 @@ export const FORGE_REPOS: ForgeRepo[] = [
     nextSteps: ['apiforge install --yes'],
   },
   {
-    // Instalação via fonte até existir uma distribuição oficial no registry.
+    // Dist publicada no PyPI (registry); os comandos nativos abaixo são o
+    // lifecycle pós-install, não a fonte de instalação.
     name: 'api-sentinel-forge',
     packageName: 'api-sentinel-forge',
     url: 'https://github.com/EdgarSocrates98/api-sentinel-forge',
@@ -150,7 +151,8 @@ export const FORGE_REPOS: ForgeRepo[] = [
     nextSteps: ['npm start'],
   },
   {
-    // Instalação via fonte até existir uma distribuição oficial no registry.
+    // Dist publicada no PyPI (registry); os comandos nativos abaixo são o
+    // lifecycle pós-install, não a fonte de instalação.
     name: 'data-sentinel-forge',
     packageName: 'data-sentinel-forge',
     url: 'https://github.com/EdgarSocrates98/data-sentinel-forge',
@@ -169,7 +171,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
   },
   {
     name: 'forge-lens',
-    packageName: 'forge-lens',
+    packageName: 'forge-lens-fl',
     url: 'https://github.com/EdgarSocrates98/forge-lens',
     description: 'Observabilidade, traces, custos e avaliação de agentes',
     kind: 'python',

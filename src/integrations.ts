@@ -72,11 +72,17 @@ export const OPTIONAL_INTEGRATIONS: Readonly<Record<string, readonly OptionalInt
       installable: true,
     },
     {
+      name: 'api-sentinel-forge',
+      reason: 'inteligência operacional de APIs/SLOs — delegate do orquestrador',
+      adapter: true,
+      installable: true,
+    },
+    {
       name: 'data-sentinel-forge',
       reason:
-        'diagnóstico de runtime (logs/plans) — sem adapter the-forge e sem rota de install: gap documentado, nunca obrigatório',
+        'diagnóstico de runtime (logs/plans) — sem adapter the-forge: gap não-adaptado documentado, nunca obrigatório',
       adapter: false,
-      installable: false,
+      installable: true,
     },
   ],
   'spark-forge-aws': [
@@ -107,9 +113,9 @@ export const OPTIONAL_INTEGRATIONS: Readonly<Record<string, readonly OptionalInt
     {
       name: 'data-sentinel-forge',
       reason:
-        'diagnóstico de runtime — sem adapter e sem rota de install: gap documentado, nunca obrigatório',
+        'diagnóstico de runtime — sem adapter the-forge: gap não-adaptado documentado, nunca obrigatório',
       adapter: false,
-      installable: false,
+      installable: true,
     },
   ],
   'spark-forge-azure': [
@@ -134,9 +140,9 @@ export const OPTIONAL_INTEGRATIONS: Readonly<Record<string, readonly OptionalInt
     {
       name: 'data-sentinel-forge',
       reason:
-        'diagnóstico de runtime — sem adapter e sem rota de install: gap documentado, nunca obrigatório',
+        'diagnóstico de runtime — sem adapter the-forge: gap não-adaptado documentado, nunca obrigatório',
       adapter: false,
-      installable: false,
+      installable: true,
     },
   ],
   'api-forge': [
@@ -147,8 +153,28 @@ export const OPTIONAL_INTEGRATIONS: Readonly<Record<string, readonly OptionalInt
       installable: true,
     },
     {
+      name: 'api-sentinel-forge',
+      reason: 'observação de runtime das APIs produzidas — SLOs e incidentes',
+      adapter: true,
+      installable: true,
+    },
+    {
       name: 'platform-forge',
       reason: 'governança/estado da plataforma consumidora',
+      adapter: true,
+      installable: true,
+    },
+  ],
+  'api-sentinel-forge': [
+    {
+      name: 'api-forge',
+      reason: 'produtor dos serviços que o sentinel observa em runtime',
+      adapter: true,
+      installable: true,
+    },
+    {
+      name: 'forge-doctor-api',
+      reason: 'verificador independente declarado (composes_with)',
       adapter: true,
       installable: true,
     },
@@ -209,9 +235,9 @@ export const OPTIONAL_INTEGRATIONS: Readonly<Record<string, readonly OptionalInt
     {
       name: 'data-sentinel-forge',
       reason:
-        'importa doctor-bundles para diagnóstico de runtime — sem adapter e sem rota de install: gap documentado',
+        'importa doctor-bundles para diagnóstico de runtime — sem adapter the-forge: gap não-adaptado documentado',
       adapter: false,
-      installable: false,
+      installable: true,
     },
   ],
   'forge-portal': [

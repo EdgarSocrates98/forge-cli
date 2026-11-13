@@ -93,14 +93,15 @@ describe('OPTIONAL_INTEGRATIONS — declared table', () => {
     }
   });
 
-  it('marks data-sentinel-forge as unadapted and without an install route', () => {
+  it('marks data-sentinel-forge as unadapted but registry-installable', () => {
     const declared = Object.values(OPTIONAL_INTEGRATIONS)
       .flat()
       .filter((i) => i.name === 'data-sentinel-forge');
     expect(declared.length).toBeGreaterThan(0);
     for (const i of declared) {
+      // Sem adapter the-forge (gap documentado) — mas instalável via PyPI.
       expect(i.adapter).toBe(false);
-      expect(i.installable).toBe(false);
+      expect(i.installable).toBe(true);
     }
   });
 
@@ -241,15 +242,18 @@ describe('askOptionalIntegrations — explicit consent', () => {
     expect(offer.consented).toEqual([]);
   });
 
-  it('consented names split into installable vs no-route (sentinel is honest)', async () => {
+  it('consented names split into installable vs no-route (offer is honest)', async () => {
     const statuses = classifyIntegrationsSync('the-forge', { root: tmp(), home: tmp() });
     const offer = await askOptionalIntegrations(statuses, async () => [
       'forge-doctor-data',
       'data-sentinel-forge',
+      'forge-portal',
     ]);
-    expect(offer.consented).toEqual(['forge-doctor-data', 'data-sentinel-forge']);
-    expect(offer.installable).toEqual(['forge-doctor-data']);
-    expect(offer.notInstallable).toEqual(['data-sentinel-forge']);
+    expect(offer.consented).toEqual(['forge-doctor-data', 'data-sentinel-forge', 'forge-portal']);
+    // Ambos têm rota registry hoje; forge-portal não é integração declarada
+    // do the-forge — cai em notInstallable, nunca em falha.
+    expect(offer.installable).toEqual(['forge-doctor-data', 'data-sentinel-forge']);
+    expect(offer.notInstallable).toEqual(['forge-portal']);
   });
 });
 
@@ -266,11 +270,14 @@ describe('pendingIntegrations / installableNames', () => {
     expect(pending).toContain('spark-forge-aws');
   });
 
-  it('installableNames excludes the no-route sentinel', () => {
+  it('installableNames covers every pending integration (all PyPI-published)', () => {
     const statuses = classifyIntegrationsSync('the-forge', { root: tmp(), home: tmp() });
-    const names = installableNames(pendingIntegrations(statuses));
+    const pending = pendingIntegrations(statuses);
+    const names = installableNames(pending);
     expect(names).toContain('spark-forge-aws');
-    expect(names).not.toContain('data-sentinel-forge');
+    expect(names).toContain('data-sentinel-forge');
+    expect(names).toContain('api-sentinel-forge');
+    expect(names.length).toBe(pending.length);
   });
 });
 
@@ -437,7 +444,7 @@ describe('runRegistryInstall — optional integrations surface', () => {
 
     const sentinel = pending.find((i: { name: string }) => i.name === 'data-sentinel-forge');
     expect(sentinel.state).toBe('absent');
-    expect(sentinel.installable).toBe(false);
+    expect(sentinel.installable).toBe(true);
     expect(sentinel.adapter).toBe(false);
 
     // nenhum sibling foi instalado como efeito colateral da oferta
