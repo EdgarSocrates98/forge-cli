@@ -59,8 +59,12 @@ const ui = {
     if (!decorated) return;
     const mode = dryRun ? 'plan only' : 'user scope';
     this.write('');
-    this.write(`  ${sgr('38;5;208;1', `${mark.em} FORJAS`)} ${sgr('2', mark.bullet)} ${sgr('1', packageJson.name)}`);
-    this.write(`  ${sgr('2', `portable install ${mark.bullet} node ${process.versions.node} ${mark.bullet} ${mode}`)}`);
+    this.write(
+      `  ${sgr('38;5;208;1', `${mark.em} FORJAS`)} ${sgr('2', mark.bullet)} ${sgr('1', packageJson.name)}`,
+    );
+    this.write(
+      `  ${sgr('2', `portable install ${mark.bullet} node ${process.versions.node} ${mark.bullet} ${mode}`)}`,
+    );
     this.write(`  ${sgr('2', mark.rule.repeat(54))}`);
   },
   steps(steps) {
@@ -92,7 +96,9 @@ const ui = {
       return;
     }
     this.write('');
-    this.write(`  ${sgr('31', mark.fail)} ${sgr('1;31', 'install refused')} ${sgr('2', mark.rule)} ${sgr('31', code)}`);
+    this.write(
+      `  ${sgr('31', mark.fail)} ${sgr('1;31', 'install refused')} ${sgr('2', mark.rule)} ${sgr('31', code)}`,
+    );
     this.write(`    ${sgr('2', detail)}`);
     if (remedy) this.write(`    ${sgr('33', 'remedy')}  ${remedy}`);
     this.write('');
@@ -169,18 +175,28 @@ for (const [i, [command, args, label]] of steps.entries()) {
   const { result, dt } = runStep(command, args, label, i + 1, steps.length);
   if (result.error) {
     if (decorated) process.stderr.write('\r\x1b[K');
-    ui.refuse('FORGE-NODE-RUNTIME-UNAVAILABLE', result.error.message, 'instale Node.js/npm e reabra o terminal');
+    ui.refuse(
+      'FORGE-NODE-RUNTIME-UNAVAILABLE',
+      result.error.message,
+      'instale Node.js/npm e reabra o terminal',
+    );
     process.exit(2);
   }
   if (result.status !== 0) {
     if (decorated) process.stderr.write('\r\x1b[K');
-    ui.refuse('FORGE-NODE-INSTALL-FAILED', `${label} saiu com código ${result.status}`, 'o log do passo acima é a evidência — corrija e rode ./install.sh novamente');
+    ui.refuse(
+      'FORGE-NODE-INSTALL-FAILED',
+      `${label} saiu com código ${result.status}`,
+      'o log do passo acima é a evidência — corrija e rode ./install.sh novamente',
+    );
     const captured = `${result.stdout ?? ''}${result.stderr ?? ''}`.trimEnd();
     if (captured) process.stderr.write(`${sgr('2', captured)}\n`);
     process.exit(result.status ?? 1);
   }
   if (decorated) {
-    process.stderr.write(`\r\x1b[K  ${sgr('32', mark.ok)} ${sgr('2', `[${i + 1}/${steps.length}]`)} ${label} ${sgr('2', `${dt}s`)}\n`);
+    process.stderr.write(
+      `\r\x1b[K  ${sgr('32', mark.ok)} ${sgr('2', `[${i + 1}/${steps.length}]`)} ${label} ${sgr('2', `${dt}s`)}\n`,
+    );
   } else if (!quiet) {
     process.stderr.write(`  ${sgr('2', `[${i + 1}/${steps.length}]`)} ${label} done (${dt}s)\n`);
   }
