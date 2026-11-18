@@ -10,7 +10,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['theforge', '--help'],
     nativeInstall: {
       command: ['theforge', 'install', 'apply'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: {
         update: ['theforge', 'install', 'update'],
         uninstall: ['theforge', 'install', 'uninstall'],
@@ -27,7 +37,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-aws', '--help'],
     nativeInstall: {
       command: ['sparkforge-aws', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: { update: ['sparkforge-aws', 'update'], uninstall: ['sparkforge-aws', 'uninstall'] },
     },
     nextSteps: ['sparkforge-aws install'],
@@ -41,7 +61,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-azure', '--help'],
     nativeInstall: {
       command: ['sparkforge-azure', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: {
         update: ['sparkforge-azure', 'install', 'update'],
         uninstall: ['sparkforge-azure', 'install', 'uninstall'],
@@ -58,7 +88,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['platformforge', '--help'],
     nativeInstall: {
       command: ['platformforge', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: { update: ['platformforge', 'upgrade'], uninstall: ['platformforge', 'uninstall'] },
     },
     nextSteps: ['platformforge doctor', 'platformforge init --repo .'],
@@ -72,7 +112,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['apiforge', '--help'],
     nativeInstall: {
       command: ['apiforge', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: {
         update: ['apiforge', 'install', 'update'],
         uninstall: ['apiforge', 'install', 'uninstall'],
@@ -118,7 +168,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-api', '--help'],
     nativeInstall: {
       command: ['{python}', 'scripts/forge_install.py', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: {
         update: ['{python}', 'scripts/forge_install.py', 'update'],
         uninstall: ['{python}', 'scripts/forge_install.py', 'uninstall'],
@@ -135,7 +195,17 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-data', '--help'],
     nativeInstall: {
       command: ['forge-doctor-data', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
+      flags: [
+        'scope',
+        'profile',
+        'components',
+        'host',
+        'gateway-profile',
+        'root',
+        'to',
+        'repo',
+        'purge',
+      ],
       ops: {
         update: ['forge-doctor-data', 'install', 'update'],
         uninstall: ['forge-doctor-data', 'install', 'uninstall'],

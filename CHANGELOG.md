@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Added
+
+- Root `forge.json` manifest (`forge/ForgeDescriptor/v1`) describing
+  forge-cli as a control-tool / runtime-acquisition meta-installer —
+  shipped in the npm package.
+- Native flag vocabulary expansion: `--root`, `--to`, `--repo`,
+  `--purge` parsed into `CliOptions`; `--root` forwarded on install
+  when the target `forge.json` declares it (`workspace install` passes
+  the resolved workspace root), `--to`/`--repo` on native update and
+  `--purge` on native uninstall. Undeclared flags are reported as
+  `ignored`, never passed silently.
+- `docs/forge-cli-vs-theforge.md` (responsibility boundary), refreshed
+  `docs/capabilities.md` (corrected forge-doctor-api native installer,
+  six missing ecosystem Forges, drift-guard), the two-ledger section in
+  `docs/registry-state-contract.md` and `docs/threat-model.md`
+  (subprocess env model + gitless provenance/trust).
+
+### Security
+
+- Subprocess environments are now deny-first: spawned children (setup
+  scripts, git, pip, probes, MCP handshakes, AI bridge) receive an
+  allowlisted environment instead of `process.env`. Credential-shaped
+  variables (`AWS_SECRET_ACCESS_KEY`, `OPENAI_API_KEY`, …) never leak;
+  `FORGE_CLI_ENV_ALLOW="FOO,BAR"` is the explicit caller opt-in, and
+  `extendEnv: false` prevents re-merging the parent environment.
+- `GIT_TERMINAL_PROMPT=0` plus bounded timeouts on git fetch/pull/clone:
+  credential prompts can no longer hang the CLI; failures stay
+  classified (auth/dns/timeout/refused), never fabricated.
+- Native delegation no longer reports success from the exit code alone:
+  `src/child-receipt.ts` requires a `forge/InstallReceipt/v1` with
+  `status: completed` and `verification.status: PASS` (from child stdout
+  or `.<state>/**/receipts/*.json`) before a delegation is `applied`.
+  Clean exit without receipt → `unverified`; non-PASS → not applied;
+  non-zero exit → `failed`.
+
+### Fixed
+
+- Catalog/manifest drift: forge-doctor-api regained its documented
+  `scripts/forge_install.py` native installer; forge-doctor-data and
+  the wave-14 entries declare `host`/`gateway-profile` where the
+  manifests do; six ecosystem Forges (`api-sentinel-forge`,
+  `data-sentinel-forge`, `forge-lens`, `code-atlas-forge`,
+  `product-forge`, `forge-agent-bridge`) present in the catalog are now
+  documented. `tests/catalog-drift.test.ts` locks catalog flags to the
+  sibling `forge.json` declarations whenever the checkouts are present.
+
 ## 0.5.2 — 2026-11-12
 
 ### Added

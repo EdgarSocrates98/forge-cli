@@ -72,7 +72,7 @@ export function receiptFromStdout(
  */
 export function childReceiptDirs(root: string): string[] {
   const dirs: string[] = [];
-  let hidden: string[] = [];
+  let hidden: string[];
   try {
     hidden = readdirSync(root)
       .filter((name) => name.startsWith('.'))
@@ -127,7 +127,7 @@ export function findChildReceipt(opts: FindChildReceiptOptions): ChildReceipt | 
   let newest: { mtime: number; doc: Record<string, unknown>; ref: string } | null = null;
   for (const root of opts.roots) {
     for (const dir of childReceiptDirs(root)) {
-      let files: string[] = [];
+      let files: string[];
       try {
         files = readdirSync(dir)
           .filter((f) => f.endsWith('.json'))
@@ -137,14 +137,14 @@ export function findChildReceipt(opts: FindChildReceiptOptions): ChildReceipt | 
       }
       for (const file of files) {
         const filePath = path.join(dir, file);
-        let mtime = 0;
+        let mtime: number;
         try {
           mtime = statSync(filePath).mtimeMs / 1000;
         } catch {
           continue;
         }
         if (mtime < sinceSec) continue;
-        let doc: unknown = null;
+        let doc: unknown;
         try {
           doc = JSON.parse(readFileSync(filePath, 'utf8'));
         } catch {

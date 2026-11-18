@@ -66,7 +66,6 @@ describe('drift-guard: catálogo ↔ forge.json do irmão (P1-5)', () => {
     // irmãos, `present` é vazio e os asserts por-Forja não rodam.
     expect(present.length).toBeGreaterThanOrEqual(0);
     if (present.length) {
-      // eslint-disable-next-line no-console
       console.log(`drift-guard cobrindo: ${present.map((r) => r.name).join(', ')}`);
     }
   });
@@ -76,7 +75,9 @@ describe('drift-guard: catálogo ↔ forge.json do irmão (P1-5)', () => {
     for (const repo of FORGE_REPOS.filter((r) => r.nativeInstall)) {
       const manifest = siblingManifest(repo.name);
       if (!manifest) continue;
-      const declared = new Set([...declaredFlags(manifest)].filter((f) => VOCAB.has(f as NativeFlag)));
+      const declared = new Set(
+        [...declaredFlags(manifest)].filter((f) => VOCAB.has(f as NativeFlag)),
+      );
       const catalog = new Set(repo.nativeInstall!.flags);
       const missing = [...declared].filter((f) => !catalog.has(f as NativeFlag));
       const phantom = [...catalog].filter((f) => !declared.has(f));
@@ -99,16 +100,16 @@ describe('drift-guard: catálogo ↔ forge.json do irmão (P1-5)', () => {
 
   it('os dois achados da auditoria ficaram resolvidos', () => {
     // forge-doctor-data declara --host no manifesto — o catálogo tinha esquecido.
-    expect(
-      FORGE_REPOS.find((r) => r.name === 'forge-doctor-data')?.nativeInstall?.flags,
-    ).toContain('host');
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-doctor-data')?.nativeInstall?.flags).toContain(
+      'host',
+    );
     // data-sentinel-forge declara --gateway-profile — idem.
     expect(
       FORGE_REPOS.find((r) => r.name === 'data-sentinel-forge')?.nativeInstall?.flags,
     ).toContain('gateway-profile');
     // forge-doctor-api TEM instalador nativo (script do repositório).
-    expect(
-      FORGE_REPOS.find((r) => r.name === 'forge-doctor-api')?.nativeInstall?.command[0],
-    ).toBe('{python}');
+    expect(FORGE_REPOS.find((r) => r.name === 'forge-doctor-api')?.nativeInstall?.command[0]).toBe(
+      '{python}',
+    );
   });
 });

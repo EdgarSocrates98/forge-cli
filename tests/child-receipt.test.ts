@@ -138,9 +138,9 @@ describe('delegationVerdict — exit 0 NUNCA é prova sozinho', () => {
     expect(delegationVerdict(0, receiptAt(receiptDoc()))).toBe('applied');
   });
   it('rc 0 + receipt completed sem PASS → unverified', () => {
-    expect(
-      delegationVerdict(0, receiptAt(receiptDoc({ verification: { status: 'FAIL' } }))),
-    ).toBe('unverified');
+    expect(delegationVerdict(0, receiptAt(receiptDoc({ verification: { status: 'FAIL' } })))).toBe(
+      'unverified',
+    );
   });
   it('rc 0 + receipt planned → unverified', () => {
     expect(delegationVerdict(0, receiptAt(receiptDoc({ status: 'planned' })))).toBe('unverified');

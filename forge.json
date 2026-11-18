@@ -9,12 +9,7 @@
   "version": "0.5.3",
   "installation_kind": "control-tool",
   "install": {
-    "operations": [
-      "status",
-      "doctor",
-      "update",
-      "uninstall"
-    ],
+    "operations": ["status", "doctor", "update", "uninstall"],
     "operation_commands": {
       "install": ["npm", "i", "-g", "theforge-cli"],
       "status": ["forge-cli", "status"],
@@ -22,12 +17,7 @@
       "update": ["forge-cli", "self", "update"],
       "uninstall": ["forge-cli", "self", "uninstall"]
     },
-    "flags": [
-      "--yes",
-      "--dry-run",
-      "--json",
-      "--dir"
-    ],
+    "flags": ["--yes", "--dry-run", "--json", "--dir"],
     "approval": "--yes",
     "notes": "control-tool — runtime-acquisition meta-installer. It acquires and updates forge runtimes (registry venvs, git checkouts, gitless sources, native-installer delegation); it is NOT a content forge and does not install host assets itself — that is `theforge install`."
   },

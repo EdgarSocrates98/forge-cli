@@ -138,13 +138,7 @@ describe('wave-14: root/to/repo/purge no vocabulário nativo', () => {
 
   it('buildNativeInstall repassa --root <alvo> quando a Forja declara root', () => {
     const built = buildNativeInstall(aws, { root: '/ws/alvo', approve: true });
-    expect(built?.argv).toEqual([
-      'sparkforge-aws',
-      'install',
-      '--root',
-      '/ws/alvo',
-      '--yes',
-    ]);
+    expect(built?.argv).toEqual(['sparkforge-aws', 'install', '--root', '/ws/alvo', '--yes']);
   });
 
   it('--root NÃO é repassado a Forja que não o declara (ignored honesto)', () => {
@@ -190,13 +184,7 @@ describe('wave-14: root/to/repo/purge no vocabulário nativo', () => {
       to: '9.9.9',
       repo: 'https://example.test/x',
     });
-    expect(built?.argv).toEqual([
-      'sparkforge-aws',
-      'uninstall',
-      '--root',
-      '/ws/alvo',
-      '--purge',
-    ]);
+    expect(built?.argv).toEqual(['sparkforge-aws', 'uninstall', '--root', '/ws/alvo', '--purge']);
     expect(built?.ignored).toEqual([]);
   });
 
@@ -222,7 +210,16 @@ describe('wave-14: root/to/repo/purge no vocabulário nativo', () => {
   });
 
   it('parser aceita --to/--repo/--purge e valida vazios', () => {
-    const cli = parseCliArgs(['update', 'x', '--native', '--to', '1.2.3', '--repo', 'r', '--purge']);
+    const cli = parseCliArgs([
+      'update',
+      'x',
+      '--native',
+      '--to',
+      '1.2.3',
+      '--repo',
+      'r',
+      '--purge',
+    ]);
     expect(cli.to).toBe('1.2.3');
     expect(cli.repo).toBe('r');
     expect(cli.purge).toBe(true);
