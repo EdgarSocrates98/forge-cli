@@ -15,7 +15,8 @@
     "README.md",
     "CHANGELOG.md",
     "docs",
-    "LICENSE"
+    "LICENSE",
+    "forge.json"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
