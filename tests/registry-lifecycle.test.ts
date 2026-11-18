@@ -492,7 +492,8 @@ describe('delegação nativa no registry', () => {
   beforeEach(() => (calls.length = 0));
 
   it('install --native roda <venv-bin> install --dry-run (sem --yes)', async () => {
-    await runRegistryInstall(cli({ native: true }), ['api-forge'], {
+    const dir = path.join(tmp, 'ws');
+    await runRegistryInstall(cli({ native: true, dir }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -502,18 +503,29 @@ describe('delegação nativa no registry', () => {
     const nat = calls.at(-1)!;
     const receipt = loadForgeState(tmp).forges['api-forge'];
     expect(nat[0]).toBe(receipt.bin);
-    expect(nat.slice(1)).toEqual(['install', '--dry-run']);
+    // wave-14: --root é repassado porque api-forge o declara no manifesto
+    expect(nat.slice(1)).toEqual(['install', '--root', dir, '--dry-run']);
     expect(receipt.native).toMatchObject({ ran: true, dryRun: true, exitCode: 0 });
   });
 
   it('install --native --yes → --yes (não --dry-run) + flags documentadas viram argv', async () => {
+    const dir = path.join(tmp, 'ws');
     await runRegistryInstall(
-      cli({ native: true, yes: true, profile: 'minimal', scope: 'user' }),
+      cli({ native: true, yes: true, profile: 'minimal', scope: 'user', dir }),
       ['api-forge'],
       { home: tmp, pythons: py(), fetchImpl: fetchOk, run: runRec },
     );
     const nat = calls.at(-1)!;
-    expect(nat.slice(1)).toEqual(['install', '--scope', 'user', '--profile', 'minimal', '--yes']);
+    expect(nat.slice(1)).toEqual([
+      'install',
+      '--scope',
+      'user',
+      '--profile',
+      'minimal',
+      '--root',
+      dir,
+      '--yes',
+    ]);
     expect(loadForgeState(tmp).forges['api-forge'].native?.argv.slice(1)).toContain('--yes');
   });
 
@@ -532,15 +544,16 @@ describe('delegação nativa no registry', () => {
 
   it('uninstall --native roda a op documentada antes de remover a venv', async () => {
     seed('0.1.0');
+    const dir = path.join(tmp, 'ws');
     const { runRegistryUninstall } = await import('../src/cmd/registry.js');
-    await runRegistryUninstall(cli({ yes: true, native: true }), ['api-forge'], {
+    await runRegistryUninstall(cli({ yes: true, native: true, dir }), ['api-forge'], {
       home: tmp,
       run: runRec,
     });
     const nat = calls.at(-1)!;
     expect(nat[0]).toContain('apiforge');
     // buildNativeOp: aprovado = argv sem --dry-run (não adiciona --yes)
-    expect(nat.slice(1)).toEqual(['install', 'uninstall']);
+    expect(nat.slice(1)).toEqual(['install', 'uninstall', '--root', dir]);
     expect(loadForgeState(tmp).forges['api-forge']).toBeUndefined();
   });
 
@@ -563,14 +576,16 @@ describe('delegação nativa no registry', () => {
 
   it('update com --native roda a op update do instalador', async () => {
     seed('0.1.0');
-    await runRegistryUpdate(cli({ native: true, yes: true }), ['api-forge'], {
+    const dir = path.join(tmp, 'ws');
+    await runRegistryUpdate(cli({ native: true, yes: true, dir }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
       run: runRec,
     });
     const nat = calls.at(-1)!;
-    expect(nat.slice(1)).toEqual(['install', 'update']);
+    // wave-14: --to=<versão resolvida> vai junto quando o manifesto declara
+    expect(nat.slice(1)).toEqual(['install', 'update', '--root', dir, '--to', '0.2.0']);
     expect(loadForgeState(tmp).forges['api-forge'].native?.argv.slice(1)).toContain('update');
   });
 });

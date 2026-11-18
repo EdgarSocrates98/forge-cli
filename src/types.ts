@@ -1,6 +1,21 @@
 export type RepoKind = 'python' | 'node';
 
-export type NativeFlag = 'scope' | 'profile' | 'components' | 'host' | 'gateway-profile';
+/**
+ * Vocabulário de flags nativas que o catálogo pode declarar — o conjunto
+ * comum dos `install.flags` dos `forge.json` dos irmãos (wave-14):
+ * `root` = alvo explícito, `to`/`repo` = pin/fonte de update,
+ * `purge` = remoção profunda no uninstall.
+ */
+export type NativeFlag =
+  | 'scope'
+  | 'profile'
+  | 'components'
+  | 'host'
+  | 'gateway-profile'
+  | 'root'
+  | 'to'
+  | 'repo'
+  | 'purge';
 
 export interface ForgeRepo {
   name: string;

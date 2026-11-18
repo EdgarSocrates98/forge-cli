@@ -4,6 +4,29 @@ Fonte única do formato que `forge-cli` escreve e que leitores externos
 (forge-portal, scripts, hosts) podem consumir. O CLI é o único escritor;
 leitores são somente-leitura e nunca inventam campos.
 
+## Dois ledgers — reconciliar, nunca confundir (wave-14)
+
+Existem **dois** ledgers de instalação na plataforma, com donos e
+escopos diferentes:
+
+| Ledger                    | Dono        | O que registra                                                                         |
+| ------------------------- | ----------- | -------------------------------------------------------------------------------------- |
+| `~/.forge-cli/forges/`    | `forge-cli` | **Runtimes adquiridos**: venv registry, wheel verificada, versão, pin, histórico       |
+| `~/.forge/installations/` | `theforge`  | **Ativações**: o que o installkit aplicou em workspaces/hosts (skills, agents, regras) |
+
+O `forge-cli` nunca escreve no ledger do `theforge`, e vice-versa.
+Leitores devem tratar os dois como fatos independentes e reconciliáveis:
+
+- presente só em `~/.forge-cli/forges/` → runtime instalado, nada
+  ativado em workspace (rode `theforge install plan|apply`);
+- presente só em `~/.forge/installations/` → ativação sem runtime
+  gerenciado (instale o runtime via `forge-cli install <forja>`);
+- presente nos dois → runtime + ativação — estado completo.
+
+`forge-cli doctor`/`status`/`registry` leem apenas o primeiro; o ledger
+de ativação é do `theforge` (`install status`, `doctor`). A fronteira
+completa de responsabilidades está em `docs/forge-cli-vs-theforge.md`.
+
 ## Arquivos
 
 | Arquivo                                   | Conteúdo                                              | Escrita                     |

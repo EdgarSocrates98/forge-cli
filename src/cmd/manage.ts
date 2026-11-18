@@ -182,7 +182,10 @@ export async function runForgeUninstall(cli: CliOptions, names: string[]): Promi
       const bk = plan.backups.length ? ` · ${S.uninstallBackups}: ${plan.backups.join(', ')}` : '';
       lines.push(`${repo.name} — ${theme.warn(S.uninstallReady)}${theme.dim(bk)}`);
       if (cli.native) {
-        const op = buildNativeOp(repo, 'uninstall', true);
+        const op = buildNativeOp(repo, 'uninstall', true, {
+          root: targetDir,
+          purge: cli.purge,
+        });
         lines.push(
           `  ${theme.dim(`${S.nativeUninstallPlan}: ${op ? op.argv.join(' ') : S.nativeUnsupported}`)}`,
         );
@@ -222,7 +225,7 @@ export async function runForgeUninstall(cli: CliOptions, names: string[]): Promi
   for (const { repo, plan } of ready) {
     if (plan.kind !== 'ready') continue;
     if (cli.native) {
-      const op = buildNativeOp(repo, 'uninstall', true);
+      const op = buildNativeOp(repo, 'uninstall', true, { root: targetDir, purge: cli.purge });
       if (!op) {
         log.error(`${repo.name}: ${S.nativeUnsupported}`);
         refusedNative = true;

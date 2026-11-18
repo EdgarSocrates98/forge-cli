@@ -1,0 +1,25 @@
+{
+  "forge_id": "forge-cli",
+  "name": "Forge CLI",
+  "package": "theforge-cli",
+  "distribution": "theforge-cli",
+  "cli": "forge-cli",
+  "kind": "node",
+  "node": ">=20",
+  "version": "0.5.3",
+  "installation_kind": "control-tool",
+  "install": {
+    "operations": ["status", "doctor", "update", "uninstall"],
+    "operation_commands": {
+      "install": ["npm", "i", "-g", "theforge-cli"],
+      "status": ["forge-cli", "status"],
+      "doctor": ["forge-cli", "doctor"],
+      "update": ["forge-cli", "self", "update"],
+      "uninstall": ["forge-cli", "self", "uninstall"]
+    },
+    "flags": ["--yes", "--dry-run", "--json", "--dir"],
+    "approval": "--yes",
+    "notes": "control-tool — runtime-acquisition meta-installer. It acquires and updates forge runtimes (registry venvs, git checkouts, gitless sources, native-installer delegation); it is NOT a content forge and does not install host assets itself — that is `theforge install`."
+  },
+  "depends_on": []
+}

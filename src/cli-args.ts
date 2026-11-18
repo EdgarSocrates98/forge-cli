@@ -34,6 +34,12 @@ export interface CliOptions {
   verify: boolean;
   host?: string;
   gatewayProfile?: string;
+  /** `--to <versão>` — pin repassado à operação nativa de update (wave-14). */
+  to?: string;
+  /** `--repo <url|dir>` — fonte alternativa repassada à op nativa de update. */
+  repo?: string;
+  /** `--purge` — remoção profunda repassada à op nativa de uninstall. */
+  purge?: boolean;
   verbose: boolean;
   offline: boolean;
   /** `--lock <file>` — lock offline (registry install --offline). */
@@ -90,6 +96,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         native: { type: 'boolean' },
         host: { type: 'string' },
         'gateway-profile': { type: 'string' },
+        to: { type: 'string' },
+        repo: { type: 'string' },
+        purge: { type: 'boolean' },
         verbose: { type: 'boolean' },
         offline: { type: 'boolean' },
         profile: { type: 'string' },
@@ -134,6 +143,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
     components: values.components,
     host: values.host,
     gatewayProfile: values['gateway-profile'],
+    to: values.to,
+    repo: values.repo,
   });
   if (nativeError) throw new CliError(nativeError);
   const ref = values.ref ?? values.version;
@@ -178,6 +189,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
     python: values.python,
     host: values.host,
     gatewayProfile: values['gateway-profile'],
+    to: values.to,
+    repo: values.repo,
+    purge: values.purge ?? false,
     verbose: values.verbose ?? false,
     offline: values.offline ?? false,
     profile: values.profile,

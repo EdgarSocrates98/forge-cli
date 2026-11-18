@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { redactSecrets } from '../safety.js';
+import { commandEnv } from '../utils/system.js';
 import { CLI_VERSION } from '../version.js';
 
 /**
@@ -186,7 +187,11 @@ export function probeMcpServer(argv: string[], opts: ProbeOptions = {}): Promise
     }
     let child: ChildProcess;
     try {
-      child = spawn(argv[0], argv.slice(1), { stdio: ['pipe', 'pipe', 'pipe'], shell: false });
+      child = spawn(argv[0], argv.slice(1), {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+        env: commandEnv(argv[0]),
+      });
     } catch (e) {
       resolve(err('spawn-failed', e instanceof Error ? e.message : String(e)));
       return;

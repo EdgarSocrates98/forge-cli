@@ -3,6 +3,7 @@
  * Resolve names → catálogo, escolhe o melhor interpretador que satisfaz
  * `requires_python`, cria venv isolada por Forja e grava receipt.
  */
+import os from 'node:os';
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { confirm, isCancel, multiselect } from '@clack/prompts';
@@ -38,6 +39,7 @@ import {
   validateNativeOptions,
 } from '../native-install.js';
 import { FORGE_REPOS } from '../constants/repos.js';
+import { delegationVerdict, findChildReceipt } from '../child-receipt.js';
 import { resolveRelease, type FetchLike, type ResolveError } from '../registry/pypi.js';
 import { generateOfflineLock, type OfflineLock } from '../registry/lock.js';
 import { compareVersions, type ParsedVersion } from '../registry/versions.js';
@@ -266,6 +268,7 @@ export async function delegateNative(
     });
   if (!wants) return undefined;
   const repo = FORGE_REPOS.find((r) => r.name === entry.name);
+  const target = resolveTargetDir(cli.dir);
   const built =
     repo &&
     (op === 'install'
@@ -275,9 +278,16 @@ export async function delegateNative(
           components: cli.components,
           host: cli.host,
           gatewayProfile: cli.gatewayProfile,
+          root: target,
           approve: cli.yes,
         })
-      : buildNativeOp(repo, 'update', cli.yes ?? false));
+      : buildNativeOp(repo, 'update', cli.yes ?? false, {
+          root: target,
+          // `--to` recebe o pin explícito do usuário ou a versão que o
+          // registry acabou de instalar — o update nativo mira a mesma.
+          to: cli.to ?? receipt.version,
+          repo: cli.repo,
+        }));
   if (!built) {
     return { argv: [], ran: false, skipped: 'sem instalador nativo documentado' };
   }
@@ -290,13 +300,30 @@ export async function delegateNative(
     };
   }
   const argv = [receipt.bin, ...built.argv.slice(1)];
+  const startedAt = Date.now();
   const res = await run(argv[0], argv.slice(1));
   const ignored = 'ignored' in built ? (built.ignored as string[]) : [];
+  // Exit 0 não é prova — o receipt forge/InstallReceipt/v1 do filho é a
+  // evidência: stdout primeiro, depois `.<state>/receipts` sob o alvo
+  // (scope=workspace) e sob o home (scope=user / FORGE_HOME_OVERRIDE).
+  const roots = [resolveTargetDir(cli.dir), os.homedir()];
+  const homeOverride = process.env.FORGE_HOME_OVERRIDE;
+  if (homeOverride) roots.push(path.resolve(homeOverride));
+  const found = findChildReceipt({
+    forgeId: entry.name,
+    operation: op,
+    roots,
+    sinceMs: startedAt,
+    stdout: typeof res.stdout === 'string' ? res.stdout : '',
+  });
+  const verdict = delegationVerdict(res.exitCode ?? 1, found);
   return {
     argv,
     ran: true,
     dryRun: built.dryRun,
     exitCode: res.exitCode,
+    verdict,
+    ...(found ? { receiptRef: found.ref } : {}),
     ...(ignored.length ? { ignored } : {}),
   };
 }
@@ -533,16 +560,26 @@ export async function runRegistryInstall(
       const n = receipt.native;
       if (!quiet) {
         if (n.skipped) boardLog(log.warn, `${name}: ${n.skipped}`);
-        else if (n.exitCode !== 0)
-          boardLog(log.warn, `${name}: instalador nativo saiu ${n.exitCode}`);
-        else
+        else if (n.verdict === 'failed')
+          boardLog(log.warn, `${name}: instalador nativo saiu ${n.exitCode ?? 'com falha'}`);
+        else if (n.verdict === 'applied')
           boardLog(
             log.info,
-            `${name}: nativo ${n.dryRun ? '(dry-run)' : 'aplicado'} — ${n.argv.join(' ')}`,
+            `${name}: nativo ${n.dryRun ? '(dry-run)' : 'aplicado (receipt PASS)'} — ${n.argv.join(' ')}`,
+          );
+        else
+          boardLog(
+            log.warn,
+            `${name}: nativo rodou mas sem receipt de verificação — unverified — ${n.argv.join(' ')}`,
           );
       }
       if (n.skipped) warnings.push(`${name}: ${n.skipped}`);
-      if (n.ran && n.exitCode !== 0) warnings.push(`${name}: instalador nativo saiu ${n.exitCode}`);
+      if (n.verdict === 'failed')
+        warnings.push(`${name}: instalador nativo saiu ${n.exitCode ?? 'com falha'}`);
+      if (n.verdict === 'unverified')
+        warnings.push(
+          `${name}: instalador nativo sem receipt forge/InstallReceipt/v1 PASS — unverified`,
+        );
     }
     if (receipt.staleCache) {
       const w = `${S.registryStaleCache} (${entry!.dist})`;
@@ -1086,7 +1123,12 @@ export async function runRegistryUninstall(
     if (cli.native) {
       const repo = FORGE_REPOS.find((x) => x.name === r.name);
       const receipt = Object.hasOwn(state, r.name) ? state[r.name] : undefined;
-      const op = repo && buildNativeOp(repo, 'uninstall', cli.yes ?? false);
+      const op =
+        repo &&
+        buildNativeOp(repo, 'uninstall', cli.yes ?? false, {
+          root: resolveTargetDir(cli.dir),
+          purge: cli.purge,
+        });
       if (!op) {
         native = { argv: [], ran: false, skipped: 'sem op nativa de uninstall documentada' };
       } else if (op.argv[0] === '{python}' || !receipt || receipt.method === 'local') {

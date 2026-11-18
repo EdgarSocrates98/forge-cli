@@ -89,7 +89,14 @@ export function receiptForPlan(
     completed_at: status === 'planned' ? null : new Date().toISOString(),
     actions: plan.actions.map((action) => ({
       id: action.id,
-      status: status === 'applied' ? 'applied' : status === 'blocked' ? 'blocked' : 'skipped',
+      status:
+        status === 'applied'
+          ? 'applied'
+          : status === 'blocked'
+            ? 'blocked'
+            : status === 'unverified'
+              ? 'unverified'
+              : 'skipped',
       detail: action.description,
     })),
   };

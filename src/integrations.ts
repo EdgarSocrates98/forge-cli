@@ -20,7 +20,7 @@ import { existsSync } from 'node:fs';
 import { execa } from 'execa';
 import { loadForgeState } from './registry/install.js';
 import { resolveInside } from './safety.js';
-import { hasGitRepo } from './utils/system.js';
+import { commandEnv, hasGitRepo } from './utils/system.js';
 
 export interface OptionalIntegration {
   /** Nome da Forja irmã (id do catálogo — ou gap nomeado e documentado). */
@@ -395,6 +395,8 @@ export async function defaultWhich(bin: string): Promise<string | null> {
   try {
     const res = await execa(isWin ? 'where' : 'sh', isWin ? [bin] : ['-c', `command -v ${bin}`], {
       reject: false,
+      env: commandEnv(isWin ? 'where' : 'sh'),
+      extendEnv: false,
     });
     const first = (res.stdout ?? '').split('\n')[0]?.trim();
     return res.exitCode === 0 && first ? first : null;

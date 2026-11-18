@@ -29,12 +29,14 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
     cwd: repoDir,
     reject: false,
     env: commandEnv('git'),
+    extendEnv: false,
   });
   if (up.exitCode !== 0) return { behind: 0, ahead: 0, failure: 'no-upstream' };
   try {
     await execa(gitExecutable(), ['fetch', '--quiet', '--tags'], {
       cwd: repoDir,
       env: commandEnv('git', NO_PROMPT),
+      extendEnv: false,
     });
   } catch (error) {
     return { behind: 0, ahead: 0, failure: classifyGitFailure(errorDetail(error)) };
@@ -46,6 +48,7 @@ export async function updateCheck(repoDir: string): Promise<UpdateCheck> {
       cwd: repoDir,
       reject: false,
       env: commandEnv('git'),
+      extendEnv: false,
     },
   );
   const [ahead, behind] = String(counts.stdout ?? '')
@@ -60,6 +63,7 @@ export async function localTags(repoDir: string, limit = 10): Promise<string[]> 
     cwd: repoDir,
     reject: false,
     env: commandEnv('git'),
+    extendEnv: false,
   });
   if (res.exitCode !== 0) return [];
   return String(res.stdout)
@@ -75,6 +79,7 @@ export async function remoteTags(url: string, limit = 10): Promise<string[] | nu
     reject: false,
     env: commandEnv('git', NO_PROMPT),
     timeout: 30_000,
+    extendEnv: false,
   });
   if (res.exitCode !== 0) return null;
   return String(res.stdout)
@@ -93,12 +98,13 @@ export async function checkoutRef(repoDir: string, ref: string): Promise<string>
     const verify = await execa(
       gitExecutable(),
       ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`],
-      { cwd: repoDir, reject: false, env: commandEnv('git') },
+      { cwd: repoDir, reject: false, env: commandEnv('git'), extendEnv: false },
     );
     if (verify.exitCode === 0) {
       await execa(gitExecutable(), ['checkout', '--detach', String(verify.stdout).trim()], {
         cwd: repoDir,
         env: commandEnv('git'),
+        extendEnv: false,
       });
       return candidate;
     }

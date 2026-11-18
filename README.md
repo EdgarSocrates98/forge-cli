@@ -10,6 +10,29 @@ sincroniza cada repositório (clone ou pull), provisiona o arquivo `.env`
 e executa o script de instalação do sistema operacional — tudo com
 feedback visual em tempo real.
 
+## O que o forge-cli é — e o que não é
+
+O forge-cli é uma **ferramenta de controle**: um meta-instalador de
+aquisição de runtimes. Ele instala e atualiza os runtimes das Forjas
+(venvs do PyPI em `~/.forge-cli/forges/`, clones git, fontes locais sem
+`.git`, shims em `~/.forge-cli/bin/`), delega aos instaladores nativos e
+verifica os receipts — **não é uma Forja de conteúdo** e não ativa
+capacidades em workspace.
+
+Quem ativa capacidades (skills, agents, regras, MCP) dentro de um
+workspace é o **The Forge** (`theforge install plan|apply|auto`); quem
+visualiza e administra a plataforma é o **Forge Portal**. São três
+papéis distintos usados em sequência:
+
+```bash
+forge-cli install the-forge --method registry   # 1. aquisição do runtime
+cd meu-workspace && theforge install apply      # 2. ativação no workspace
+```
+
+A fronteira completa, incluindo os dois ledgers independentes
+(`~/.forge-cli/forges/` × `~/.forge/installations/`), está em
+[docs/forge-cli-vs-theforge.md](docs/forge-cli-vs-theforge.md).
+
 ## Funcionalidades
 
 - **Fluxo 100% interativo** com `@clack/prompts`: banner animado,
@@ -100,7 +123,14 @@ forge-cli install spark-forge-aws --profile recommended --scope project --compon
 
 O forge-cli só delega ao `<cli> install` que a Forja documenta; Forjas sem
 instalador nativo (ex.: forge-portal) recebem um aviso, sem substituto
-silencioso. Veja [docs/capabilities.md](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md).
+silencioso. O vocabulário nativo inclui `--scope`, `--profile`,
+`--components`, `--host`, `--gateway-profile` e, conforme cada `forge.json`
+declara, `--root` (workspace install passa o root resolvido), `--to`/`--repo`
+(update) e `--purge` (uninstall); flags não declaradas são reportadas como
+`ignored`, nunca passadas adiante. O veredito de aplicação vem do receipt
+filho `forge/InstallReceipt/v1` (`completed` + `verification: PASS`) —
+exit code `0` sozinho rende só `unverified`, nunca `applied`. Veja
+[docs/capabilities.md](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md).
 
 ## Instalação via PyPI (registry-first — método recomendado)
 
@@ -116,7 +146,7 @@ Forja por comando). O interpretador escolhido é o mais novo que
 satisfaz `requires_python` do release; sem compatível, o install é
 recusado antes de qualquer mutação.
 
-- `forge-cli registry` lista o catálogo (7 dists) e o instalado.
+- `forge-cli registry` lista o catálogo (13 dists) e o instalado.
 - Receipts em `install.json`/`state.json`: dist, versão, interpretador,
   digests sha256 e verify — o artefato da dist é conferido byte a byte
   após o download.
@@ -306,7 +336,10 @@ factory/             # fluxo spec-driven (Loop Factory)
 ## Documentação
 
 - [Arquitetura e decisões de design](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/arquitetura.md)
+- [forge-cli × theforge — fronteira de responsabilidades](docs/forge-cli-vs-theforge.md)
 - [Matriz de capacidades das Forjas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/capabilities.md)
+- [Modelo de ameaça e confiança](docs/threat-model.md)
+- [Contrato de estado registry](docs/registry-state-contract.md)
 - [Guia de instalação por cenário](docs/installation.md)
 - [Códigos FORGE-* de recusa](docs/troubleshooting.md)
 - [Solução de problemas](https://github.com/EdgarSocrates98/forge-cli/blob/v0.1.0/docs/solucao-de-problemas.md)

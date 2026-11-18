@@ -69,6 +69,9 @@ async function cli(...args: string[]) {
       FORGE_CLI_HOME: home,
       FORCE_COLOR: '0',
       GIT_STUB_LOG: gitLog,
+      // Scrub wave-14: GIT_STUB_LOG não é nome allowlisted — o escape hatch
+      // explícito re-admite a var para os filhos (stub git a escreveria).
+      FORGE_CLI_ENV_ALLOW: 'GIT_STUB_LOG',
       PATH: `${stubBin}${path.delimiter}${process.env.PATH ?? ''}`,
     },
     extendEnv: true,

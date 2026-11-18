@@ -18,7 +18,7 @@ import path from 'node:path';
 import { execa } from 'execa';
 import { artifactsRoot } from '../artifacts.js';
 import { redactSecrets, writeFileAtomic } from '../safety.js';
-import { errorDetail } from '../utils/system.js';
+import { childEnv, errorDetail } from '../utils/system.js';
 import { aiCacheGet, aiCacheKey, aiCacheSet } from './cache.js';
 import {
   isAiProposalShape,
@@ -55,6 +55,35 @@ export interface AiBridgeDeps {
 
 const DETAIL_CAP = 300;
 
+/**
+ * BYOK: o bridge é um comando configurado pelo usuário que consome a
+ * própria chave — os prefixos de provedor de IA são re-admitidos APENAS
+ * para este filho (o deny de credencial continua para todo o resto).
+ */
+const AI_BRIDGE_ENV_PREFIXES = [
+  'OPENAI_',
+  'ANTHROPIC_',
+  'GEMINI_',
+  'GOOGLE_',
+  'MISTRAL_',
+  'GROQ_',
+  'XAI_',
+  'DEEPSEEK_',
+  'TOGETHER_',
+  'COHERE_',
+  'OPENROUTER_',
+  'OLLAMA_',
+  'PERPLEXITY_',
+  'FIREWORKS_',
+  'CLAUDE_',
+  'CODEX_',
+  'CURSOR_',
+  'REPLICATE_',
+  'HF_',
+  'HUGGINGFACE_',
+  'AI_',
+];
+
 /** Default spawn via execa — the only place a subprocess can start. */
 const execaSpawn: AiSpawnFn = async (argv, opts) => {
   const [bin, ...args] = argv;
@@ -62,6 +91,8 @@ const execaSpawn: AiSpawnFn = async (argv, opts) => {
     cwd: opts.cwd,
     timeout: opts.timeoutMs,
     reject: false,
+    env: childEnv({ allowPrefixes: AI_BRIDGE_ENV_PREFIXES }),
+    extendEnv: false,
   });
   return {
     stdout: typeof res.stdout === 'string' ? res.stdout : '',

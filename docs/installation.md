@@ -13,6 +13,14 @@ diagnostica a instalação depois do fato; `forge env discover --json`
 mostra as rotas/shells/interpretadores que a máquina oferece **antes**
 de instalar.
 
+> **Fronteira de responsabilidades**: este guia cobre a **aquisição do
+> runtime** — venv, checkout, fonte local. Instalar uma Forja aqui **não
+> ativa** skills/agents/regras no seu workspace; a ativação é do
+> `theforge install plan|apply|auto` dentro do workspace. Detalhes e os
+> dois ledgers independentes em
+> [forge-cli-vs-theforge.md](forge-cli-vs-theforge.md); modelo de ameaça
+> e confiança de fontes gitless em [threat-model.md](threat-model.md).
+
 ## Sumário dos cenários
 
 | #   | Cenário                         | Comando                                                 | Rota                                                |
