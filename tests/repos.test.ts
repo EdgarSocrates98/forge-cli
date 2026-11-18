@@ -87,7 +87,7 @@ describe('FORGE_REPOS catalog', () => {
     });
     expect(FORGE_REPOS.find((r) => r.name === 'api-sentinel-forge')?.nativeInstall).toEqual({
       command: ['api-sentinel', 'install'],
-      flags: ['scope', 'profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'purge'],
       ops: {
         update: ['api-sentinel', 'update'],
         uninstall: ['api-sentinel', 'uninstall'],

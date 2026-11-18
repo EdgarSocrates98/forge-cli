@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -86,7 +86,15 @@ describe('workspace install <forja> — GAP-07', () => {
       const doc = lastJson(spy);
       expect((doc.plan as { operation: string }).operation).toBe('install');
       expect((doc.receipt as { status: string }).status).toBe('planned');
-      expect(doc.argv).toEqual(['data-sentinel', 'install', '--scope', 'workspace', '--dry-run']);
+      expect(doc.argv).toEqual([
+        'data-sentinel',
+        'install',
+        '--scope',
+        'workspace',
+        '--root',
+        path.resolve(ws),
+        '--dry-run',
+      ]);
       expect(streamed).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();
@@ -103,9 +111,23 @@ describe('workspace install <forja> — GAP-07', () => {
     expect(streamed).not.toHaveBeenCalled();
   });
 
-  it('--yes executa o instalador nativo na raiz do workspace com --yes', async () => {
+  it('--yes executa o instalador na raiz do workspace — applied exige receipt PASS', async () => {
     const ws = temp();
-    streamed.mockResolvedValue(undefined);
+    // O filho real gravaria o receipt; o mock o escreve para simular isso.
+    streamed.mockImplementation(async (_argv, cwd) => {
+      const receipts = path.join(cwd as string, '.data_sentinel_forge', 'receipts');
+      mkdirSync(receipts, { recursive: true });
+      writeFileSync(
+        path.join(receipts, 'install-20990101T000000Z.json'),
+        JSON.stringify({
+          schema: 'forge/InstallReceipt/v1',
+          forge_id: 'data-sentinel-forge',
+          operation: 'install',
+          status: 'completed',
+          verification: { status: 'PASS' },
+        }),
+      );
+    });
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     try {
       const code = await runWorkspaceCommand(cliFor(['--yes'], ws), [
@@ -115,10 +137,66 @@ describe('workspace install <forja> — GAP-07', () => {
       expect(code).toBe(0);
       expect(streamed).toHaveBeenCalledTimes(1);
       const [argv, cwd] = streamed.mock.calls[0];
-      expect(argv).toEqual(['data-sentinel', 'install', '--scope', 'workspace', '--yes']);
+      expect(argv).toEqual([
+        'data-sentinel',
+        'install',
+        '--scope',
+        'workspace',
+        '--root',
+        path.resolve(ws),
+        '--yes',
+      ]);
       expect(cwd).toBe(path.resolve(ws));
       const doc = lastJson(spy);
       expect((doc.receipt as { status: string }).status).toBe('applied');
+      expect(String(doc.childReceipt)).toContain('install-20990101T000000Z.json');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('--yes SEM receipt filho → unverified + exit 1 (exit 0 nunca é prova)', async () => {
+    const ws = temp();
+    streamed.mockResolvedValue(undefined); // rodou limpo, sem receipt
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const code = await runWorkspaceCommand(cliFor(['--yes'], ws), [
+        'install',
+        'data-sentinel-forge',
+      ]);
+      expect(code).toBe(1);
+      const doc = lastJson(spy);
+      expect((doc.receipt as { status: string }).status).toBe('unverified');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('--yes com receipt não-PASS → unverified, nunca applied', async () => {
+    const ws = temp();
+    streamed.mockImplementation(async (_argv, cwd) => {
+      const receipts = path.join(cwd as string, '.data_sentinel_forge', 'receipts');
+      mkdirSync(receipts, { recursive: true });
+      writeFileSync(
+        path.join(receipts, 'install-20990101T000000Z.json'),
+        JSON.stringify({
+          schema: 'forge/InstallReceipt/v1',
+          forge_id: 'data-sentinel-forge',
+          operation: 'install',
+          status: 'completed',
+          verification: { status: 'FAIL' },
+        }),
+      );
+    });
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const code = await runWorkspaceCommand(cliFor(['--yes'], ws), [
+        'install',
+        'data-sentinel-forge',
+      ]);
+      expect(code).toBe(1);
+      const doc = lastJson(spy);
+      expect((doc.receipt as { status: string }).status).toBe('unverified');
     } finally {
       spy.mockRestore();
     }
