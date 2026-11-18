@@ -597,6 +597,7 @@ export async function execaRun(
     reject: false,
     timeout: opts.timeoutMs ?? 300_000,
     env: commandEnv(cmd),
+    extendEnv: false,
     ...(opts.cwd ? { cwd: opts.cwd } : {}),
   });
   return {

@@ -10,6 +10,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
+import { commandEnv } from './utils/system.js';
 
 export interface InstallOptions {
   platform?: NodeJS.Platform;
@@ -85,6 +86,8 @@ async function psRun(script: string): Promise<string | null> {
   try {
     const result = await execa('powershell.exe', ['-NoProfile', '-Command', script], {
       reject: false,
+      env: commandEnv('powershell.exe'),
+      extendEnv: false,
     });
     return result.exitCode === 0 ? (result.stdout ?? '') : null;
   } catch {
@@ -243,7 +246,11 @@ export async function pathStatus(opts: InstallOptions = {}): Promise<'on-path' |
       platform === 'win32'
         ? (['where', ['forge-cli']] as const)
         : (['sh', ['-c', 'command -v forge-cli']] as const);
-    const result = await execa(cmd, [...args], { reject: false });
+    const result = await execa(cmd, [...args], {
+      reject: false,
+      env: commandEnv(cmd),
+      extendEnv: false,
+    });
     return result.exitCode === 0 ? 'on-path' : 'missing';
   } catch {
     return 'missing';

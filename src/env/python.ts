@@ -48,6 +48,7 @@ import {
   satisfiesRequiresPython,
   type ParsedVersion,
 } from '../registry/versions.js';
+import { commandEnv } from '../utils/system.js';
 import type { ProbeOutcome, ProbeRun } from './shells.js';
 
 /** Teto de cada probe `<exe> --version` / `command -v` — spec: ≤ 5 s. */
@@ -185,6 +186,8 @@ const defaultRun: ProbeRun = async (command, args): Promise<ProbeOutcome> => {
     const res = await execa(command, args, {
       reject: false,
       timeout: PYTHON_PROBE_TIMEOUT_MS,
+      env: commandEnv(command),
+      extendEnv: false,
     });
     if (res.timedOut) return { ok: false, output: null, timed_out: true };
     if (res.exitCode !== 0) {

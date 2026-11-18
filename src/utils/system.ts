@@ -10,15 +10,167 @@ import type { ForgeRepo, SetupScript, SyncFailure, SyncResult } from '../types.j
 
 export const DEFAULT_WORKSPACE = './forge-workspace';
 
-/** Keep Windows subprocess lookup stable when a host exposes both PATH/Path. */
-export function portableEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const env = { ...process.env, ...extra };
-  if (process.platform === 'win32') {
-    const winPath = env.Path ?? env.PATH;
-    delete env.PATH;
-    delete env.Path;
-    if (winPath) env.Path = winPath;
+/* ── Ambiente de subprocessos (P0: anti-exfiltração) ──────────────────
+ * Todo filho spawnado pelo CLI recebe um env MÍNIMO, nunca `process.env`
+ * inteiro: scripts de setup de Forjas e fontes gitless são código de
+ * terceiros — um `GITHUB_TOKEN`/`AWS_SECRET_ACCESS_KEY` ambiente seria
+ * legível por qualquer instalador. A política é deny-first para nomes
+ * com cara de credencial e allowlist para toolchain/OS; o escape hatch
+ * documentado é `FORGE_CLI_ENV_ALLOW="FOO,BAR"` (re-admissão explícita
+ * do operador — assume o risco conscientemente). */
+
+/** Padrão de nome credential-shaped — negado antes da allowlist. */
+const CREDENTIAL_ENV_RE =
+  /(TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIALS?|_CREDS\b|^CREDS\b|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|SECRET_?KEY|SESSION_?KEY|SIGNING_?KEY|ENCRYPTION_?KEY|MASTER_?KEY|RECOVERY_?KEY|CLIENT_?SECRET|OAUTH|BEARER|AUTHORIZATION|_AUTH_|_AUTH$|^AUTH_|^AUTH$|_JWT$|_DSN$|^DSN_|COOKIE|CONNECTION_?STRING|CONN_?STR|_PASS$|^PASS$|_PIN$|^PIN$|_KEY$|^KEY$)/i;
+
+/** Nomes exatos admitidos — identidade de processo, OS, terminal,
+ * toolchain e proxy corporativo (documentado: proxies podem embutir
+ * credenciais na URL; necessários para instalação em rede corporativa —
+ * `FORGE_CLI_ENV_ALLOW` é o caminho para ambientes que preferem cortar). */
+const SAFE_ENV_NAMES = new Set(
+  [
+    // processo / identidade / OS
+    'PATH', 'HOME', 'USER', 'LOGNAME', 'USERNAME', 'USERPROFILE', 'HOMEDRIVE',
+    'HOMEPATH', 'USERDOMAIN', 'SHELL', 'SHLVL', 'PWD', 'OLDPWD', 'COMSPEC',
+    'OS', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'PATHEXT', 'PUBLIC',
+    'ALLUSERSPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'PROGRAMFILES',
+    'PROGRAMFILES(X86)', 'PROGRAMW6432', 'COMMONPROGRAMFILES',
+    'COMMONPROGRAMFILES(X86)', 'COMMONPROGRAMW6432', 'DRIVERDATA',
+    'PSMODULEPATH', 'COMPUTERNAME', 'NUMBER_OF_PROCESSORS',
+    'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER', 'PROCESSOR_LEVEL',
+    'PROCESSOR_REVISION', 'MSYSTEM', 'PLINK_PROTOCOL', 'EXEPATH',
+    // locale / terminal / UI
+    'LANG', 'LANGUAGE', 'LC_ALL', 'TZ', 'TERM', 'COLORTERM', 'TERM_PROGRAM',
+    'TERM_PROGRAM_VERSION', 'TERMINFO', 'NO_COLOR', 'CLICOLOR',
+    'CLICOLOR_FORCE', 'FORCE_COLOR', 'CI', 'LS_COLORS', 'EDITOR', 'VISUAL',
+    'PAGER', 'MANPATH', 'INFOPATH',
+    // temp
+    'TMP', 'TEMP', 'TMPDIR',
+    // proxy corporativo — ver comentário acima
+    'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'FTP_PROXY',
+    // TLS / CA corporativa
+    'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
+    'NODE_EXTRA_CA_CERTS', 'DENO_CERT', 'NIX_SSL_CERT_FILE',
+    // python toolchain (nomes exatos — o resto entra por prefixo)
+    'PYTHON', 'PYTHONHOME', 'PYTHONPATH', 'PYTHONSTARTUP',
+    'PYTHONDONTWRITEBYTECODE', 'PYTHONNOUSERSITE', 'PYTHONIOENCODING',
+    'PYTHONUTF8', 'PYTHONHASHSEED', 'PYTHONWARNINGS', 'PYTHONINSPECT',
+    'PYTHONOPTIMIZE', 'PYTHONUNBUFFERED', 'VIRTUAL_ENV', 'VIRTUAL_ENV_PROMPT',
+    'FORGE_PYTHON',
+    // node toolchain
+    'NODE', 'NODE_PATH', 'NODE_ENV', 'NODE_OPTIONS', 'NODE_REPL_HISTORY',
+    // toolchains compiladas / JVM / .NET
+    'CLASSPATH', 'GOPATH', 'GOROOT', 'GOPROXY', 'GOFLAGS', 'GOSUMDB',
+    'GONOSUMDB', 'GONOSUMCHECK', 'GOPRIVATE', 'GOINSECURE', 'GOVCS',
+    'RUSTFLAGS', 'RUSTC', 'NUGET_PACKAGES', 'CMAKE_PREFIX_PATH',
+    'PKG_CONFIG_PATH', 'CHOCOLATEYINSTALL', 'SCOOP',
+    // descoberta interna do próprio CLI
+    'FORGE_CLI_HOME', 'FORGE_CLI_PROBE_TIMEOUT_MS', 'FORGE_CLI_ENV_ALLOW',
+    'FORGE_CLI_QUIET', 'FORGE_CLI_FORCE_TTY', 'FORGE_CLI_AI_CMD',
+    'FORGE_HOME_OVERRIDE',
+  ].map((n) => n.toUpperCase()),
+);
+
+/** Prefixos admitidos — famílias de toolchain/gerenciador/Forja. O deny
+ * de credencial continua valendo (TWINE_PASSWORD, NPM_CONFIG_//TOKEN…). */
+const SAFE_ENV_PREFIXES = [
+  'LC_', 'XDG_',
+  'PIP_', 'UV_', 'POETRY_', 'PIPX_', 'PDM_', 'HATCH_', 'FLIT_', 'RYE_',
+  'TWINE_', 'NPM_CONFIG_',
+  'PYENV_', 'RBENV_', 'NVM_', 'VOLTA_', 'FNM_', 'NODENV_', 'ASDF_',
+  'MISE_', 'SDKMAN_', 'COREPACK_', 'PNPM_', 'YARN_', 'BUN_', 'DENO_',
+  'NODE_',
+  'CONDA_', 'MAMBA_', 'MICROMAMBA_',
+  'JAVA_', 'JDK_', 'M2_', 'MAVEN_', 'GRADLE_', 'SBT_', 'COURSIER_',
+  'CARGO_', 'RUSTUP_', 'RUST_',
+  'GEM_', 'BUNDLE_', 'RUBY', 'RAILS_',
+  'DOTNET_', 'NUGET_',
+  'CMAKE_', 'PKG_CONFIG_',
+  'MSYS', 'MINGW_', 'CYGWIN', 'WSL',
+  'HOMEBREW_',
+  // Forjas — variáveis públicas de configuração do ecossistema.
+  'FORGE_', 'APIFORGE_', 'SPARKFORGE_', 'PLATFORMFORGE_', 'PRODUCTFORGE_',
+  'THEFORGE_',
+  // Cloud CLIs — config/perfis passam; credenciais continuam negadas.
+  'AWS_', 'AZURE_', 'CLOUDSDK_', 'GCLOUD_', 'GOOGLE_',
+  'KRB5',
+];
+
+/** `FORGE_CLI_ENV_ALLOW="A,B"` — re-admissão explícita do operador. */
+export function envAllowList(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  const out = new Set<string>();
+  for (const raw of String(env.FORGE_CLI_ENV_ALLOW ?? '').split(/[,;:]/)) {
+    const name = raw.trim().toUpperCase();
+    if (/^[A-Z_][A-Z0-9_]*$/.test(name)) out.add(name);
   }
+  return out;
+}
+
+export interface ChildEnvOptions {
+  /** Nomes exatos force-admitidos (checados ANTES do deny de credencial). */
+  readonly allow?: readonly string[];
+  /** Prefixos force-admitidos (checados ANTES do deny de credencial). */
+  readonly allowPrefixes?: readonly string[];
+  /** Fonte — default `process.env` (injetável em testes). */
+  readonly base?: NodeJS.ProcessEnv;
+}
+
+/**
+ * Monta o env de um subprocesso: allowlist de toolchain/OS + regras
+ * explícitas do caller + `FORGE_CLI_ENV_ALLOW`, com deny-first para
+ * nomes credential-shaped. `GIT_TERMINAL_PROMPT=0` é injetado sempre —
+ * o CLI é não-interativo por desenho; um prompt de credencial git é um
+ * hang garantido, não uma feature.
+ */
+export function childEnv(opts: ChildEnvOptions = {}): NodeJS.ProcessEnv {
+  const allow = envAllowList(opts.base ?? process.env);
+  for (const n of opts.allow ?? []) {
+    const name = n.trim().toUpperCase();
+    if (name) allow.add(name);
+  }
+  const allowPrefixes = (opts.allowPrefixes ?? []).map((p) => p.toUpperCase());
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(opts.base ?? process.env)) {
+    if (value === undefined) continue;
+    const upper = key.toUpperCase();
+    if (allow.has(upper) || allowPrefixes.some((p) => upper.startsWith(p))) {
+      env[key] = value;
+      continue;
+    }
+    if (CREDENTIAL_ENV_RE.test(upper)) continue;
+    if (SAFE_ENV_NAMES.has(upper) || SAFE_ENV_PREFIXES.some((p) => upper.startsWith(p))) {
+      env[key] = value;
+    }
+  }
+  env.GIT_TERMINAL_PROMPT = '0';
+  return env;
+}
+
+/** Filho `git`: GIT_* + SSH_* re-admitidos (SSH_AUTH_SOCK para git@…). */
+const GIT_CHILD_ENV: ChildEnvOptions = {
+  allowPrefixes: ['GIT_', 'SSH_'],
+};
+
+/** `git`, `git.exe`, `C:\…\git.exe` → mesmo comando (win32 usa path). */
+function isGitCommand(command: string): boolean {
+  return /^(?:.*[\\/])?git(?:\.(?:exe|cmd|bat))?$/i.test(command.trim());
+}
+
+function normalizeWinPath(env: NodeJS.ProcessEnv): void {
+  const winPath = env.Path ?? env.PATH;
+  delete env.PATH;
+  delete env.Path;
+  if (winPath) env.Path = winPath;
+}
+
+/**
+ * Env completo de um subprocesso genérico — substitui o antigo
+ * `{...process.env}`: use com `extendEnv: false` no execa para que o
+ * ambiente ambiente NÃO vaze de volta por cima do scrub.
+ */
+export function portableEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env = { ...childEnv(), ...extra };
+  if (process.platform === 'win32') normalizeWinPath(env);
   return env;
 }
 
@@ -33,17 +185,34 @@ export function gitExecutable(): string {
   return 'git';
 }
 
+/**
+ * Env completo para `command` — `git` recebe prefixos GIT_ e SSH_ a
+ * mais; o resto segue a allowlist comum. Sempre `extendEnv: false`.
+ */
 export function commandEnv(command: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const env = portableEnv(extra);
-  if (process.platform === 'win32' && command.toLowerCase() === 'git') {
-    const git = gitExecutable();
-    if (path.isAbsolute(git)) {
-      const current = env.Path ?? '';
-      env.Path = `${path.dirname(git)}${path.delimiter}${current}`;
+  const git = isGitCommand(command);
+  const env = { ...childEnv(git ? GIT_CHILD_ENV : undefined), ...extra };
+  if (process.platform === 'win32') {
+    normalizeWinPath(env);
+    if (git) {
+      const exe = gitExecutable();
+      if (path.isAbsolute(exe)) {
+        const current = env.Path ?? '';
+        env.Path = `${path.dirname(exe)}${path.delimiter}${current}`;
+      }
     }
   }
   return env;
 }
+
+/** Git nunca pode pedir credencial no TTY — prompt = hang. */
+export const GIT_NO_PROMPT: NodeJS.ProcessEnv = { GIT_TERMINAL_PROMPT: '0' };
+
+/** Tetos das operações git de rede — remoto pendurado não pode travar
+ * clone/pull para sempre (o fetch já era bounded via NO_PROMPT). */
+export const GIT_FETCH_TIMEOUT_MS = 120_000;
+export const GIT_PULL_TIMEOUT_MS = 300_000;
+export const GIT_CLONE_TIMEOUT_MS = 600_000;
 
 function executable(command: string): string {
   return command.toLowerCase() === 'git' ? gitExecutable() : command;
@@ -331,6 +500,7 @@ export async function commandWorks(
       reject: false,
       timeout: opts.timeoutMs ?? probeTimeoutMs(),
       env: commandEnv(command),
+      extendEnv: false,
     });
     return result.exitCode === 0;
   } catch {
@@ -362,6 +532,7 @@ export async function commandOutput(
       reject: false,
       timeout: opts.timeoutMs ?? probeTimeoutMs(),
       env: commandEnv(command),
+      extendEnv: false,
     });
     if (result.exitCode !== 0) return null;
     return (result.stdout || result.stderr || '').trim() || 'ok';
@@ -391,6 +562,7 @@ export async function commandProbe(
       reject: false,
       timeout: timeoutMs,
       env: commandEnv(command),
+      extendEnv: false,
     });
     if (result.timedOut) return { output: null, timedOut: true };
     if (result.exitCode !== 0) return { output: null, timedOut: false };
@@ -405,6 +577,7 @@ export async function isGitDirty(repoDir: string): Promise<boolean> {
     const { stdout } = await execa(gitExecutable(), ['status', '--porcelain'], {
       cwd: repoDir,
       env: commandEnv('git'),
+      extendEnv: false,
     });
     return stdout.trim().length > 0;
   } catch {
@@ -478,12 +651,19 @@ export async function syncRepo(
       await execa(gitExecutable(), ['fetch', '--quiet', '--tags'], {
         cwd: repoDir,
         reject: false,
-        env: commandEnv('git', { GIT_TERMINAL_PROMPT: '0' }),
+        timeout: GIT_FETCH_TIMEOUT_MS,
+        env: commandEnv('git', GIT_NO_PROMPT),
+        extendEnv: false,
       });
       return { kind: 'fixed-ref', dirty };
     }
     try {
-      await execa(gitExecutable(), ['pull', '--ff-only'], { cwd: repoDir, env: commandEnv('git') });
+      await execa(gitExecutable(), ['pull', '--ff-only'], {
+        cwd: repoDir,
+        timeout: GIT_PULL_TIMEOUT_MS,
+        env: commandEnv('git', GIT_NO_PROMPT),
+        extendEnv: false,
+      });
       return { kind: 'pulled', dirty };
     } catch (error) {
       return { kind: 'pull-failed', dirty, failure: classifyGitFailure(errorDetail(error)) };
@@ -491,7 +671,11 @@ export async function syncRepo(
   }
   if (opts.offline) throw new Error(`modo offline: ${repo.name} não está clonada localmente`);
   const cloneArgs = opts.shallow ? ['clone', '--depth', '1'] : ['clone'];
-  await execa(gitExecutable(), [...cloneArgs, '--', repo.url, repoDir], { env: commandEnv('git') });
+  await execa(gitExecutable(), [...cloneArgs, '--', repo.url, repoDir], {
+    timeout: GIT_CLONE_TIMEOUT_MS,
+    env: commandEnv('git', GIT_NO_PROMPT),
+    extendEnv: false,
+  });
   return { kind: 'cloned', dirty: false };
 }
 
@@ -508,6 +692,7 @@ export async function runStreamed(
     buffer: false,
     timeout: timeoutMs,
     env: commandEnv(bin),
+    extendEnv: false,
   });
   for await (const line of sub.iterable({ from: 'all' })) {
     onLine?.(redactSecrets(line));
