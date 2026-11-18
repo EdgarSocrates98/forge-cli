@@ -10,7 +10,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['theforge', '--help'],
     nativeInstall: {
       command: ['theforge', 'install', 'apply'],
-      flags: ['scope', 'profile', 'components', 'host'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: {
         update: ['theforge', 'install', 'update'],
         uninstall: ['theforge', 'install', 'uninstall'],
@@ -27,7 +27,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-aws', '--help'],
     nativeInstall: {
       command: ['sparkforge-aws', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: { update: ['sparkforge-aws', 'update'], uninstall: ['sparkforge-aws', 'uninstall'] },
     },
     nextSteps: ['sparkforge-aws install'],
@@ -41,7 +41,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['sparkforge-azure', '--help'],
     nativeInstall: {
       command: ['sparkforge-azure', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: {
         update: ['sparkforge-azure', 'install', 'update'],
         uninstall: ['sparkforge-azure', 'install', 'uninstall'],
@@ -58,7 +58,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['platformforge', '--help'],
     nativeInstall: {
       command: ['platformforge', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: { update: ['platformforge', 'upgrade'], uninstall: ['platformforge', 'uninstall'] },
     },
     nextSteps: ['platformforge doctor', 'platformforge init --repo .'],
@@ -72,7 +72,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['apiforge', '--help'],
     nativeInstall: {
       command: ['apiforge', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: {
         update: ['apiforge', 'install', 'update'],
         uninstall: ['apiforge', 'install', 'uninstall'],
@@ -91,11 +91,13 @@ export const FORGE_REPOS: ForgeRepo[] = [
     kind: 'python',
     verify: ['api-sentinel', '--help'],
     // O `install` é init de workspace (profile local|aws|opentelemetry,
-    // scope project|user). components/host/gateway-profile não se aplicam —
-    // flags não suportadas caem em `ignored` (degradação honesta).
+    // scope project|user). O forge.json declara também host/components/
+    // gateway-profile/root/purge — o catálogo espelha o manifesto
+    // (drift-guard em tests/catalog-drift.test.ts); o que a Forja não
+    // consumir, ela mesma trata.
     nativeInstall: {
       command: ['api-sentinel', 'install'],
-      flags: ['scope', 'profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'purge'],
       ops: {
         update: ['api-sentinel', 'update'],
         uninstall: ['api-sentinel', 'uninstall'],
@@ -116,7 +118,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-api', '--help'],
     nativeInstall: {
       command: ['{python}', 'scripts/forge_install.py', 'install'],
-      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: {
         update: ['{python}', 'scripts/forge_install.py', 'update'],
         uninstall: ['{python}', 'scripts/forge_install.py', 'uninstall'],
@@ -133,7 +135,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-doctor-data', '--help'],
     nativeInstall: {
       command: ['forge-doctor-data', 'install'],
-      flags: ['scope', 'profile', 'components', 'gateway-profile'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'to', 'repo', 'purge'],
       ops: {
         update: ['forge-doctor-data', 'install', 'update'],
         uninstall: ['forge-doctor-data', 'install', 'uninstall'],
@@ -161,7 +163,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['data-sentinel', '--help'],
     nativeInstall: {
       command: ['data-sentinel', 'install'],
-      flags: ['scope', 'profile', 'components', 'host'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'purge'],
       ops: {
         update: ['data-sentinel', 'install', 'update'],
         uninstall: ['data-sentinel', 'install', 'uninstall'],
@@ -178,7 +180,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-lens', '--help'],
     nativeInstall: {
       command: ['forge-lens', 'install'],
-      flags: ['scope', 'profile', 'components', 'host'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root'],
       ops: {
         update: ['forge-lens', 'install', 'update'],
         uninstall: ['forge-lens', 'install', 'uninstall'],
@@ -195,7 +197,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['code-atlas', '--help'],
     nativeInstall: {
       command: ['code-atlas', 'install'],
-      flags: ['scope', 'profile', 'components'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'purge'],
       ops: {
         update: ['code-atlas', 'install'],
         uninstall: ['code-atlas', 'install', 'uninstall'],
@@ -212,7 +214,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['productforge', '--help'],
     nativeInstall: {
       command: ['productforge', 'install'],
-      flags: ['scope', 'profile', 'components', 'host'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root', 'purge'],
       ops: {
         update: ['productforge', 'update'],
         uninstall: ['productforge', 'uninstall'],
@@ -229,7 +231,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
     verify: ['forge-bridge', '--help'],
     nativeInstall: {
       command: ['forge-bridge', 'install'],
-      flags: ['scope', 'profile', 'components', 'host'],
+      flags: ['scope', 'profile', 'components', 'host', 'gateway-profile', 'root'],
       ops: {
         update: ['forge-bridge', 'install', 'update'],
         uninstall: ['forge-bridge', 'uninstall'],

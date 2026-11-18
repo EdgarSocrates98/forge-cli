@@ -17,6 +17,7 @@ import { scanWorkspace } from '../adaptive/workspace.js';
 import { buildFederatedMatrix } from '../adaptive/federation.js';
 import type { WorkspaceInventory } from '../adaptive/contracts.js';
 import { buildNativeInstall } from '../native-install.js';
+import { delegationVerdict, findChildReceipt } from '../child-receipt.js';
 import { catalogFor, reposByNames } from './shared.js';
 import type { ForgeRepo } from '../types.js';
 import { icons, theme } from '../ui/theme.js';
@@ -252,6 +253,9 @@ async function workspaceInstallOne(
     components: cli.components,
     host: cli.host,
     gatewayProfile: cli.gatewayProfile,
+    // cwd E --root apontam para a raiz do workspace: o alvo é explícito,
+    // nunca um ascendente que o instalador resolvesse sozinho (wave-14).
+    root,
     approve: cli.yes,
   });
   if (!built) {
@@ -290,10 +294,22 @@ async function workspaceInstallOne(
     );
     return 0;
   }
+  // Linhas `{…}` do stdout do filho são guardadas — o receipt
+  // forge/InstallReceipt/v1 pode vir emitido no terminal.
+  const stdoutLines: string[] = [];
+  const startedAt = Date.now();
   try {
     // cwd = raiz do workspace: o installkit resolve scope=workspace a
     // partir daí (state root `.forge/` ascendente mais próximo).
-    await runStreamed(argv, root, (line) => log.info(theme.dim(line)), cli.timeoutSecs * 1000);
+    await runStreamed(
+      argv,
+      root,
+      (line) => {
+        log.info(theme.dim(line));
+        if (line.trim().startsWith('{')) stdoutLines.push(line.trim());
+      },
+      cli.timeoutSecs * 1000,
+    );
   } catch (error) {
     const detail = errorDetail(error);
     emit(
@@ -304,13 +320,47 @@ async function workspaceInstallOne(
     );
     return 1;
   }
+  // Exit 0 não é prova: `applied` exige o receipt filho com
+  // verification=PASS (stdout ou `.<state>/receipts` sob a raiz).
+  const found = findChildReceipt({
+    forgeId: repo.name,
+    operation: 'install',
+    roots: [root],
+    sinceMs: startedAt,
+    stdout: stdoutLines.join('\n'),
+  });
+  const verdict = delegationVerdict(0, found);
+  if (verdict === 'applied') {
+    emit(
+      cli,
+      {
+        plan,
+        receipt: receiptForPlan(plan, 'applied'),
+        argv,
+        ignored: built.ignored,
+        childReceipt: found!.ref,
+      },
+      `Host-assets de ${repo.name} instalados no workspace (scope=workspace).\nexecutado: ${argv.join(' ')}\nreceipt: ${found!.ref}`,
+      'Workspace install',
+    );
+    return 0;
+  }
   emit(
     cli,
-    { plan, receipt: receiptForPlan(plan, 'applied'), argv, ignored: built.ignored },
-    `Host-assets de ${repo.name} instalados no workspace (scope=workspace).\nexecutado: ${argv.join(' ')}`,
+    {
+      plan,
+      receipt: receiptForPlan(plan, 'unverified'),
+      argv,
+      ignored: built.ignored,
+      ...(found ? { childReceipt: found.ref } : {}),
+    },
+    `Instalador nativo de ${repo.name} rodou sem erro, mas o receipt\n` +
+      `forge/InstallReceipt/v1 com verification=PASS não foi encontrado —\n` +
+      `estado: unverified (não aplicado). executado: ${argv.join(' ')}` +
+      (found ? `\nreceipt encontrado sem PASS: ${found.ref}` : ''),
     'Workspace install',
   );
-  return 0;
+  return 1;
 }
 
 export async function runPackCommand(cli: CliOptions, args: string[]): Promise<number> {

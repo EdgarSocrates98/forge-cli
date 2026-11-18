@@ -121,6 +121,14 @@ export interface RegistryInstallReceipt {
     exitCode?: number;
     skipped?: string;
     ignored?: string[];
+    /**
+     * Veredito honesto da delegação — `applied` EXIGE o receipt
+     * `forge/InstallReceipt/v1` do filho com verification=PASS; exit 0
+     * sem receipt é `unverified`, nunca `applied` (wave-14, P0-2).
+     */
+    verdict?: 'applied' | 'unverified' | 'failed';
+    /** Onde o receipt do filho foi encontrado — path ou 'stdout'. */
+    receiptRef?: string;
   };
   /** Instalação offline travada — arquivo do lock + fecho verificado. */
   offlineLock?: { file: string; artifacts: number };

@@ -272,7 +272,7 @@ export async function processRepo(
   };
 
   if (nativeRequested && opts.native) {
-    const built = buildNativeInstall(repo, opts.native);
+    const built = buildNativeInstall(repo, { ...opts.native, root: targetDir });
     if (!built) {
       status = 'warning';
       notes.push(S.nativeUnsupported);
@@ -283,7 +283,9 @@ export async function processRepo(
   }
 
   if (opts.nativeUpdate) {
-    const op = buildNativeOp(repo, 'update', opts.native?.approve === true);
+    const op = buildNativeOp(repo, 'update', opts.native?.approve === true, {
+      root: targetDir,
+    });
     if (!op) {
       status = 'warning';
       notes.push(S.nativeUnsupported);

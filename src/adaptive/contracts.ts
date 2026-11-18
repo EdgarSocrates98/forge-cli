@@ -106,8 +106,17 @@ export interface WorkspaceOperationReceipt {
   operation: WorkspaceOperationPlan['operation'];
   target: string;
   plan_sha256: string;
-  status: 'planned' | 'applied' | 'blocked' | 'failed';
+  /**
+   * `unverified` = o processo rodou limpo mas o receipt filho
+   * `forge/InstallReceipt/v1` com verification=PASS não foi encontrado —
+   * estado honesto, nunca promovido a `applied` por exit code (wave-14).
+   */
+  status: 'planned' | 'applied' | 'unverified' | 'blocked' | 'failed';
   created_at: string;
   completed_at: string | null;
-  actions: { id: string; status: 'skipped' | 'applied' | 'blocked' | 'failed'; detail: string }[];
+  actions: {
+    id: string;
+    status: 'skipped' | 'applied' | 'unverified' | 'blocked' | 'failed';
+    detail: string;
+  }[];
 }
