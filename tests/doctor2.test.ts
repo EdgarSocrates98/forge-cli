@@ -540,6 +540,19 @@ describe('wave-02 — saúde por runtime e contrato do ledger', () => {
     expect(c.evidence.join(' ')).toContain('resto-de-crash');
   });
 
+  it('state.json.corrupt (quarentena) e lock não são órfãos', async () => {
+    const dir = tmp();
+    const home = tmp();
+    seedRuntime(home, 'api-forge');
+    writeFileSync(path.join(home, '.forge-cli', 'forges', 'state.json.corrupt'), '{');
+    mkdirSync(path.join(home, '.forge-cli', 'forges', '.forge-lifecycle.lock'), {
+      recursive: true,
+    });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.orphans')!;
+    expect(c.result).toBe('pass');
+  });
+
   it('manifest com python.executable dentro da venv → ledger check passa', async () => {
     const dir = tmp();
     const home = tmp();

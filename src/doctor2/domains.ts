@@ -647,8 +647,10 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
   const forgeDirs = listDir(forgesRoot(ctx.home));
   if (forgeDirs !== null) {
     const known = new Set(runtimeEntries.map(([n]) => n));
-    const infrastructure = new Set(['state.json', '.forge-lifecycle.lock']);
-    const orphans = forgeDirs.filter((d) => !infrastructure.has(d) && !known.has(d));
+    // Infra do próprio ledger: state, sua quarentena (.corrupt) e o
+    // lifecycle lock — nenhum é "resto de instalação".
+    const isInfra = (d: string) => d.startsWith('state.json') || d === '.forge-lifecycle.lock';
+    const orphans = forgeDirs.filter((d) => !isInfra(d) && !known.has(d));
     if (orphans.length || runtimeEntries.length) {
       checks.push(
         mkCheck(ctx.now, {
