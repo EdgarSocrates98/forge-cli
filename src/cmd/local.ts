@@ -24,6 +24,7 @@ import {
 } from '../source/install.js';
 import { windowsSetupShells } from '../env/shells.js';
 import { discoverPythons } from '../env/python.js';
+import { S } from '../ui/strings.js';
 import { icons, theme } from '../ui/theme.js';
 import { cliHome } from '../utils/system.js';
 import { emitJson } from './shared.js';
@@ -238,6 +239,9 @@ export async function runLocalInstallCommand(cli: CliOptions, dirs: string[]): P
   if (quiet(cli)) emitJson(doc, failures ? 1 : refusals ? 2 : 0);
   if (results.some((r) => r.ok)) {
     outro(`${icons.ok} instalação de fonte local concluída`);
+    // Onboarding (§7.1): o runtime local foi adquirido — ativar
+    // capacidades num workspace é papel do theforge, não deste CLI.
+    note(S.runtimeVsWorkspaceNote, S.runtimeVsWorkspaceTitle);
   }
   if (failures) process.exit(1);
   if (refusals) process.exit(2);

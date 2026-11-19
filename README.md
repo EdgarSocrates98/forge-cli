@@ -150,9 +150,23 @@ recusado antes de qualquer mutação.
 - Receipts em `install.json`/`state.json`: dist, versão, interpretador,
   digests sha256 e verify — o artefato da dist é conferido byte a byte
   após o download.
+- **Instalação existente é detectada, não refeita**: venv + receipt +
+  state coerentes fazem `install` sair como `skipped` (já instalado);
+  estado divergente (crash/interrupção) sai como `incomplete` com o
+  reparo nomeado (`--clean` ou `uninstall`), nunca como saudável.
+- Launchers: `install` emite shim em `~/.forge-cli/bin/` (POSIX `sh`,
+  Windows `<cli>.cmd`) apontando para o binário **dentro da venv** —
+  mesma convenção que o manifest `forge/InstallationManifest/v1` usa
+  para `<FORGE>_PYTHON`/`python.executable` (o guard de regressão é
+  um check do `forge-cli doctor`).
 - `--offline` resolve do cache local (metadados em
   `~/.forge-cli/cache/pypi/`, wheels em `cache/wheels/<dist>/`);
-  artefato ausente = recusa honesta, nunca instalação fingida.
+  artefato ausente = recusa honesta, nunca instalação fingida. Com o
+  cache preparado (metadados + wheels), a instalação offline é
+  verificável: zero chamadas de rede e pip isolado por
+  `--no-index --find-links` — invariante coberto por teste com
+  sentinel de rede. `registry lock <f>` + `--offline --lock` trava o
+  fecho transitivo por sha256.
 - Releases yanked (PEP 592) são puladas na escolha automática; só
   instalam por pin explícito e ficam marcadas no receipt.
 - `uninstall --method registry` remove venv + receipt com plano e

@@ -17,11 +17,35 @@ import type { HostDetection } from '../hosts/types.js';
 import { checkEnvLock, interruptedRuns, type EnvLock } from '../maintenance.js';
 import { classifyIntegrationsSync } from '../integrations.js';
 import { loadContextStates } from '../context-registry.js';
-import { loadForgeState, type LocalInstallReceipt } from '../registry/install.js';
+import {
+  forgeVenv,
+  forgesRoot,
+  installConsistency,
+  loadForgeState,
+  venvBin,
+  type LocalInstallReceipt,
+} from '../registry/install.js';
 import { resolveInside } from '../safety.js';
 import { hasGitRepo } from '../utils/system.js';
 import { boundEntries, errMsg, listDir, mkCheck, readJson, type DoctorCtx } from './context.js';
 import type { CheckResult, DoctorCheck, Severity } from './model.js';
+
+/** Manifests do ledger (`forge/InstallationManifest/v1`) são pequenos — cap defensivo de leitura. */
+const MANIFEST_MAX_BYTES = 256 * 1024;
+
+/** `target` contido estritamente em `dir` (lexical — não resolve symlinks). */
+function insideDir(dir: string, target: string): boolean {
+  const rel = path.relative(path.resolve(dir), path.resolve(target));
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/** Prefixo de `<FORGE>_PYTHON`/`_CLI` — mesma regra de install/providers.py (`re.sub("[^A-Z0-9]+","_",id.upper()).strip("_")`). */
+function envPrefix(forgeId: string): string {
+  return forgeId
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
 
 // ---------------------------------------------------------------------------
 // 1. system — runtime, platform, workspace access, required dirs, offline note
@@ -539,6 +563,229 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
         reversible: missing.length ? false : null,
       }),
     );
+  }
+
+  // wave-02 — saúde por runtime: um check por Forja registrada cobre a
+  // matriz venv + receipt + launcher(bin) + shim; diretórios órfãos em
+  // ~/.forge-cli/forges viram um check separado. Divergência nunca vira
+  // 'pass' — 'warn' acionável com o reparo nomeado (saúde não fabricada).
+  const runtimeEntries = Object.entries(loadForgeState(ctx.home).forges).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
+  for (const [name, entry] of runtimeEntries) {
+    const evidence = [`method=${entry.method}`, `version=${entry.version}`];
+    const problems: string[] = [];
+    const consistency = installConsistency(ctx.home, name);
+    evidence.push(`consistency=${consistency.status}`);
+    if (!consistency.ok && consistency.status !== 'not-installed') {
+      problems.push(consistency.detail);
+    }
+    const venv =
+      typeof entry.venv === 'string' && entry.venv ? entry.venv : forgeVenv(ctx.home, name);
+    const bin = typeof entry.bin === 'string' && entry.bin ? entry.bin : null;
+    if (bin) {
+      if (!existsSync(bin)) {
+        problems.push(`launcher ausente: ${bin}`);
+        evidence.push(`bin=${bin} AUSENTE`);
+      } else if (entry.method === 'pypi' && !insideDir(venvBin(venv), bin)) {
+        // Contrato wave-01: o launcher exportado mora DENTRO da venv —
+        // bin apontando para interpretador-base quebra o isolamento e
+        // propaga ao manifest (`<FORGE>_PYTHON` → venv launcher).
+        problems.push(`launcher fora da venv: ${bin} ∉ ${venvBin(venv)}`);
+        evidence.push(`bin=${bin} fora da venv`);
+      } else {
+        evidence.push(`bin=${bin} presente`);
+      }
+    } else {
+      // `bin` é obrigatório no receipt pypi — ausência = receipt truncado
+      // (escrita interrompida), não "runtime sem launcher".
+      if (entry.method === 'pypi') {
+        problems.push('receipt pypi sem launcher registrado (campo bin ausente)');
+      }
+      evidence.push('bin=não registrado no receipt');
+    }
+    const shim = typeof entry.shim === 'string' && entry.shim ? entry.shim : null;
+    if (shim) {
+      if (!existsSync(shim)) {
+        problems.push(`shim registrado ausente: ${shim}`);
+        evidence.push(`shim=${shim} AUSENTE`);
+      } else {
+        evidence.push(`shim=${shim} presente`);
+      }
+    } else {
+      evidence.push(
+        typeof entry.shimRefused === 'string' && entry.shimRefused
+          ? `shim=recusado (${entry.shimRefused})`
+          : 'shim=não emitido',
+      );
+    }
+    checks.push(
+      mkCheck(ctx.now, {
+        id: `installation.runtime.${name}`,
+        domain: 'installation',
+        result: problems.length ? 'warn' : 'pass',
+        severity: problems.length ? 'medium' : 'info',
+        diagnosis: problems.length
+          ? `${name}: runtime inconsistente — ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1})` : ''}`
+          : `${name}: venv + receipt + launcher íntegros`,
+        evidence: boundEntries(ctx, evidence).shown,
+        ...(problems.length
+          ? {
+              correctiveAction:
+                'reinstall --method registry --clean ou uninstall --method registry',
+            }
+          : {}),
+        reversible: problems.length ? false : null,
+      }),
+    );
+  }
+
+  // Órfãos: qualquer entrada em ~/.forge-cli/forges que não seja state,
+  // lock de lifecycle ou Forja registrada é resto de instalação
+  // interrompida — installConsistency só a denuncia quando consultada,
+  // então a varredura precisa acontecer aqui.
+  const forgeDirs = listDir(forgesRoot(ctx.home));
+  if (forgeDirs !== null) {
+    const known = new Set(runtimeEntries.map(([n]) => n));
+    // Infra do próprio ledger: state, sua quarentena (.corrupt) e o
+    // lifecycle lock — nenhum é "resto de instalação".
+    const isInfra = (d: string) => d.startsWith('state.json') || d === '.forge-lifecycle.lock';
+    const orphans = forgeDirs.filter((d) => !isInfra(d) && !known.has(d));
+    if (orphans.length || runtimeEntries.length) {
+      checks.push(
+        mkCheck(ctx.now, {
+          id: 'installation.runtime.orphans',
+          domain: 'installation',
+          result: orphans.length ? 'warn' : 'pass',
+          severity: orphans.length ? 'medium' : 'info',
+          diagnosis: orphans.length
+            ? `${orphans.length} diretório(s) órfão(s) em ${forgesRoot(ctx.home)}`
+            : 'nenhum diretório órfão sob ~/.forge-cli/forges',
+          evidence: boundEntries(
+            ctx,
+            orphans.length
+              ? orphans.map((d) => `${d}: presente sem registro no state`)
+              : [`runtimes registrados=${runtimeEntries.length}`],
+          ).shown,
+          ...(orphans.length
+            ? {
+                correctiveAction:
+                  'uninstall <forja> se o state estiver errado, ou remova o diretório manualmente se for resto confirmado',
+              }
+            : {}),
+          reversible: orphans.length ? false : null,
+        }),
+      );
+    }
+  }
+
+  // wave-02 — contrato wave-01 nos manifests do The Forge
+  // (~/.forge/installations/<forge_id>.json, `forge/InstallationManifest/v1`):
+  // com `venv` declarada, `python.executable` (e `<FORGE>_PYTHON` quando
+  // definido) devem apontar para o launcher DA VENV — nunca para o
+  // interpretador-base resolvido. O consumidor (install/providers.py)
+  // resolve <PREFIX>_PYTHON → python.executable → venv launcher.
+  if (ledgerNames !== null) {
+    for (const file of ledgerNames.filter((f) => f.endsWith('.json'))) {
+      const manifestPath = path.join(ledgerDir, file);
+      const id = `installation.ledger.${file.replace(/\.json$/, '')}`;
+      const size = (() => {
+        try {
+          return statSync(manifestPath).size;
+        } catch {
+          return -1;
+        }
+      })();
+      if (size < 0 || size > MANIFEST_MAX_BYTES) {
+        checks.push(
+          mkCheck(ctx.now, {
+            id,
+            domain: 'installation',
+            result: 'warn',
+            severity: 'low',
+            diagnosis:
+              size < 0
+                ? `${file}: manifest ilegível`
+                : `${file}: manifest grande demais para inspeção (${size}B > ${MANIFEST_MAX_BYTES}B)`,
+            evidence: [manifestPath],
+            reversible: null,
+          }),
+        );
+        continue;
+      }
+      const parsed = readJson(manifestPath);
+      if (!parsed.ok || !parsed.value || typeof parsed.value !== 'object') {
+        checks.push(
+          mkCheck(ctx.now, {
+            id,
+            domain: 'installation',
+            result: 'warn',
+            severity: 'medium',
+            diagnosis: `${file}: manifest inválido/corrompido`,
+            evidence: [manifestPath, parsed.ok ? 'não é objeto JSON' : parsed.error],
+            correctiveAction: 'reinstale a Forja pelo theforge para regenerar o manifest',
+            reversible: false,
+          }),
+        );
+        continue;
+      }
+      const m = parsed.value as Record<string, unknown>;
+      const forgeId = typeof m.forge_id === 'string' && m.forge_id ? m.forge_id : file;
+      const venv = typeof m.venv === 'string' && m.venv ? m.venv : null;
+      const prefix = envPrefix(forgeId);
+      const vars = (m.environment as Record<string, unknown> | undefined)?.variables;
+      const envPython =
+        vars && typeof vars === 'object'
+          ? (vars as Record<string, unknown>)[`${prefix}_PYTHON`]
+          : undefined;
+      const manifestPython = (m.python as Record<string, unknown> | undefined)?.executable;
+      const evidence = [`forge_id=${forgeId}`, `venv=${venv ?? 'não declarada'}`];
+      const problems: string[] = [];
+      if (venv) {
+        for (const [label, raw] of [
+          [`${prefix}_PYTHON`, envPython],
+          ['python.executable', manifestPython],
+        ] as const) {
+          if (typeof raw !== 'string' || !raw) continue;
+          if (!insideDir(venv, raw)) {
+            problems.push(`${label} fora da venv: ${raw} ∉ ${venv}`);
+            evidence.push(`${label}=${raw} FORA DA VENV`);
+          } else {
+            evidence.push(`${label}=${raw} dentro da venv`);
+          }
+        }
+      } else {
+        evidence.push('sem venv declarada — contrato de launcher não se aplica');
+      }
+      const cliShim = (m.cli as Record<string, unknown> | undefined)?.shim;
+      if (typeof cliShim === 'string' && cliShim && path.isAbsolute(cliShim)) {
+        if (!existsSync(cliShim)) {
+          problems.push(`cli.shim ausente: ${cliShim}`);
+          evidence.push(`cli.shim=${cliShim} AUSENTE`);
+        } else {
+          evidence.push(`cli.shim=${cliShim} presente`);
+        }
+      }
+      checks.push(
+        mkCheck(ctx.now, {
+          id,
+          domain: 'installation',
+          result: problems.length ? 'warn' : 'pass',
+          severity: problems.length ? 'medium' : 'info',
+          diagnosis: problems.length
+            ? `${file}: manifest viola o contrato do launcher — ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1})` : ''}`
+            : `${file}: manifest íntegro (python → venv)`,
+          evidence: boundEntries(ctx, evidence).shown,
+          ...(problems.length
+            ? {
+                correctiveAction:
+                  'reinstale a Forja (theforge) ou corrija o manifest — <FORGE>_PYTHON/python.executable devem apontar para o launcher da venv',
+              }
+            : {}),
+          reversible: problems.length ? false : null,
+        }),
+      );
+    }
   }
 
   const withCheckout = ctx.catalog.filter((r) => {
