@@ -8,7 +8,10 @@ let c: Colors = pc.isColorSupported ? pc : createColors(false);
 let colorEnabled = pc.isColorSupported;
 
 export function setColorEnabled(on: boolean): void {
-  c = on ? pc : createColors(false);
+  // `pc` é a instância detectada no import — quando o ambiente diz
+  // sem-cor, `pc` já é a variante desligada e reatribuí-la NÃO liga
+  // ANSI de volta. `set(true)` precisa de uma instância habilitada.
+  c = createColors(on);
   colorEnabled = on;
 }
 
