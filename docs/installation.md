@@ -279,7 +279,7 @@ aparecem como `adapter=ausente`/`capability=não declarada` em evidência
 | Operação     | Comando                            | Comportamento                                                                                                                               |
 | ------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Atualizar    | `forge-cli update <dir-mais-novo>` | reconcilia arquivos na fonte registrada (copia novos/alterados; remove só o que o receipt registrou e a fonte nova não traz)                |
-| Reparar      | `forge-cli reinstall <nome> --yes` | remove artefatos gerenciados registrados e re-executa o bootstrap no lugar (`--yes` fora de TTY; a fonte permanece)                        |
+| Reparar      | `forge-cli reinstall <nome> --yes` | remove artefatos gerenciados registrados e re-executa o bootstrap no lugar (`--yes` fora de TTY; a fonte permanece)                         |
 | Desinstalar  | `forge-cli uninstall <nome> --yes` | remove **só** `managed_artifacts` (com backup dos arquivos em `~/.forge-cli/backups/`); a fonte e os arquivos do usuário nunca são apagados |
 | Diagnosticar | `forge status` / `forge doctor`    | receipt local aparece como `install_method: local`; fonte ausente vira `drifted`, nunca erro                                                |
 
