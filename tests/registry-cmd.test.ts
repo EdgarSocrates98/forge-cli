@@ -17,6 +17,7 @@ import {
   forgeVenv,
   forgesRoot,
   loadForgeState,
+  receiptPath,
   saveForgeState,
   type RegistryInstallReceipt,
 } from '../src/registry/install.js';
@@ -401,5 +402,77 @@ describe('loadForgeState corrompido', () => {
     expect(existsSync(`${file}.corrupt`)).toBe(true);
     expect(readFileSync(`${file}.corrupt`, 'utf8')).toBe('{forges: !!!');
     expect(loadForgeState(tmp).forges).toEqual({});
+  });
+});
+
+describe('runRegistryInstall — instalação existente (wave-02)', () => {
+  const py = () => [{ exe: ['python3'], version: '3.12.4', parsed: parseVersion('3.12.4')! }];
+  const receiptFor = (name: string, dist: string): RegistryInstallReceipt => ({
+    forge: name,
+    method: 'pypi',
+    dist,
+    version: '0.1.0',
+    python: '3.12.4',
+    source: 'latest-stable',
+    venv: forgeVenv(tmp, name),
+    bin: path.join(forgeVenv(tmp, name), 'bin', dist),
+    installedAt: '2026-01-01T00:00:00Z',
+    verify: { command: [], ok: true },
+    files: [],
+  });
+
+  it('venv+receipt+state coerentes → skipped honesto, sem rede nem subprocesso', async () => {
+    const receipt = receiptFor('api-forge', 'apiforge-af');
+    mkdirSync(path.join(receipt.venv, 'bin'), { recursive: true });
+    writeFileSync(receipt.bin, '#!');
+    writeFileSync(receiptPath(tmp, 'api-forge'), JSON.stringify(receipt));
+    saveForgeState(tmp, { forges: { 'api-forge': receipt } });
+
+    const fetches: string[] = [];
+    const ran: string[][] = [];
+    const res = await runRegistryInstall(cli(), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: async (url) => {
+        fetches.push(String(url));
+        throw new Error(`network attempt on already-installed: ${url}`);
+      },
+      run: async (cmd, args) => {
+        ran.push([cmd, ...args]);
+        return { exitCode: 0 };
+      },
+      skipIntegrations: true,
+    });
+    // Detecção honesta: o pedido já está satisfeito → skipped com versão,
+    // nunca falha do lote e nunca "reinstalou" silenciosamente.
+    expect(res).toEqual([
+      expect.objectContaining({
+        forge: 'api-forge',
+        ok: true,
+        skipped: 'already-installed',
+        version: '0.1.0',
+      }),
+    ]);
+    expect(fetches).toHaveLength(0);
+    expect(ran).toHaveLength(0);
+    // state intacto — nada foi sobrescrito pela detecção
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.1.0');
+  });
+
+  it('instalação quebrada (state sem install.json) → falha com reparo, nunca skipped', async () => {
+    mkdirSync(forgeVenv(tmp, 'api-forge'), { recursive: true });
+    saveForgeState(tmp, { forges: { 'api-forge': receiptFor('api-forge', 'apiforge-af') } });
+    const res = await runRegistryInstall(cli(), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: async () => ({ status: 200, body: '{}' }),
+      run: async () => ({ exitCode: 0 }),
+      skipIntegrations: true,
+    });
+    expect(res[0].ok).toBe(false);
+    expect(res[0].skipped).toBeUndefined();
+    // 'incomplete' nomeia a divergência + o caminho de reparo (PROBLEM→ACTION)
+    expect(res[0].detail).toMatch(/install\.json/);
+    expect(res[0].detail).toMatch(/uninstall|reinstall/i);
   });
 });

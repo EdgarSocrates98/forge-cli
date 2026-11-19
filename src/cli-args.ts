@@ -215,7 +215,9 @@ const COMMAND_USAGE: Record<string, string> = {
   install:
     '\ninstall <forjas|<dir>> — PyPI+venv (default) ou git clone + setup (--method git).\n' +
     '  <dir> existente = fonte local (detecção forge/LocalForgeSourceDetection/v1;\n' +
-    '  sem git/clone/rede no caminho gitless). --plan só mostra; --ref fixa UMA Forja.',
+    '  sem git/clone/rede no caminho gitless). --plan só mostra; --ref fixa UMA Forja.\n' +
+    '  Instala o RUNTIME (venv+receipt+launcher) — já instalada sai "skipped";\n' +
+    '  ativar capacidades num workspace é `theforge install plan|apply`.',
   update:
     '\nupdate [forjas|<dir>] — pull + setup. --check só verifica; --method registry usa o receipt.\n' +
     '  <dir> é a fonte mais nova de uma fonte local (substituição de arquivos).\n' +

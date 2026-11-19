@@ -385,6 +385,13 @@ export const S = {
   integrationsOffer: 'Integrações opcionais — marque para instalar (nada entra sem sua seleção)',
   integrationNoInstallRoute:
     'sem dist no catálogo registry — instale via git (`--method git`) ou pelo método do repositório',
+  runtimeVsWorkspaceTitle: 'Runtime × workspace — papéis diferentes',
+  runtimeVsWorkspaceNote:
+    'O forge-cli instalou o RUNTIME (venv + receipt em ~/.forge-cli/forges,\n' +
+    'launcher em ~/.forge-cli/bin). Isso NÃO ativa capacidades num workspace.\n' +
+    'Quem ativa skills/agents/regras/MCP dentro de um projeto é o The Forge:\n' +
+    '  cd <seu-workspace> && theforge install plan|apply\n' +
+    '(ledger próprio em ~/.forge/installations — docs/forge-cli-vs-theforge.md)',
   usage: `forge-cli — instalador do ecossistema Forge
 
 Uso:
@@ -487,6 +494,9 @@ Extras:
   forge-cli.config.json no diretório alvo define padrões (only, timeout,
   json, shallow, jobs, ai) — flags explícitas sempre vencem o arquivo.
   Artefatos (logs, estado, relatórios) ficam em <dir>/.forge-cli/
+  Runtime × workspace: 'install' adquire o RUNTIME (venv+receipt); ativar
+  capacidades num workspace é 'theforge install plan|apply' — outro ledger
+  (~/.forge/installations). Guia: docs/forge-cli-vs-theforge.md
 `,
   askTitle: 'Inteligência Forge',
   intelBadDomain: 'Domínio desconhecido — use discovery|recommendation|repair',

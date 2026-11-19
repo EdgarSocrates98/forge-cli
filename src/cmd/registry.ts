@@ -173,6 +173,13 @@ export interface RegistryInstallResult {
   detail: string;
   native?: RegistryInstallReceipt['native'];
   version?: string;
+  /**
+   * Detecção honesta de instalação existente: venv+receipt+state
+   * coerentes → `'already-installed'` (skipped, nunca erro — o estado
+   * final já é o pedido). Instalação quebrada continua sendo falha
+   * ('incomplete') com o reparo nomeado.
+   */
+  skipped?: 'already-installed';
 }
 
 interface RegistryPlanItem {
@@ -547,6 +554,25 @@ export async function runRegistryInstall(
       run: deps.run,
     });
     if ('stage' in receipt) {
+      if (receipt.stage === 'already-installed') {
+        // venv+receipt+state coerentes: o pedido já está satisfeito —
+        // reporta `skipped` com o caminho do reparo, não falha do lote.
+        // Divergência (crash/interrupção) é 'incomplete' — erro abaixo.
+        const inst = loadForgeState(home).forges[name];
+        board?.done(name, 'já instalado');
+        boardLog(
+          log.info,
+          `${name}: ${theme.dim('já instalado — nada alterado (--clean reinstala)')}`,
+        );
+        results.push({
+          forge: name,
+          ok: true,
+          skipped: 'already-installed',
+          version: inst?.version,
+          detail: receipt.detail,
+        });
+        continue;
+      }
       board?.fail(name);
       boardLog(log.error, `${name}: ${theme.err('falhou')}`);
       results.push({ forge: name, ok: false, detail: describeInstallError(receipt) });
@@ -640,12 +666,23 @@ export async function runRegistryInstall(
   );
   const elapsed = ((Date.now() - installStartedAt) / 1000).toFixed(1);
   const okCount = results.filter((r) => r.ok).length;
+  const skippedCount = results.filter((r) => r.skipped).length;
   const summaryParts = [
     `${okCount}/${results.length} ${results.length === 1 ? 'forja' : 'forjas'}`,
     `${elapsed}s`,
+    ...(skippedCount
+      ? [`${skippedCount} já instalada${skippedCount === 1 ? '' : 's'} (skipped)`]
+      : []),
     ...(warnings.length ? [`${warnings.length} aviso(s)`] : []),
   ];
   outro(`${icons.ok} instalação registry-first concluída — ${theme.dim(summaryParts.join(' · '))}`);
+
+  // Onboarding (§7.1): runtime instalado ≠ capacidades ativadas — o
+  // usuário não deve ter que descobrir sozinho que o próximo passo é do
+  // theforge, não do forge-cli. Só quando algo instalável existiu.
+  if (!quiet && results.some((r) => r.ok)) {
+    note(S.runtimeVsWorkspaceNote, S.runtimeVsWorkspaceTitle);
+  }
 
   // Oferta checkbox-style: só em TTY interativo e sem --yes — consentimento
   // nunca é presumido. Nos demais modos a lista vira nota (opcional, informativa).
