@@ -80,6 +80,8 @@ import {
 import { runWizard } from './wizard.js';
 import { runPackCommand, runWorkspaceCommand } from './cmd/adaptive.js';
 
+// Comandos que emitem um documento JSON no stdout sob --json: o banner
+// nunca pode preceder o doc (purity contract — `status --json` e2e).
 const JSON_QUERY_COMMANDS = new Set([
   'status',
   'list',
@@ -100,7 +102,13 @@ const JSON_QUERY_COMMANDS = new Set([
   'predict',
   'context',
   'install',
+  'clone',
   'uninstall',
+  'reinstall',
+  'rollback',
+  'pin',
+  'unpin',
+  'self',
   'registry',
   'ai',
   'bundle',

@@ -109,7 +109,7 @@ com `incompleta` e o JSON carrega `consistency` com o motivo exato:
 Reparo documentado (as duas únicas portas de saída honestas):
 
 ```bash
-forge-cli reinstall --method registry <forja> --clean   # regrava tudo com backup da anterior
+forge-cli reinstall --method registry <forja> --clean --yes   # regrava tudo (--yes fora de TTY)
 forge-cli uninstall --method registry <forja>           # remove venv + state + receipt (inclui órfãs)
 ```
 

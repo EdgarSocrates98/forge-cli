@@ -26,7 +26,7 @@ export const FORGE_REPOS: ForgeRepo[] = [
         uninstall: ['theforge', 'install', 'uninstall'],
       },
     },
-    nextSteps: ['theforge install apply --yes', 'theforge doctor'],
+    nextSteps: ['theforge setup', 'theforge doctor'],
   },
   {
     name: 'spark-forge-aws',

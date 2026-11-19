@@ -410,7 +410,7 @@ describe('fault injection — lifecycle (update/rollback interrompidos)', () => 
   it('rollback interrompido (pip fail) → versão corrente restaurada', async () => {
     seed('0.2.0', { history: [{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }] });
     const codes = exitCodes();
-    await runRegistryRollback(cli(), ['api-forge'], {
+    await runRegistryRollback(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -430,7 +430,7 @@ describe('fault injection — lifecycle (update/rollback interrompidos)', () => 
     seed('0.1.0');
     const before = readFileSync(forgeStatePath(tmp), 'utf8');
     const codes = exitCodes();
-    await runRegistryRollback(cli(), ['api-forge'], {
+    await runRegistryRollback(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,

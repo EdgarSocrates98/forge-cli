@@ -16,7 +16,8 @@ de instalar.
 > **Fronteira de responsabilidades**: este guia cobre a **aquisição do
 > runtime** — venv, checkout, fonte local. Instalar uma Forja aqui **não
 > ativa** skills/agents/regras no seu workspace; a ativação é do
-> `theforge install plan|apply|auto` dentro do workspace. Detalhes e os
+> `theforge setup` na raiz do workspace (onboarding guiado — controle
+> fino: `theforge install plan|apply|auto`). Detalhes e os
 > dois ledgers independentes em
 > [forge-cli-vs-theforge.md](forge-cli-vs-theforge.md); modelo de ameaça
 > e confiança de fontes gitless em [threat-model.md](threat-model.md).
@@ -58,16 +59,21 @@ que satisfaz `requires_python`. Sem compatível, a instalação é recusada
   do lote e não toca disco nem rede (a checagem precede a resolução);
 - divergência (venv sem receipt, versões divergentes, venv ausente —
   resto de crash/interrupção) → erro `incomplete` **nomeando o
-  reparo**: `reinstall --method registry --clean` ou
+  reparo**: `reinstall --method registry --clean --yes` ou
   `uninstall --method registry`. Instalação quebrada nunca aparece
   como saudável — a mesma classificação
   (`ok`/`orphaned`/`missing-receipt`/`version-mismatch`/`missing-venv`…)
   aparece em `forge-cli registry` (`consistency`) e no `doctor`.
 
+`reinstall`/`rollback --method registry` regravam a venv inteira —
+mudança destrutiva que exige `--plan` explícito (só leitura) **mais**
+`--yes` fora de TTY ou confirmação no prompt; nunca silencioso.
+
 Ao final do install (registry **ou** fonte local) uma nota reforça a
 fronteira **runtime × workspace**: o que foi instalado é o runtime
 (venv + receipt + launcher); ativar capacidades num workspace é do
-`theforge install plan|apply` — outro ledger (`~/.forge/installations/`).
+`theforge setup` na raiz do workspace — outro ledger
+(`~/.forge/installations/`).
 
 ### Saúde por runtime — `forge-cli doctor`
 
@@ -86,8 +92,11 @@ para cada `~/.forge/installations/<id>.json` válido, o check
 `forge/InstallationManifest/v1` — com `venv` declarada,
 `python.executable` e `<FORGE>_PYTHON` (quando definido) devem
 apontar para o launcher **da venv**, nunca para o interpretador-base;
-`cli.shim` absoluto deve existir. É o guard de regressão da integração
-wave-01 — manifest violando sai `warn` com o reparo, não crash.
+`cli.shim` declarado deve ser **absoluto** e existir (relativo/ausente
+do disco quebra a resolução MCP — o theforge só honra shim absoluto,
+senão cai no fallback `sys.executable -m <pkg>` do interpretador
+errado). É o guard de regressão da integração wave-01 — manifest
+violando sai `warn` com o reparo, não crash.
 
 ## 2. Clone git — `install <nome>`
 
@@ -270,7 +279,7 @@ aparecem como `adapter=ausente`/`capability=não declarada` em evidência
 | Operação     | Comando                            | Comportamento                                                                                                                               |
 | ------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Atualizar    | `forge-cli update <dir-mais-novo>` | reconcilia arquivos na fonte registrada (copia novos/alterados; remove só o que o receipt registrou e a fonte nova não traz)                |
-| Reparar      | `forge-cli reinstall <nome>`       | remove artefatos gerenciados registrados e re-executa o bootstrap no lugar                                                                  |
+| Reparar      | `forge-cli reinstall <nome> --yes` | remove artefatos gerenciados registrados e re-executa o bootstrap no lugar (`--yes` fora de TTY; a fonte permanece)                         |
 | Desinstalar  | `forge-cli uninstall <nome> --yes` | remove **só** `managed_artifacts` (com backup dos arquivos em `~/.forge-cli/backups/`); a fonte e os arquivos do usuário nunca são apagados |
 | Diagnosticar | `forge status` / `forge doctor`    | receipt local aparece como `install_method: local`; fonte ausente vira `drifted`, nunca erro                                                |
 

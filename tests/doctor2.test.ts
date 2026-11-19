@@ -592,6 +592,57 @@ describe('wave-02 — saúde por runtime e contrato do ledger', () => {
     expect(c.correctiveAction).toBeTruthy();
   });
 
+  it('cli.shim relativo → warn: resolução MCP absoluta ignoraria o shim (cycle 16.1.1)', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const venv = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv');
+    writeJson(path.join(home, '.forge', 'installations', 'api-forge.json'), {
+      schema: 'forge/InstallationManifest/v1',
+      forge_id: 'api-forge',
+      venv,
+      python: { executable: path.join(venv, 'bin', 'python'), version: '3.12.4' },
+      // shim relativo: _installkit só honra cli.shim absoluto — cairia no
+      // fallback sys.executable -m <pkg> do interpretador errado.
+      cli: { name: 'apiforge', shim: 'bin/apiforge' },
+      environment: { variables: {} },
+    });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.ledger.api-forge')!;
+    expect(c.result).toBe('warn');
+    expect(c.evidence.join(' ')).toContain('NÃO ABSOLUTO');
+    expect(c.correctiveAction).toBeTruthy();
+  });
+
+  it('cli.shim absoluto ausente do disco → warn; ausente do manifest → pass (fallback declarado)', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const venv = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv');
+    writeJson(path.join(home, '.forge', 'installations', 'api-forge.json'), {
+      schema: 'forge/InstallationManifest/v1',
+      forge_id: 'api-forge',
+      venv,
+      python: { executable: path.join(venv, 'bin', 'python'), version: '3.12.4' },
+      cli: { name: 'apiforge', shim: path.join(home, '.forge-cli', 'bin', 'apiforge') },
+    });
+    let report = await runDoctor2(dir, baseOpts(dir, home));
+    let c = find(report, 'installation.ledger.api-forge')!;
+    expect(c.result).toBe('warn');
+    expect(c.evidence.join(' ')).toContain('cli.shim');
+    expect(c.evidence.join(' ')).toContain('AUSENTE');
+    // Sem cli.shim declarado: o fallback sys.executable -m <pkg> é do
+    // contrato — manifest íntegro, não warn fabricado.
+    writeJson(path.join(home, '.forge', 'installations', 'api-forge.json'), {
+      schema: 'forge/InstallationManifest/v1',
+      forge_id: 'api-forge',
+      venv,
+      python: { executable: path.join(venv, 'bin', 'python'), version: '3.12.4' },
+      cli: { name: 'apiforge' },
+    });
+    report = await runDoctor2(dir, baseOpts(dir, home));
+    c = find(report, 'installation.ledger.api-forge')!;
+    expect(c.result).toBe('pass');
+  });
+
   it('manifest corrompido → warn, nunca crash', async () => {
     const dir = tmp();
     const home = tmp();

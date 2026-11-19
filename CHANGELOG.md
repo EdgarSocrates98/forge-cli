@@ -61,6 +61,36 @@
 
 ### Fixed
 
+- `installation.ledger.<id>` no longer passes manifests whose declared
+  `cli.shim` is relative (cycle 16.1.1 wave-08): theforge's MCP resolver
+  only honors absolute shims — a relative value silently fell back to
+  `sys.executable -m <pkg>` on the wrong interpreter while doctor
+  reported `pass`. Non-absolute shims now `warn` with evidence and the
+  repair named; a declared shim missing from disk was already `warn`,
+  and an absent `cli.shim` remains `pass` (the declared fallback is
+  legal).
+- `reinstall --method registry` and `rollback --method registry` now
+  honor the destructive-change contract: both rewrite the managed venv
+  and previously ran without `--plan`/`--yes`/confirmation. They now
+  emit the plan, require `--yes` in non-interactive shells (clean
+  refusal, nothing mutated) or interactive confirmation, and `--json`
+  without `--yes` exits 2 with a pure-JSON refusal.
+- `reinstall <nome>` for local sources (ZIP/gitless repair) received the
+  same gate — managed artifacts are deleted and the bootstrap re-run
+  only after `--yes` or interactive confirmation; the source directory
+  is never touched.
+- `--json` stdout purity: `reinstall`, `rollback`, `pin`, `unpin`,
+  `clone` and `self` were missing from the banner-suppression command
+  set, so the ASCII banner preceded the JSON document on stdout. They
+  now emit JSON only.
+- Onboarding drift: post-install note, `install --help`, global usage
+  and `nextSteps` for the-forge now point at `theforge setup` (guided
+  wizard at the workspace root) instead of sending first-time users to
+  `theforge install plan|apply`, which remains documented as the
+  fine-control path.
+- Repair hints emitted by `installConsistency` and local-source repair
+  refusals now include `--yes` so the named corrective command works
+  verbatim in non-interactive shells.
 - `setColorEnabled(true)` now creates an enabled color instance
   instead of reusing the env-detected `picocolors` export — forcing
   colors on (as the UI tests do) no longer silently yields plain

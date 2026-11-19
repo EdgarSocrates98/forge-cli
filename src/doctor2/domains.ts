@@ -632,7 +632,7 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
         ...(problems.length
           ? {
               correctiveAction:
-                'reinstall --method registry --clean ou uninstall --method registry',
+                'reinstall --method registry --clean --yes ou uninstall --method registry',
             }
           : {}),
         reversible: problems.length ? false : null,
@@ -758,8 +758,16 @@ export function installationChecks(ctx: DoctorCtx): DoctorCheck[] {
         evidence.push('sem venv declarada — contrato de launcher não se aplica');
       }
       const cliShim = (m.cli as Record<string, unknown> | undefined)?.shim;
-      if (typeof cliShim === 'string' && cliShim && path.isAbsolute(cliShim)) {
-        if (!existsSync(cliShim)) {
+      if (cliShim !== undefined && cliShim !== null && cliShim !== '') {
+        // Contrato de resolução MCP absoluta (_installkit.mcp_argv_resolved):
+        // cli.shim só é usado quando é um caminho absoluto — valor relativo/
+        // não-string cai no fallback `sys.executable -m <pkg>` do interpretador
+        // errado. Ausência é legal (fallback declarado); presença inválida
+        // NUNCA é saúde — warn nomeado, não pass fabricado.
+        if (typeof cliShim !== 'string' || !path.isAbsolute(cliShim)) {
+          problems.push(`cli.shim não absoluto: ${JSON.stringify(cliShim)}`);
+          evidence.push(`cli.shim=${JSON.stringify(cliShim)} NÃO ABSOLUTO`);
+        } else if (!existsSync(cliShim)) {
           problems.push(`cli.shim ausente: ${cliShim}`);
           evidence.push(`cli.shim=${cliShim} AUSENTE`);
         } else {

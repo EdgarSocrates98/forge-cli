@@ -44,6 +44,8 @@ o que não foi re-verificado no código da Forja está marcado
   planeja; respeita pin), `reinstall` (mesma versão do receipt — reparo
   de drift), `rollback` (desempilha `history` do receipt; rollback de
   rollback funciona), `pin`/`unpin` (trava a versão instalada no state).
+  `reinstall`/`rollback` regravam a venv: exigem `--yes` fora de TTY
+  (ou confirmação no prompt); `--json` sem `--yes` recusa com exit 2.
   Tudo com o mesmo contrato: receipts atômicos, `--json`/`--report`,
   flags git ignoradas avisadas, nomes desconhecidos → exit 2, falhas → 1.
 - **hosts/MCP sem clone** — `forge-cli mcp <forja>` resolve o argv MCP
