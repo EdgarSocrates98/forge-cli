@@ -53,9 +53,16 @@ só marca `applied` quando o receipt do filho comprova.
 | `~/.forge-cli/forges/`    | forge-cli | runtimes: venv, wheel cache, versão, pin, receipt registry |
 | `~/.forge/installations/` | theforge  | ativações: o que o installkit aplicou em hosts/workspaces  |
 
-`forge-cli doctor` e `forge-cli status` leem o primeiro; `theforge
-install status`/`doctor` leem o segundo. Uma Forja presente nos dois
-está com runtime **e** ativação; presente só no primeiro = runtime
-instalado, nada ativado; só no segundo = ativação sem runtime gerenciado
-(repare: instale o runtime primeiro). Detalhes do formato em
+`forge-cli status` lê o primeiro; `theforge install status`/`doctor`
+leem o segundo. O `forge-cli doctor` reconcilia os dois **somente para
+leitura**: além da matriz venv/receipt/launcher/shim de cada runtime
+(`installation.runtime.<forja>` + `installation.runtime.orphans`), cada
+`~/.forge/installations/<id>.json` é verificado contra o contrato
+`forge/InstallationManifest/v1` — com `venv` declarada,
+`python.executable` e `<FORGE>_PYTHON` devem apontar para o launcher
+**da venv** (`installation.ledger.<id>`; escrita continua exclusiva do
+theforge). Uma Forja presente nos dois está com runtime **e** ativação;
+presente só no primeiro = runtime instalado, nada ativado; só no
+segundo = ativação sem runtime gerenciado (repare: instale o runtime
+primeiro). Detalhes do formato em
 `docs/registry-state-contract.md`.

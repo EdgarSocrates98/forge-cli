@@ -134,6 +134,35 @@ Regras do contrato de consistência:
 5. Escritas são atômicas (tmp + fsync + rename) e varrem `*.tmp`
    órfãos de runs mortos com SIGKILL.
 
+## Saúde por runtime e contrato do ledger (wave-02)
+
+Sobre a mesma classificação de consistência, `forge-cli doctor`
+(publicado como `forge/DoctorReport/v1`) expõe:
+
+- `installation.runtime.<forja>` — um check por entrada no state,
+  cobrindo `installConsistency` + `bin` presente no disco e **dentro
+  da venv** (receipts `pypi`) + `shim` registrado existente + campo
+  `bin` obrigatório em receipts `pypi`. Divergência sai `warn` com
+  `correctiveAction` (`reinstall --method registry --clean` /
+  `uninstall --method registry`) — nunca `pass`;
+- `installation.runtime.orphans` — qualquer entrada em
+  `~/.forge-cli/forges/` que não seja `state.json`, o lifecycle lock
+  ou uma Forja registrada (a varredura cobre o que
+  `installConsistency` só denunciaria por nome);
+- `installation.ledger.<id>` — para cada
+  `~/.forge/installations/<id>.json` (ledger do theforge, lido,
+  nunca escrito): manifest válido; com `venv` declarada,
+  `python.executable` e `environment.variables.<FORGE>_PYTHON`
+  (quando presentes) devem estar contidos na venv — o contrato
+  wave-01 de que `<FORGE>_PYTHON` resolve o **launcher da venv**,
+  não o interpretador-base; `cli.shim` absoluto deve existir.
+
+No verbo `install`, o mesmo portão de consistência produz
+`skipped: "already-installed"` no resultado (venv+receipt+state
+coerentes → nada alterado, sem rede nem subprocesso) ou o erro
+`incomplete` com o reparo nomeado — distinção testada em
+`tests/registry-cmd.test.ts` e `tests/doctor2.test.ts`.
+
 ## Lifecycle lock
 
 `~/.forge-cli/forges/.forge-lifecycle.lock` é um diretório criado com

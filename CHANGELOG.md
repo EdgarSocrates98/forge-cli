@@ -4,6 +4,28 @@
 
 ### Added
 
+- Runtime onboarding (cycle 16.1 wave-02): `install` now detects an
+  already-coherent install (venv + `install.json` + `state.json`) and
+  reports it as `skipped: "already-installed"` — never a batch failure,
+  never a silent reinstall, and the check runs before any network or
+  subprocess. Divergent state still fails as `incomplete` with the
+  repair named. Registry and local-source installs end with a
+  runtime-vs-workspace note (runtime acquired here; workspace
+  activation is `theforge install plan|apply`, a different ledger).
+- Doctor runtime-health matrix: `installation.runtime.<forja>` checks
+  consistency + `bin` on disk + `bin` inside the venv (pypi receipts) +
+  declared `shim` presence; `installation.runtime.orphans` sweeps
+  unregistered dirs under `~/.forge-cli/forges/`;
+  `installation.ledger.<id>` validates each
+  `~/.forge/installations/*.json` manifest against the wave-01
+  launcher contract (`python.executable`/`<FORGE>_PYTHON` inside the
+  declared venv, `cli.shim` alive) — read-only, never writes the
+  theforge ledger.
+- Zero-network offline-install guard: a test proves the prepared
+  offline path (metadata + wheels cached) issues no fetch, no
+  `pip download`, and runs pip under `--no-index --find-links`.
+  Help text documents the runtime×workspace boundary
+  (`S.runtimeVsWorkspaceNote`, `install --help`, global usage).
 - Root `forge.json` manifest (`forge/ForgeDescriptor/v1`) describing
   forge-cli as a control-tool / runtime-acquisition meta-installer —
   shipped in the npm package.
@@ -39,6 +61,10 @@
 
 ### Fixed
 
+- `setColorEnabled(true)` now creates an enabled color instance
+  instead of reusing the env-detected `picocolors` export — forcing
+  colors on (as the UI tests do) no longer silently yields plain
+  output in colorless environments.
 - Catalog/manifest drift: forge-doctor-api regained its documented
   `scripts/forge_install.py` native installer; forge-doctor-data and
   the wave-14 entries declare `host`/`gateway-profile` where the

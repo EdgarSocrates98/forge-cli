@@ -49,6 +49,46 @@ Cada Forja vai para `~/.forge-cli/forges/<nome>/` com
 que satisfaz `requires_python`. Sem compatível, a instalação é recusada
 (`FORGE-PYTHON-INCOMPATIBLE`) antes de qualquer mutação.
 
+### Detecção de instalação existente (wave-02)
+
+`install` sobre uma Forja já presente **nunca reinstala por cima**:
+
+- venv + `install.json` + `state.json` coerentes → o resultado sai como
+  **skipped** (`já instalado`), com a versão registrada — não é falha
+  do lote e não toca disco nem rede (a checagem precede a resolução);
+- divergência (venv sem receipt, versões divergentes, venv ausente —
+  resto de crash/interrupção) → erro `incomplete` **nomeando o
+  reparo**: `reinstall --method registry --clean` ou
+  `uninstall --method registry`. Instalação quebrada nunca aparece
+  como saudável — a mesma classificação
+  (`ok`/`orphaned`/`missing-receipt`/`version-mismatch`/`missing-venv`…)
+  aparece em `forge-cli registry` (`consistency`) e no `doctor`.
+
+Ao final do install (registry **ou** fonte local) uma nota reforça a
+fronteira **runtime × workspace**: o que foi instalado é o runtime
+(venv + receipt + launcher); ativar capacidades num workspace é do
+`theforge install plan|apply` — outro ledger (`~/.forge/installations/`).
+
+### Saúde por runtime — `forge-cli doctor`
+
+Um check `installation.runtime.<forja>` por Forja registrada cobre a
+matriz **venv + receipt + launcher + shim**: consistência
+(`installConsistency`), `bin` presente no disco e **dentro da venv**
+(receipts `pypi`), `shim` registrado existente, e o campo `bin`
+obrigatório em receipts `pypi`. Diretórios órfãos em
+`~/.forge-cli/forges/` (sem entrada no state) viram
+`installation.runtime.orphans`. Divergências saem `warn` com
+`correctiveAction` — nunca `pass`.
+
+O doctor também reconcilia o **segundo ledger** (somente leitura):
+para cada `~/.forge/installations/<id>.json` válido, o check
+`installation.ledger.<id>` verifica o contrato do manifest
+`forge/InstallationManifest/v1` — com `venv` declarada,
+`python.executable` e `<FORGE>_PYTHON` (quando definido) devem
+apontar para o launcher **da venv**, nunca para o interpretador-base;
+`cli.shim` absoluto deve existir. É o guard de regressão da integração
+wave-01 — manifest violando sai `warn` com o reparo, não crash.
+
 ## 2. Clone git — `install <nome>`
 
 ```bash
@@ -161,6 +201,15 @@ forge-cli install <dir>                                   # fonte local: zero re
 
 - `--offline` resolve do wheelhouse (`~/.forge-cli/cache/wheels/`) e
   metadados — artefato ausente = recusa honesta, nunca fingimento.
+- **Offline verificável (wave-02)**: com metadados + wheels já em
+  cache, o caminho preparado é provadamente sem rede — nenhum fetch é
+  emitido, nenhum `pip download` roda e o pip final fica isolado por
+  `--no-index --find-links <wheelhouse>` (o invariante é travado por
+  teste com sentinel de rede que falha em qualquer tentativa). A
+  mesma garantia vale no modo travado: `registry lock <forja>` gera
+  `<forja>.offline-lock.json` (fecho transitivo + sha256, online uma
+  vez) e `install --offline --lock <arquivo>` instala só o fecho
+  verificado — `--lock` sem `--offline` é recusado.
 - Nada de `sudo`/admin: alvos de escrita são os diretórios do usuário
   (`env paths` mostra `home`, `bin`, `venvs`, `receipts`…); alvo
   negado sai como `FORGE-INSTALL-PERMISSION-DENIED` com o fallback.
