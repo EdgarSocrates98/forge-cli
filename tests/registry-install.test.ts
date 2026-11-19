@@ -802,4 +802,83 @@ describe('launchers (~/.forge-cli/bin)', () => {
       expect.stringMatching(/cli\.cmd/),
     );
   });
+
+  it('shim POSIX com espaços no caminho — alvo entre aspas (Git Bash)', () => {
+    // Home com espaço ("C:\\Users\\Fulano Silva") é o caso normal do Git
+    // Bash — o shim deve citar o alvo inteiro, nunca quebrar no espaço.
+    const bin = path.join(tmp, 'dir com espaços', 'apiforge');
+    const shim = emitForgeShim(tmp, bin, 'linux');
+    const escaped = bin.replace(/(["\\$`])/g, '\\$1');
+    expect(readFileSync(shim, 'utf8')).toContain(`exec "${escaped}" "$@"`);
+  });
+});
+
+describe('wave-02 — offline verificável e contrato do launcher', () => {
+  it('offline preparado: ZERO rede (fetch sentinel) + sem pip download + --no-index', async () => {
+    // Metadados + wheel já em cache: a instalação inteira resolve local.
+    // O fetchImpl injetado é um sentinel — qualquer tentativa de rede
+    // registra a URL e explode. O único outro canal (subprocesso pip)
+    // fica provadamente isolado por --no-index/--find-links.
+    const wheels = wheelCacheDir(path.join(tmp, 'c'), 'apiforge-af');
+    mkdirSync(wheels, { recursive: true });
+    writeFileSync(path.join(wheels, WHEEL_NAME), 'wb');
+    const realHash = createHash('sha256').update('wb').digest('hex');
+    const pypi = structuredClone(PYPI);
+    pypi.releases['0.1.0'][0].digests.sha256 = realHash;
+    const metaDir = path.join(tmp, 'c');
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      path.join(metaDir, 'apiforge-af.json'),
+      JSON.stringify({ fetchedAt: Date.now(), payload: pypi }),
+    );
+
+    const fetches: string[] = [];
+    const fetchSentinel: FetchLike = async (url) => {
+      fetches.push(String(url));
+      throw new Error(`network attempt in offline install: ${url}`);
+    };
+    const calls: string[][] = [];
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: metaDir,
+      pythons: [py('3.12.4')],
+      offline: true,
+      run: runOk(calls),
+      fetchImpl: fetchSentinel,
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    expect(fetches).toHaveLength(0); // metadados vieram do cache, nunca da rede
+    expect(calls.some((c) => c.includes('download'))).toBe(false); // wheel já estava no cache
+    const pipArgs = calls.find((c) => c.includes('install'))!;
+    expect(pipArgs).toContain('--no-index');
+    expect(pipArgs[pipArgs.indexOf('--find-links') + 1]).toBe(wheels);
+    expect(res.provenance?.resolvedVia).toBe('offline-cache');
+    expect(existsSync(receiptPath(tmp, 'api-forge'))).toBe(true);
+  });
+
+  it('receipt.bin aponta para o launcher DENTRO da venv (regressão <FORGE>_PYTHON)', async () => {
+    // Contrato wave-01: o manifest do theforge deriva <FORGE>_PYTHON e
+    // python.executable da venv — receipt.bin fora dela quebraria o
+    // isolamento do runtime e propagaria o caminho errado ao manifest.
+    const res = await registryInstall(ENTRY, undefined, {
+      home: tmp,
+      cacheDir: path.join(tmp, 'c'),
+      pythons: [py('3.12.4')],
+      run: runOk([]),
+      fetchImpl: fetchOk,
+      platform: 'linux',
+    });
+    if ('stage' in res) throw new Error(`unexpected: ${JSON.stringify(res)}`);
+    const venv = forgeVenv(tmp, 'api-forge');
+    expect(res.venv).toBe(venv);
+    const rel = path.relative(path.join(venv, 'bin'), res.bin);
+    expect(rel).not.toBe('');
+    expect(rel.startsWith('..')).toBe(false);
+    expect(path.isAbsolute(rel)).toBe(false);
+    // o shim delega ao bin da venv — nunca ao interpretador-base
+    expect(res.shim).toBeDefined();
+    const shimBody = readFileSync(res.shim!, 'utf8');
+    expect(shimBody).toContain('exec "');
+    expect(shimBody).toContain(res.bin);
+  });
 });
