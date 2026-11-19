@@ -11,6 +11,7 @@ import {
 } from '../src/doctor2/index.js';
 import { hostAdapters } from '../src/hosts/index.js';
 import type { HostProbe } from '../src/hosts/types.js';
+import { venvBin } from '../src/registry/install.js';
 import type { ForgeRepo } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -448,7 +449,7 @@ describe('wave-02 — saúde por runtime e contrato do ledger', () => {
   ) => {
     const root = path.join(home, '.forge-cli', 'forges', name);
     const venv = path.join(root, 'venv');
-    const bin = over.bin === undefined ? path.join(venv, 'bin', 'apiforge') : over.bin;
+    const bin = over.bin === undefined ? path.join(venvBin(venv), 'apiforge') : over.bin;
     mkdirSync(venv, { recursive: true });
     if (bin) {
       mkdirSync(path.dirname(bin), { recursive: true });
@@ -505,7 +506,7 @@ describe('wave-02 — saúde por runtime e contrato do ledger', () => {
     expect(c.result).toBe('warn');
     expect(c.correctiveAction).toBeTruthy();
     expect(c.evidence.join(' ')).toContain('AUSENTE');
-    expect(c.evidence.join(' ')).toContain(path.join(venv, 'bin'));
+    expect(c.evidence.join(' ')).toContain(venvBin(venv));
   });
 
   it('receipt pypi sem campo bin → warn (escrita truncada, não saudável)', async () => {

@@ -879,6 +879,8 @@ describe('wave-02 — offline verificável e contrato do launcher', () => {
     expect(res.shim).toBeDefined();
     const shimBody = readFileSync(res.shim!, 'utf8');
     expect(shimBody).toContain('exec "');
-    expect(shimBody).toContain(res.bin);
+    // shim escapa o path (JSON-style): `\\` no corpo ↔ `\` em res.bin
+    const binEscaped = res.bin.replace(/\\/g, '\\\\');
+    expect(shimBody).toContain(binEscaped);
   });
 });
