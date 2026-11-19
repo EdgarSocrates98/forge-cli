@@ -249,4 +249,23 @@ describe('E2E gitless — ciclo de vida completo (processo real)', { timeout: 30
     expect(res.out).toContain(dir); // o remédio aponta o diretório-fonte
     expect(gitRepoOps()).toEqual([]);
   });
+
+  it('reinstall <nome> de fonte local sem --yes (não-TTY) → recusa limpa exit 0, nada reescrito', async () => {
+    const dir = path.join(ws, 'acme-forge-1.0.0');
+    makeZipLikeSource(dir, '1.0.0');
+    expect((await cli('install', dir, '--yes')).code).toBe(0);
+    const marker = path.join(dir, 'dist-marker', 'user-marker');
+    writeFileSync(marker, 'não tocar');
+    // Antes do gate o repair apagava managed_artifacts e rerodava o
+    // bootstrap direto — reescrita operacional sem plano nem --yes.
+    const res = await cli('reinstall', 'acme-forge');
+    expect(res.code, res.out).toBe(0);
+    expect(res.out).toContain('--yes');
+    expect(existsSync(marker)).toBe(true);
+    // --yes confirma e o repair segue normal.
+    const rep = await cli('reinstall', 'acme-forge', '--yes', '--json');
+    expect(rep.code, rep.out).toBe(0);
+    expect(parseJson(rep.stdout, rep).results[0].ok).toBe(true);
+    expect(gitRepoOps()).toEqual([]);
+  });
 });

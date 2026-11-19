@@ -1574,6 +1574,44 @@ export async function runRegistryReinstall(
     );
     return;
   }
+  // DESTRUCTIVE_CHANGE (docs/roadmap/THREAT_MODEL.md): reinstall regrava a
+  // venv inteira (clean: true) — nunca silencioso. Mostra o plano e exige
+  // --yes fora de TTY ou confirmação no prompt; --plan/--check já saiu acima.
+  if (!quiet) {
+    note(
+      targets.map((t) => `${t.name}==${t.receipt.version} (reinstall limpo)`).join('\n'),
+      S.registryReinstallConfirm,
+    );
+  }
+  if (!cli.yes) {
+    const needYesDoc = {
+      error: S.registryReinstallNeedsYes,
+      planned: targets.map((t) => t.name),
+      skipped,
+      warnings,
+    };
+    if (quiet) {
+      emitJson(needYesDoc, 2);
+      // exit interceptado (testes) — não escreve nada após o JSON.
+      return;
+    }
+    // Não-interativo sem --yes nunca trava em prompt — recusa limpa,
+    // mesmo contrato do uninstall registry e do fluxo git.
+    if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+      reportTo(needYesDoc);
+      log.warn(S.registryReinstallNeedsYes);
+      process.exit(0);
+      return;
+    }
+    const answer = await confirm({ message: S.registryReinstallConfirm });
+    if (isCancel(answer) || !answer) {
+      if (isCancel(answer)) exitCancelled();
+      reportTo(needYesDoc);
+      log.warn(S.registryReinstallNeedsYes);
+      process.exit(0);
+      return;
+    }
+  }
   const { pythons, refusal } = await registryPythons(cli, deps.pythons);
   if (refusal) {
     const msg = `${refusal.code}: ${refusal.cause}`;
@@ -1696,6 +1734,42 @@ export async function runRegistryRollback(
     log.error(msg);
     process.exit(1);
     return;
+  }
+  // Mesmo gate do reinstall: rollback regrava a venv inteira (clean: true)
+  // para a versão anterior — reescrita operacional exige plano explícito
+  // (--plan já saiu) + --yes fora de TTY ou confirmação no prompt.
+  if (!quiet) {
+    note(
+      actionable.map((p) => `${p.name}: ${p.receipt.version} → ${p.to}`).join('\n'),
+      S.registryRollbackConfirm,
+    );
+  }
+  if (!cli.yes) {
+    const needYesDoc = {
+      error: S.registryRollbackNeedsYes,
+      planned: actionable.map((p) => p.name),
+      skipped,
+      warnings,
+      ...(unknown.length ? { unknown } : {}),
+    };
+    if (quiet) {
+      emitJson(needYesDoc, 2);
+      return; // exit interceptado (testes) — não escreve nada após o JSON
+    }
+    if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+      reportTo(needYesDoc);
+      log.warn(S.registryRollbackNeedsYes);
+      process.exit(0);
+      return;
+    }
+    const answer = await confirm({ message: S.registryRollbackConfirm });
+    if (isCancel(answer) || !answer) {
+      if (isCancel(answer)) exitCancelled();
+      reportTo(needYesDoc);
+      log.warn(S.registryRollbackNeedsYes);
+      process.exit(0);
+      return;
+    }
   }
   const { pythons, refusal } = await registryPythons(cli, deps.pythons);
   if (refusal) {

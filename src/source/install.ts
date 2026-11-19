@@ -793,7 +793,7 @@ export async function localRepair(name: string, deps: LocalDeps): Promise<LocalO
     return fail({
       code: 'FORGE-SOURCE-INVALID',
       cause: `${name}: instalada via registry (PyPI) — o repair local não se aplica`,
-      remedy: `use \`reinstall --method registry ${name}\``,
+      remedy: `use \`reinstall --method registry ${name} --yes\``,
     });
   }
   const dir = prior.source_dir;

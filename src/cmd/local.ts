@@ -355,21 +355,40 @@ export async function runLocalLifecycleCommand(
     process.exit(0);
   }
 
-  if (op === 'uninstall' && !cli.yes) {
+  // uninstall remove artefatos gerenciados; repair os apaga e regrava via
+  // bootstrap — reescrita operacional (THREAT_MODEL: DESTRUCTIVE_CHANGE).
+  // As duas ops exigem --yes fora de TTY ou confirmação no prompt; a fonte
+  // NUNCA é apagada. --plan/--check já saiu acima sem tocar nada.
+  if (!cli.yes) {
+    const opText =
+      op === 'uninstall'
+        ? {
+            error: 'uninstall de fonte local exige --yes (remove artefatos gerenciados)',
+            refuse: 'Nada foi removido. Reexecute com --yes para confirmar.',
+            prompt: 'Remover os artefatos gerenciados (a fonte permanece)?',
+            cancel: 'Nada foi removido.',
+          }
+        : {
+            error: 'repair de fonte local exige --yes (regrava artefatos gerenciados)',
+            refuse: 'Nada foi reparado. Reexecute com --yes para confirmar.',
+            prompt: 'Regravar os artefatos gerenciados via bootstrap (a fonte permanece)?',
+            cancel: 'Nada foi reparado.',
+          };
     if (!(process.stdin.isTTY && process.stdout.isTTY)) {
-      const doc = { error: 'uninstall de fonte local exige --yes (remove artefatos gerenciados)' };
+      const doc = { error: opText.error };
       reportTo(cli, doc);
       if (quiet(cli)) emitJson(doc, 2);
-      log.warn('Nada foi removido. Reexecute com --yes para confirmar.');
+      log.warn(opText.refuse);
       process.exit(0);
+      // exit interceptado (testes/hooks) não pode seguir para o prompt.
+      return;
     }
-    const answer = await confirm({
-      message: 'Remover os artefatos gerenciados (a fonte permanece)?',
-    });
+    const answer = await confirm({ message: opText.prompt });
     if (isCancel(answer) || !answer) {
       if (isCancel(answer)) exitCancelled();
-      log.warn('Nada foi removido.');
+      log.warn(opText.cancel);
       process.exit(0);
+      return;
     }
   }
 

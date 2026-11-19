@@ -20,13 +20,14 @@ verifica os receipts — **não é uma Forja de conteúdo** e não ativa
 capacidades em workspace.
 
 Quem ativa capacidades (skills, agents, regras, MCP) dentro de um
-workspace é o **The Forge** (`theforge install plan|apply|auto`); quem
-visualiza e administra a plataforma é o **Forge Portal**. São três
-papéis distintos usados em sequência:
+workspace é o **The Forge** (`theforge setup` — onboarding guiado; ou
+`theforge install plan|apply|auto` para controle fino); quem visualiza e
+administra a plataforma é o **Forge Portal**. São três papéis distintos
+usados em sequência:
 
 ```bash
 forge-cli install the-forge --method registry   # 1. aquisição do runtime
-cd meu-workspace && theforge install apply      # 2. ativação no workspace
+cd meu-workspace && theforge setup              # 2. ativação no workspace
 ```
 
 A fronteira completa, incluindo os dois ledgers independentes
@@ -171,6 +172,9 @@ recusado antes de qualquer mutação.
   instalam por pin explícito e ficam marcadas no receipt.
 - `uninstall --method registry` remove venv + receipt com plano e
   confirmação (`--yes`); `--all`/`--only` resolvem o conjunto instalado.
+- `reinstall`/`rollback --method registry` e `reinstall <nome>` de fonte
+  local regravam a venv/artefatos gerenciados — mesma classe destrutiva:
+  plano (`--plan`) + confirmação `--yes` fora de TTY; nunca silencioso.
 
 ## Fonte local (ZIP, pasta copiada, sem `.git`)
 
@@ -205,6 +209,7 @@ forge-cli registry                            # catálogo PyPI + instaladas (--j
 forge-cli uninstall api-forge --method registry --yes  # remove venv + receipt registry
 forge-cli pin|unpin|rollback api-forge       # fixação e retorno ao HEAD anterior
 forge-cli reinstall api-forge [--clean]      # mantém a revisão; --clean reclona com backup
+forge-cli reinstall api-forge --method registry --yes  # regrava a venv (mesma versão; --yes fora de TTY)
 forge-cli uninstall api-forge [--yes]        # plano + backup de .env/configs
 forge-cli components [forjas]                # flags do instalador nativo por Forja
 forge-cli doctor [forjas] [--fix]            # diagnostica (ou repara) Forjas

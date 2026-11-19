@@ -502,7 +502,7 @@ export interface InstallConsistency {
 }
 
 const REPAIR_HINT =
-  'repare com `reinstall --method registry --clean` ou remova com `uninstall --method registry`';
+  'repare com `reinstall --method registry --clean --yes` ou remova com `uninstall --method registry`';
 
 export function installConsistency(home: string, name: string): InstallConsistency {
   const entry = loadForgeState(home).forges[name];

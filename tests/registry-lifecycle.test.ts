@@ -279,7 +279,7 @@ describe('update --method registry', () => {
 describe('reinstall --method registry', () => {
   it('reinstala a MESMA versão (drift repair) — sem history nova', async () => {
     seed('0.1.0');
-    await runRegistryReinstall(cli(), ['api-forge'], {
+    await runRegistryReinstall(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -292,7 +292,7 @@ describe('reinstall --method registry', () => {
 
   it('preserva pin através do reinstall', async () => {
     seed('0.1.0', { pinned: '0.1.0', history: [{ version: '0.0.9', installedAt: 'x' }] });
-    await runRegistryReinstall(cli(), ['api-forge'], {
+    await runRegistryReinstall(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -306,7 +306,7 @@ describe('reinstall --method registry', () => {
   it('repara drift: venv apagada mas state presente → recria', async () => {
     seed('0.1.0');
     rmSync(forgeVenv(tmp, 'api-forge'), { recursive: true });
-    await runRegistryReinstall(cli(), ['api-forge'], {
+    await runRegistryReinstall(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -314,12 +314,59 @@ describe('reinstall --method registry', () => {
     });
     expect(existsSync(forgeVenv(tmp, 'api-forge'))).toBe(true);
   });
+
+  it('não-TTY sem --yes recusa limpa (exit 0) — reinstall nunca regrava venv sem aprovação', async () => {
+    seed('0.1.0');
+    const venv = forgeVenv(tmp, 'api-forge');
+    mkdirSync(venv, { recursive: true });
+    const marker = path.join(venv, 'user-marker');
+    writeFileSync(marker, 'intocado');
+    const codes = exitCodes();
+    const writes: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
+      writes.push(chunk);
+      return true;
+    }) as never);
+    // vitest roda sem TTY — antes do gate este caminho apagava a venv
+    // direto (clean: true), sem plano nem confirmação.
+    await runRegistryReinstall(cli({}), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runOk,
+    });
+    expect(codes).toContain(0);
+    expect(writes.join('')).toContain('--yes');
+    // nada foi reescrito — a venv e o receipt seguem intocados
+    expect(existsSync(marker)).toBe(true);
+    expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.1.0');
+  });
+
+  it('--json sem --yes → erro JSON (exit 2), stdout puro', async () => {
+    seed('0.1.0');
+    const codes = exitCodes();
+    const writes: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
+      writes.push(chunk);
+      return true;
+    }) as never);
+    await runRegistryReinstall(cli({ jsonReport: true }), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runOk,
+    });
+    expect(codes).toContain(2);
+    const doc = JSON.parse(writes.join(''));
+    expect(doc.error).toContain('--yes');
+    expect(doc.planned).toEqual(['api-forge']);
+  });
 });
 
 describe('rollback --method registry', () => {
   it('desempilha a última versão e empilha a abandonada', async () => {
     seed('0.2.0', { history: [{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }] });
-    await runRegistryRollback(cli(), ['api-forge'], {
+    await runRegistryRollback(cli({ yes: true }), ['api-forge'], {
       home: tmp,
       pythons: py(),
       fetchImpl: fetchOk,
@@ -346,9 +393,31 @@ describe('rollback --method registry', () => {
   it('rollback → rollback retorna à versão original', async () => {
     seed('0.2.0', { history: [{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }] });
     const deps = { home: tmp, pythons: py(), fetchImpl: fetchOk, run: runOk };
-    await runRegistryRollback(cli(), ['api-forge'], deps);
-    await runRegistryRollback(cli(), ['api-forge'], deps);
+    await runRegistryRollback(cli({ yes: true }), ['api-forge'], deps);
+    await runRegistryRollback(cli({ yes: true }), ['api-forge'], deps);
     expect(loadForgeState(tmp).forges['api-forge'].version).toBe('0.2.0');
+  });
+
+  it('não-TTY sem --yes recusa limpa (exit 0) — rollback nunca regrava venv sem aprovação', async () => {
+    seed('0.2.0', { history: [{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }] });
+    const codes = exitCodes();
+    const writes: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
+      writes.push(chunk);
+      return true;
+    }) as never);
+    await runRegistryRollback(cli({}), ['api-forge'], {
+      home: tmp,
+      pythons: py(),
+      fetchImpl: fetchOk,
+      run: runOk,
+    });
+    expect(codes).toContain(0);
+    expect(writes.join('')).toContain('--yes');
+    // versão e history intocados — nada foi reescrito
+    const state = loadForgeState(tmp).forges['api-forge'];
+    expect(state.version).toBe('0.2.0');
+    expect(state.history).toEqual([{ version: '0.1.0', installedAt: '2026-01-01T00:00:00Z' }]);
   });
 });
 

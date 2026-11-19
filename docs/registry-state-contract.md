@@ -18,7 +18,8 @@ O `forge-cli` nunca escreve no ledger do `theforge`, e vice-versa.
 Leitores devem tratar os dois como fatos independentes e reconciliáveis:
 
 - presente só em `~/.forge-cli/forges/` → runtime instalado, nada
-  ativado em workspace (rode `theforge install plan|apply`);
+  ativado em workspace (rode `theforge setup` na raiz do workspace —
+  controle fino: `theforge install plan|apply`);
 - presente só em `~/.forge/installations/` → ativação sem runtime
   gerenciado (instale o runtime via `forge-cli install <forja>`);
 - presente nos dois → runtime + ativação — estado completo.
@@ -143,7 +144,7 @@ Sobre a mesma classificação de consistência, `forge-cli doctor`
   cobrindo `installConsistency` + `bin` presente no disco e **dentro
   da venv** (receipts `pypi`) + `shim` registrado existente + campo
   `bin` obrigatório em receipts `pypi`. Divergência sai `warn` com
-  `correctiveAction` (`reinstall --method registry --clean` /
+  `correctiveAction` (`reinstall --method registry --clean --yes` /
   `uninstall --method registry`) — nunca `pass`;
 - `installation.runtime.orphans` — qualquer entrada em
   `~/.forge-cli/forges/` que não seja `state.json`, o lifecycle lock
@@ -155,7 +156,9 @@ Sobre a mesma classificação de consistência, `forge-cli doctor`
   `python.executable` e `environment.variables.<FORGE>_PYTHON`
   (quando presentes) devem estar contidos na venv — o contrato
   wave-01 de que `<FORGE>_PYTHON` resolve o **launcher da venv**,
-  não o interpretador-base; `cli.shim` absoluto deve existir.
+  não o interpretador-base; `cli.shim` declarado deve ser absoluto e
+  existir (relativo ou ausente do disco quebra a resolução MCP, que só
+  honra shim absoluto antes do fallback `sys.executable -m <pkg>`).
 
 No verbo `install`, o mesmo portão de consistência produz
 `skipped: "already-installed"` no resultado (venv+receipt+state
