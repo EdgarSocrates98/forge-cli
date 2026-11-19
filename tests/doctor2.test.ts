@@ -434,3 +434,158 @@ describe('doctor2/context — helpers compartilhados', () => {
     expect(errMsg('plain')).toBe('plain');
   });
 });
+
+// ---------------------------------------------------------------------------
+// wave-02 — matriz de integridade por runtime (venv/receipt/bin/shim),
+// órfãos sob ~/.forge-cli/forges e contrato <FORGE>_PYTHON nos manifests
+// do ledger do theforge (~/.forge/installations/*.json).
+// ---------------------------------------------------------------------------
+describe('wave-02 — saúde por runtime e contrato do ledger', () => {
+  const seedRuntime = (
+    home: string,
+    name: string,
+    over: { bin?: string | null; shim?: string | null; installJson?: boolean } = {},
+  ) => {
+    const root = path.join(home, '.forge-cli', 'forges', name);
+    const venv = path.join(root, 'venv');
+    const bin = over.bin === undefined ? path.join(venv, 'bin', 'apiforge') : over.bin;
+    mkdirSync(venv, { recursive: true });
+    if (bin) {
+      mkdirSync(path.dirname(bin), { recursive: true });
+      writeFileSync(bin, '#!');
+    }
+    const shim =
+      over.shim === undefined ? path.join(home, '.forge-cli', 'bin', 'apiforge') : over.shim;
+    if (shim) {
+      mkdirSync(path.dirname(shim), { recursive: true });
+      writeFileSync(shim, '#!/bin/sh\n');
+    }
+    const receipt = {
+      forge: name,
+      method: 'pypi',
+      dist: 'apiforge-af',
+      version: '0.1.0',
+      python: '3.12.4',
+      source: 'latest-stable',
+      venv,
+      ...(bin ? { bin } : {}),
+      ...(shim ? { shim } : {}),
+      installedAt: NOW,
+      verify: { command: [], ok: true },
+      files: [],
+    };
+    if (over.installJson !== false) {
+      writeJson(path.join(root, 'install.json'), receipt);
+    }
+    writeJson(path.join(home, '.forge-cli', 'forges', 'state.json'), {
+      forges: { [name]: receipt },
+    });
+    return { venv, bin, shim };
+  };
+
+  it('runtime íntegro → installation.runtime.<name> passa com a matriz na evidência', async () => {
+    const dir = tmp();
+    const home = tmp();
+    seedRuntime(home, 'api-forge');
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.api-forge')!;
+    expect(c.result).toBe('pass');
+    expect(c.evidence.join(' ')).toContain('consistency=ok');
+    expect(c.evidence.join(' ')).toContain('bin=');
+    expect(c.evidence.join(' ')).toContain('shim=');
+  });
+
+  it('launcher registrado ausente do disco → warn acionável (nunca saúde fabricada)', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const { venv, bin } = seedRuntime(home, 'api-forge');
+    rmSync(bin!); // receipt declara, disco não tem — a divergência é o finding
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.api-forge')!;
+    expect(c.result).toBe('warn');
+    expect(c.correctiveAction).toBeTruthy();
+    expect(c.evidence.join(' ')).toContain('AUSENTE');
+    expect(c.evidence.join(' ')).toContain(path.join(venv, 'bin'));
+  });
+
+  it('receipt pypi sem campo bin → warn (escrita truncada, não saudável)', async () => {
+    const dir = tmp();
+    const home = tmp();
+    seedRuntime(home, 'api-forge', { bin: null });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.api-forge')!;
+    expect(c.result).toBe('warn');
+    expect(c.evidence.join(' ')).toContain('bin=não registrado no receipt');
+  });
+
+  it('bin fora da venv → warn: contrato do launcher violado', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const outside = path.join(home, 'usr-bin', 'apiforge');
+    seedRuntime(home, 'api-forge', { bin: outside });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.api-forge')!;
+    expect(c.result).toBe('warn');
+    expect(c.diagnosis + c.evidence.join(' ')).toContain('fora da venv');
+  });
+
+  it('diretório órfão em forges/ → installation.runtime.orphans warn', async () => {
+    const dir = tmp();
+    const home = tmp();
+    seedRuntime(home, 'api-forge');
+    mkdirSync(path.join(home, '.forge-cli', 'forges', 'resto-de-crash'), { recursive: true });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.runtime.orphans')!;
+    expect(c.result).toBe('warn');
+    expect(c.evidence.join(' ')).toContain('resto-de-crash');
+  });
+
+  it('manifest com python.executable dentro da venv → ledger check passa', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const venv = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv');
+    writeJson(path.join(home, '.forge', 'installations', 'api-forge.json'), {
+      schema: 'forge/InstallationManifest/v1',
+      forge_id: 'api-forge',
+      venv,
+      python: { executable: path.join(venv, 'bin', 'python'), version: '3.12.4' },
+      environment: { variables: { API_FORGE_PYTHON: path.join(venv, 'bin', 'python') } },
+    });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.ledger.api-forge')!;
+    expect(c.result).toBe('pass');
+    expect(c.evidence.join(' ')).toContain('API_FORGE_PYTHON');
+  });
+
+  it('python.executable/<FORGE>_PYTHON fora da venv → warn (regressão do contrato)', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const venv = path.join(home, '.forge-cli', 'forges', 'api-forge', 'venv');
+    writeJson(path.join(home, '.forge', 'installations', 'api-forge.json'), {
+      schema: 'forge/InstallationManifest/v1',
+      forge_id: 'api-forge',
+      venv,
+      // interpretador-base resolvido — o bug que o guard deve pegar
+      python: { executable: '/usr/bin/python3', version: '3.12.4' },
+      environment: { variables: { API_FORGE_PYTHON: '/usr/bin/python3' } },
+    });
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.ledger.api-forge')!;
+    expect(c.result).toBe('warn');
+    const text = c.diagnosis + c.evidence.join(' ');
+    expect(text).toContain('fora da venv');
+    expect(text).toContain('API_FORGE_PYTHON');
+    expect(c.correctiveAction).toBeTruthy();
+  });
+
+  it('manifest corrompido → warn, nunca crash', async () => {
+    const dir = tmp();
+    const home = tmp();
+    const dir2 = path.join(home, '.forge', 'installations');
+    mkdirSync(dir2, { recursive: true });
+    writeFileSync(path.join(dir2, 'quebrado.json'), '{não-json');
+    const report = await runDoctor2(dir, baseOpts(dir, home));
+    const c = find(report, 'installation.ledger.quebrado')!;
+    expect(c.result).toBe('warn');
+  });
+});
